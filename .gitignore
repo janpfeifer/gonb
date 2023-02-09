@@ -1,3 +1,13 @@
+# GoLand configuration.
+.idea
+
+# Ignore Go workspace, this is particular to the developers machine.
+go.work
+
+# Spurious test notebook files and temporary checkpoints.
+.ipynb_checkpoints/
+Untitled*.ipynb
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -12,4 +22,4 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/

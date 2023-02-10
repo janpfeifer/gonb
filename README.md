@@ -18,8 +18,10 @@ fixes are very welcome.
 **gonb** opens a named pipe (set in environment variable gonb_PIPE) that a program can use to directly
 display any type of HTML content. 
 
-For the most cases, one can simply import [`github.com/janpfeifer/gonb/gonbui`](https://github.com/janpfeifer/gonb/gonbui):
-the library offers and convenient API to everything available.
+For the most cases, one can simply import 
+[`github.com/janpfeifer/gonb/gonbui`](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui):
+the library offers and convenient API to everything available. Examples of use in the
+[tutorial](examples/tutorial.ipynb). 
 
 If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol
 details.

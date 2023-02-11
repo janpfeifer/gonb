@@ -65,10 +65,10 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
 {{if .HasContext}}
-<span class="gonb-error-location">{{.Location}}</span> {{.MessageImpl}}
+<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
 <div class="gonb-error-context">{{.Context}}</div>
 {{else}}
-<pre>{{.MessageImpl}}</pre>
+<pre>{{.Message}}</pre>
 {{end}}
 <br/>
 {{end}}
@@ -143,33 +143,33 @@ func inBetween[T constraints.Ordered](x, from, to T) T {
 func (s *State) parseErrorLine(lineStr string, codeLines []string) (l errorLine) {
 	l.HasContext = false
 	matches := reFileLinePrefix.FindStringSubmatch(lineStr)
-	log.Printf("Matches: %q", matches)
 	if len(codeLines) == 0 || len(matches) != 5 {
 		l.HasContext = false
 		l.Message = lineStr
-	} else {
-		l.HasContext = true
-		l.Message = matches[4]
-		l.Location = matches[1]
-
-		lineNum, _ := strconv.Atoi(matches[2])
-		lineNum -= 1 // Error messages start at line 1 (as opposed to 0)
-		//colNum, _ := strconv.Atoi(matches[3])
-		fromLines := lineNum - LinesForErrorContext
-		fromLines = inBetween(fromLines, 0, len(codeLines)-1)
-		toLines := lineNum + LinesForErrorContext
-		toLines = inBetween(toLines, 0, len(codeLines))
-
-		parts := make([]string, 0, toLines-fromLines)
-		for ii := fromLines; ii < toLines; ii++ {
-			part := html.EscapeString(codeLines[ii]) + "\n"
-			if ii == lineNum {
-				part = fmt.Sprintf(`<div class="gonb-error-line">%s</div>`, part)
-			}
-			parts = append(parts, part)
-		}
-		l.Context = strings.Join(parts, "")
+		return
 	}
+
+	l.HasContext = true
+	l.Message = matches[4]
+	l.Location = matches[1]
+
+	lineNum, _ := strconv.Atoi(matches[2])
+	lineNum -= 1 // Error messages start at line 1 (as opposed to 0)
+	//colNum, _ := strconv.Atoi(matches[3])
+	fromLines := lineNum - LinesForErrorContext
+	fromLines = inBetween(fromLines, 0, len(codeLines)-1)
+	toLines := lineNum + LinesForErrorContext
+	toLines = inBetween(toLines, 0, len(codeLines))
+
+	parts := make([]string, 0, toLines-fromLines)
+	for ii := fromLines; ii < toLines; ii++ {
+		part := html.EscapeString(codeLines[ii]) + "\n"
+		if ii == lineNum {
+			part = fmt.Sprintf(`<div class="gonb-error-line">%s</div>`, part)
+		}
+		parts = append(parts, part)
+	}
+	l.Context = strings.Join(parts, "")
 	return
 }
 

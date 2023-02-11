@@ -17,13 +17,16 @@ import (
 	"strings"
 )
 
-// This file implements functions related to the parsing of the Go code. It's required,
-// so we can properly merge code coming from the execution of different cells.
+// This file implements functions related to the parsing of the Go code.
+// It is used to properly merge code coming from the execution of different cells.
 
-// extractContent from files, given the golang parser's tokens.
+// extractContentOfNode from files, given the golang parser's tokens.
+//
+// Currently, we generate all the content in file `main.go`, so fileContents will only have
+// one entry.
 //
 // This is used to get the exact definition (string) of an element (function, variable, const, import, type, etc.)
-func extractContent(filesContents map[string]string, fileSet *token.FileSet, node ast.Node) string {
+func extractContentOfNode(filesContents map[string]string, fileSet *token.FileSet, node ast.Node) string {
 	f := fileSet.File(node.Pos())
 	from, to := f.Offset(node.Pos()), f.Offset(node.End())
 	contents, found := filesContents[f.Name()]
@@ -55,7 +58,8 @@ func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations)
 			continue
 		}
 		for _, fileObj := range pkgAst.Files {
-			fmt.Printf("File: %q\n", fileObj.Name.Name)
+			// Currently, there is only `main.go` file.
+			//fmt.Printf("File: %q\n", fileObj.Name.Name)
 			filePath := path.Join(s.TempDir, fileObj.Name.Name) + ".go"
 			content, err := os.ReadFile(filePath)
 			if err != nil {
@@ -83,7 +87,7 @@ func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations)
 					if typedDecl.Recv != nil && len(typedDecl.Recv.List) > 0 {
 						key = fmt.Sprintf("%s~%s", typedDecl.Recv.List[0].Type.(*ast.Ident).Name, key)
 					}
-					f := &Function{Key: key, Definition: extractContent(filesContents, fileSet, typedDecl)}
+					f := &Function{Key: key, Definition: extractContentOfNode(filesContents, fileSet, typedDecl)}
 					decls.Functions[f.Key] = f
 				case *ast.GenDecl:
 					if typedDecl.Tok == token.IMPORT {
@@ -100,14 +104,14 @@ func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations)
 							vType := vSpec.Type
 							var typeDefinition string
 							if vType != nil {
-								typeDefinition = extractContent(filesContents, fileSet, vType)
+								typeDefinition = extractContentOfNode(filesContents, fileSet, vType)
 							}
 							_ = vType
 							for nameIdx, name := range vSpec.Names {
 								// Incorporate variable.
 								var valueDefinition string
 								if len(vSpec.Values) > nameIdx {
-									valueDefinition = extractContent(filesContents, fileSet, vSpec.Values[nameIdx])
+									valueDefinition = extractContentOfNode(filesContents, fileSet, vSpec.Values[nameIdx])
 								}
 								if isVar {
 									v := &Variable{Name: name.Name, TypeDefinition: typeDefinition, ValueDefinition: valueDefinition}
@@ -133,7 +137,7 @@ func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations)
 						for _, spec := range typedDecl.Specs {
 							tSpec := spec.(*ast.TypeSpec)
 							name := tSpec.Name.Name
-							tDef := extractContent(filesContents, fileSet, tSpec.Type)
+							tDef := extractContentOfNode(filesContents, fileSet, tSpec.Type)
 							decls.Types[name] = &TypeDecl{Key: name, TypeDefinition: tDef}
 						}
 					} else {
@@ -148,6 +152,7 @@ func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations)
 	return nil
 }
 
+// RenderImports writes out `import ( ... )` for all imports in Declarations.
 func (d *Declarations) RenderImports(writer io.Writer) (err error) {
 	// Enumerate imports sorted by keys.
 	keys := make([]string, 0, len(d.Imports))
@@ -177,6 +182,7 @@ func (d *Declarations) RenderImports(writer io.Writer) (err error) {
 	return
 }
 
+// RenderVariables writes out `var ( ... )` for all variables in Declarations.
 func (d *Declarations) RenderVariables(writer io.Writer) (err error) {
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Variables))
@@ -206,7 +212,7 @@ func (d *Declarations) RenderVariables(writer io.Writer) (err error) {
 	return
 }
 
-// RenderFunctions without comments.
+// RenderFunctions without comments, for all functions in Declarations.
 func (d *Declarations) RenderFunctions(writer io.Writer) (err error) {
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Functions))
@@ -258,7 +264,7 @@ func (d *Declarations) RenderTypes(writer io.Writer) (err error) {
 	return
 }
 
-// RenderConstants without comments.
+// RenderConstants without comments for all constants in Declarations.
 //
 // Constants are trickier to render because when they are defined in a block,
 // using `iota`, their ordering matters. So we re-render them in the same order

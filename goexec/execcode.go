@@ -23,7 +23,7 @@ var autoLine = PosInJupyter{Line: -1}
 // compiles and runs it.
 func (s *State) ExecuteCell(msg *kernel.Message, lines []string, skipLines map[int]bool) error {
 	// Find declarations on unchanged cell contents.
-	linesPos, err := s.createMainFromLines(lines, skipLines)
+	linesPos, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
@@ -137,9 +137,9 @@ can install it from the notebook with:
 	return nil
 }
 
-func (s *State) createMain(lines <-chan string) (err error) {
+func (s *State) createGoFileFromChan(filePath string, lines <-chan string) (err error) {
 	var f *os.File
-	f, err = os.Create(s.MainPath())
+	f, err = os.Create(filePath)
 	if err != nil {
 		return errors.Wrapf(err, "creating main.go")
 	}
@@ -162,8 +162,8 @@ func (s *State) createMain(lines <-chan string) (err error) {
 	return err
 }
 
-// createMainFromLines implements CreateMainGo with no extra functionality (like auto-import).
-func (s *State) createMainFromLines(lines []string, skipLines map[int]bool) (linesPos []PosInJupyter, err error) {
+// createGoFileFromLines implements CreateMainGo with no extra functionality (like auto-import).
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]bool) (linesPos []PosInJupyter, err error) {
 	linesChan := make(chan string, 1)
 
 	go func() {
@@ -207,7 +207,7 @@ func (s *State) createMainFromLines(lines []string, skipLines map[int]bool) (lin
 	}()
 
 	// Pipe linesChan to main.go file.
-	err = s.createMain(linesChan)
+	err = s.createGoFileFromChan(filePath, linesChan)
 
 	// Check for any error only at the end.
 	if err != nil {

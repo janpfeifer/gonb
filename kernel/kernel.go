@@ -8,6 +8,9 @@ package kernel
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
@@ -343,4 +346,108 @@ func bindSockets(connInfo connectionInfo) (sg *SocketGroup, err error) {
 		}
 	}
 	return
+}
+
+// FromWireMsg translates a multipart ZMQ messages received from a socket into
+// a ComposedMsg struct and a slice of return identities. This includes verifying the
+// message signature.
+func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) *Message {
+	parts := zmqMsg.Frames
+	signKey := k.sockets.Key
+	m := &Message{Kernel: k}
+
+	i := 0
+	for string(parts[i]) != "<IDS|MSG>" {
+		i++
+	}
+	m.Identities = parts[:i]
+
+	// Validate signature.
+	if len(signKey) != 0 {
+		mac := hmac.New(sha256.New, signKey)
+		for _, part := range parts[i+2 : i+6] {
+			mac.Write(part)
+		}
+		signature := make([]byte, hex.DecodedLen(len(parts[i+1])))
+		_, err := hex.Decode(signature, parts[i+1])
+		if err != nil {
+			m.err = errors.WithMessagef(&InvalidSignatureError{}, "while decoding received message")
+			return m
+		}
+		if !hmac.Equal(mac.Sum(nil), signature) {
+			m.err = errors.WithMessagef(&InvalidSignatureError{}, "invalid signature of received message, doesn't match secret key used during initialization")
+			return m
+		}
+	}
+
+	// Unmarshal contents.
+	var err error
+	err = json.Unmarshal(parts[i+2], &m.Composed.Header)
+	if err != nil {
+		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Header")
+		return m
+	}
+	err = json.Unmarshal(parts[i+3], &m.Composed.ParentHeader)
+	if err != nil {
+		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.ParentHeader")
+		return m
+	}
+	err = json.Unmarshal(parts[i+4], &m.Composed.Metadata)
+	if err != nil {
+		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Metadata")
+		return m
+	}
+	err = json.Unmarshal(parts[i+5], &m.Composed.Content)
+	if err != nil {
+		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Content")
+		return m
+	}
+	return m
+}
+
+// ToWireMsg translates a ComposedMsg into a multipart ZMQ message ready to send, and
+// signs it. This does not add the return identities or the delimiter.
+func (k *Kernel) ToWireMsg(c *ComposedMsg) ([][]byte, error) {
+	signKey := k.sockets.Key
+	parts := make([][]byte, 5)
+
+	header, err := json.Marshal(c.Header)
+	if err != nil {
+		return parts, err
+	}
+	parts[1] = header
+
+	parentHeader, err := json.Marshal(c.ParentHeader)
+	if err != nil {
+		return parts, err
+	}
+	parts[2] = parentHeader
+
+	if c.Metadata == nil {
+		c.Metadata = make(map[string]interface{})
+	}
+
+	metadata, err := json.Marshal(c.Metadata)
+	if err != nil {
+		return parts, err
+	}
+	parts[3] = metadata
+
+	content, err := json.Marshal(c.Content)
+	if err != nil {
+		return parts, err
+	}
+	parts[4] = content
+
+	// Sign the message.
+	if len(signKey) != 0 {
+		mac := hmac.New(sha256.New, signKey)
+		for _, part := range parts[1:] {
+			mac.Write(part)
+		}
+		parts[0] = make([]byte, hex.EncodedLen(mac.Size()))
+		hex.Encode(parts[0], mac.Sum(nil))
+	}
+
+	return parts, nil
 }

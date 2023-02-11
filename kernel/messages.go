@@ -1,14 +1,12 @@
 package kernel
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
+	"fmt"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"io"
 	"log"
+	"runtime"
 	"time"
 
 	"github.com/go-zeromq/zmq4"
@@ -100,6 +98,39 @@ func (e *InvalidSignatureError) Error() string {
 	return "message had an invalid signature"
 }
 
+type MessageIf interface {
+	// Error returns the error receiving the message, or nil if no error.
+	Error() error
+
+	// Ok returns whether there were no errors receiving the message.
+	Ok() bool
+
+	// Publish creates a new ComposedMsg and sends it back to the return identities over the
+	// IOPub channel.
+	Publish(msgType string, content interface{}) error
+
+	// PromptInput sends a request for input from the front-end. The text in prompt is shown
+	// to the user, and password indicates whether the input is a password (input shouldn't
+	// be echoed in terminal).
+	//
+	// onInputFn is the callback function. It receives the original shell execute
+	// message (m) and the message with the incoming input value.
+	PromptInput(prompt string, password bool, onInput OnInputFn) error
+
+	// CancelInput will cancel any `input_request` message sent by PromptInput.
+	CancelInput() error
+
+	// DeliverInput should be called if a message is received in Stdin channel. It will
+	// check if there is any running process listening to it, in which case it is forwarded
+	// (usually to the caller of PromptInput).
+	// Still the dispatcher has to handle its delivery by calling this function.
+	DeliverInput() error
+
+	// Reply creates a new ComposedMsg and sends it back to the return identities over the
+	// Shell channel.
+	Reply(msgType string, content interface{}) error
+}
+
 // Message represents a received message or an Error, with its return identities, and
 // a reference to the kernel for communication.
 type Message struct {
@@ -117,116 +148,6 @@ func (m *Message) Error() error { return m.err }
 
 // Ok returns whether there were no errors receiving the message.
 func (m *Message) Ok() bool { return m.err == nil }
-
-// FromWireMsg translates a multipart ZMQ messages received from a socket into
-// a ComposedMsg struct and a slice of return identities. This includes verifying the
-// message signature.
-func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) *Message {
-	parts := zmqMsg.Frames
-	signKey := k.sockets.Key
-	m := &Message{Kernel: k}
-
-	i := 0
-	for string(parts[i]) != "<IDS|MSG>" {
-		i++
-	}
-	m.Identities = parts[:i]
-
-	// Validate signature.
-	if len(signKey) != 0 {
-		mac := hmac.New(sha256.New, signKey)
-		for _, part := range parts[i+2 : i+6] {
-			mac.Write(part)
-		}
-		signature := make([]byte, hex.DecodedLen(len(parts[i+1])))
-		_, err := hex.Decode(signature, parts[i+1])
-		if err != nil {
-			m.err = errors.WithMessagef(&InvalidSignatureError{}, "while decoding received message")
-			return m
-		}
-		if !hmac.Equal(mac.Sum(nil), signature) {
-			m.err = errors.WithMessagef(&InvalidSignatureError{}, "invalid signature of received message, doesn't match secret key used during initialization")
-			return m
-		}
-	}
-
-	// Unmarshal contents.
-	var err error
-	err = json.Unmarshal(parts[i+2], &m.Composed.Header)
-	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Header")
-		return m
-	}
-	err = json.Unmarshal(parts[i+3], &m.Composed.ParentHeader)
-	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.ParentHeader")
-		return m
-	}
-	err = json.Unmarshal(parts[i+4], &m.Composed.Metadata)
-	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Metadata")
-		return m
-	}
-	err = json.Unmarshal(parts[i+5], &m.Composed.Content)
-	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Content")
-		return m
-	}
-	return m
-}
-
-// ToWireMsg translates a ComposedMsg into a multipart ZMQ message ready to send, and
-// signs it. This does not add the return identities or the delimiter.
-func (k *Kernel) ToWireMsg(c *ComposedMsg) ([][]byte, error) {
-	signKey := k.sockets.Key
-	parts := make([][]byte, 5)
-
-	header, err := json.Marshal(c.Header)
-	if err != nil {
-		return parts, err
-	}
-	parts[1] = header
-
-	parentHeader, err := json.Marshal(c.ParentHeader)
-	if err != nil {
-		return parts, err
-	}
-	parts[2] = parentHeader
-
-	if c.Metadata == nil {
-		c.Metadata = make(map[string]interface{})
-	}
-
-	metadata, err := json.Marshal(c.Metadata)
-	if err != nil {
-		return parts, err
-	}
-	parts[3] = metadata
-
-	content, err := json.Marshal(c.Content)
-	if err != nil {
-		return parts, err
-	}
-	parts[4] = content
-
-	// Sign the message.
-	if len(signKey) != 0 {
-		mac := hmac.New(sha256.New, signKey)
-		for _, part := range parts[1:] {
-			mac.Write(part)
-		}
-		parts[0] = make([]byte, hex.EncodedLen(mac.Size()))
-		hex.Encode(parts[0], mac.Sum(nil))
-	}
-
-	return parts, nil
-}
-
-func (m *Message) SendShellResponse(msg *ComposedMsg) error {
-	return m.Kernel.sockets.ShellSocket.RunLocked(func(socket zmq4.Socket) error {
-		return m.sendMessage(socket, msg)
-	})
-}
 
 // sendMessage sends a message to jupyter (response or request). Used original received
 // message for identification.
@@ -355,33 +276,6 @@ func (m *Message) Reply(msgType string, content interface{}) error {
 	})
 }
 
-// PublishKernelStatus publishes a status message notifying front-ends of the state the kernel
-// is in. It supports the states "starting", "busy", and "idle".
-func (m *Message) PublishKernelStatus(status string) error {
-	log.Printf("PublishKernelStatus()")
-	return m.Publish("status",
-		struct {
-			ExecutionState string `json:"execution_state"`
-		}{
-			ExecutionState: status,
-		},
-	)
-}
-
-// PublishExecutionInput publishes a status message notifying front-ends of what code is
-// currently being executed.
-func (m *Message) PublishExecutionInput(execCount int, code string) error {
-	return m.Publish("execute_input",
-		struct {
-			ExecCount int    `json:"execution_count"`
-			Code      string `json:"code"`
-		}{
-			ExecCount: execCount,
-			Code:      code,
-		},
-	)
-}
-
 func EnsureMIMEMap(bundle MIMEMap) MIMEMap {
 	if bundle == nil {
 		bundle = make(MIMEMap)
@@ -501,4 +395,51 @@ func (w *jupyterStreamWriter) Write(p []byte) (int, error) {
 		return 0, errors.WithMessagef(err, "failed to stream %d bytes of data to stream %q", n, w.stream)
 	}
 	return n, nil
+}
+
+// PublishKernelStatus publishes a status message notifying front-ends of the state the kernel
+// is in. It supports the states "starting", "busy", and "idle".
+func PublishKernelStatus(msg MessageIf, status string) error {
+	return msg.Publish("status",
+		struct {
+			ExecutionState string `json:"execution_state"`
+		}{
+			ExecutionState: status,
+		},
+	)
+}
+
+// SendKernelInfo sends a kernel_info_reply message.
+func SendKernelInfo(msg MessageIf, version string) error {
+	return msg.Reply("kernel_info_reply",
+		KernelInfo{
+			ProtocolVersion:       ProtocolVersion,
+			Implementation:        "gonb",
+			ImplementationVersion: version,
+			Banner:                fmt.Sprintf("Go kernel: gonb - v%s", version),
+			LanguageInfo: KernelLanguageInfo{
+				Name:          "go",
+				Version:       runtime.Version(),
+				FileExtension: ".go",
+			},
+			HelpLinks: []HelpLink{
+				{Text: "Go", URL: "https://golang.org/"},
+				{Text: "gonb", URL: "https://github.com/janpfeifer/gonb"},
+			},
+		},
+	)
+}
+
+// PublishExecutionInput publishes a status message notifying front-ends of what code is
+// currently being executed.
+func PublishExecutionInput(msg MessageIf, execCount int, code string) error {
+	return msg.Publish("execute_input",
+		struct {
+			ExecCount int    `json:"execution_count"`
+			Code      string `json:"code"`
+		}{
+			ExecCount: execCount,
+			Code:      code,
+		},
+	)
 }

@@ -5,12 +5,12 @@ package dispatcher
 import (
 	"fmt"
 	"github.com/janpfeifer/gonb/goexec"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/janpfeifer/gonb/specialcmd"
 	"github.com/pkg/errors"
 	"io"
 	"log"
-	"runtime"
 	"strings"
 	"sync"
 )
@@ -71,14 +71,14 @@ func handleMsg(msg *kernel.Message, goExec *goexec.State) (err error) {
 
 	// Tell the front-end that the kernel is working and when finished notify the
 	// front-end that the kernel is idle again.
-	if err = msg.PublishKernelStatus(kernel.StatusBusy); err != nil {
+	if err = kernel.PublishKernelStatus(msg, kernel.StatusBusy); err != nil {
 		err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
 		return
 	}
 
 	// Defer publishing of status idle again, before returning.
 	defer func() {
-		newErr := msg.PublishKernelStatus(kernel.StatusIdle)
+		newErr := kernel.PublishKernelStatus(msg, kernel.StatusIdle)
 		if err == nil && newErr != nil {
 			err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
 		}
@@ -86,7 +86,7 @@ func handleMsg(msg *kernel.Message, goExec *goexec.State) (err error) {
 
 	switch msg.Composed.Header.MsgType {
 	case "kernel_info_request":
-		if err = sendKernelInfo(msg); err != nil {
+		if err = kernel.SendKernelInfo(msg, Version); err != nil {
 			err = errors.WithMessagef(err, "replying to 'kernel_info_request'")
 		}
 	case "shutdown_request":
@@ -112,27 +112,6 @@ func handleMsg(msg *kernel.Message, goExec *goexec.State) (err error) {
 		log.Printf("unhandled shell message %q", msg.Composed.Header.MsgType)
 	}
 	return
-}
-
-// sendKernelInfo sends a kernel_info_reply message.
-func sendKernelInfo(msg *kernel.Message) error {
-	return msg.Reply("kernel_info_reply",
-		kernel.KernelInfo{
-			ProtocolVersion:       kernel.ProtocolVersion,
-			Implementation:        "gonb",
-			ImplementationVersion: Version,
-			Banner:                fmt.Sprintf("Go kernel: gonb - v%s", Version),
-			LanguageInfo: kernel.KernelLanguageInfo{
-				Name:          "go",
-				Version:       runtime.Version(),
-				FileExtension: ".go",
-			},
-			HelpLinks: []kernel.HelpLink{
-				{Text: "Go", URL: "https://golang.org/"},
-				{Text: "gonb", URL: "https://github.com/janpfeifer/gonb"},
-			},
-		},
-	)
 }
 
 // handleShutdownRequest sends a "shutdown" message.
@@ -173,14 +152,15 @@ func handleInspectRequest(msg *kernel.Message, goExec *goexec.State) error {
 	_ = cursorPos
 	_ = detailLevel
 
-	//replyContent := fmt.Sprintf("<div>Cursor at %f<br/>\n<pre>%s</pre></div>", cursorPos, code)
+	log.Printf("inspect_request: cursorPos=%f, detailLevel=%f", cursorPos, detailLevel)
+	replyContent := fmt.Sprintf("<div>Cursor at %f<br/>\n<pre>%s</pre></div>", cursorPos, code)
 	reply := &kernel.InspectReply{
 		Status:   "ok",
 		Found:    false,
 		Data:     make(kernel.MIMEMap),
 		Metadata: make(kernel.MIMEMap),
 	}
-	//reply.Data[string(protocol.MIMETextHTML)] = replyContent
+	reply.Data[string(protocol.MIMETextHTML)] = replyContent
 	return msg.Reply("inspect_reply", reply)
 }
 
@@ -226,7 +206,7 @@ func handleExecuteRequest(msg *kernel.Message, goExec *goexec.State) error {
 
 	// Tell the front-end what the kernel is about to execute.
 	if !msg.Silent {
-		if err := msg.PublishExecutionInput(msg.Kernel.ExecCounter, code); err != nil {
+		if err := kernel.PublishExecutionInput(msg, msg.Kernel.ExecCounter, code); err != nil {
 			return errors.WithMessagef(err, "publishing execution input")
 		}
 	}

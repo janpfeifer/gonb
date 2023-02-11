@@ -14,7 +14,7 @@ import (
 
 // PollDisplayRequests will continuously read for incoming requests for displaying content on the notebook.
 // It expects pipeIn to be closed when the polling is to stop.
-func (m *Message) PollDisplayRequests(pipeReader *os.File) {
+func PollDisplayRequests(msg Message, pipeReader *os.File) {
 	decoder := gob.NewDecoder(pipeReader)
 	for {
 		data := &protocol.DisplayData{}
@@ -25,7 +25,7 @@ func (m *Message) PollDisplayRequests(pipeReader *os.File) {
 			log.Printf("Failed to read from named pipe, stopped polling for new data content: %+v", err)
 			return
 		}
-		m.processDisplayData(data)
+		processDisplayData(msg, data)
 	}
 }
 
@@ -47,7 +47,7 @@ func logDisplayData(data MIMEMap) {
 }
 
 // processDisplayData process an incoming `protocol.DisplayData` object.
-func (m *Message) processDisplayData(data *protocol.DisplayData) {
+func processDisplayData(msg Message, data *protocol.DisplayData) {
 	// Log info about what is being displayed.
 	msgData := Data{
 		Data:      make(MIMEMap, len(data.Data)),
@@ -64,7 +64,7 @@ func (m *Message) processDisplayData(data *protocol.DisplayData) {
 	if data.DisplayID != "" {
 		msgData.Transient["display_id"] = data.DisplayID
 	}
-	err := m.PublishDisplayData(msgData)
+	err := PublishDisplayData(msg, msgData)
 	if err != nil {
 		log.Printf("Failed to display data (ignoring): %v", err)
 	}

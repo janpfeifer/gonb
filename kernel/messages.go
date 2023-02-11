@@ -81,7 +81,7 @@ type CompleteReply struct {
 	Metadata    MIMEMap  `json:"metadata"`
 }
 
-// InspectReply message sent in reply to a "inspect_request": used for introspection on the
+// InspectReply message sent in reply to an "inspect_request": used for introspection on the
 // code under a certain position of the cursor.
 type InspectReply struct {
 	Status   string  `json:"status"`
@@ -98,12 +98,18 @@ func (e *InvalidSignatureError) Error() string {
 	return "message had an invalid signature"
 }
 
-type MessageIf interface {
+type Message interface {
 	// Error returns the error receiving the message, or nil if no error.
 	Error() error
 
 	// Ok returns whether there were no errors receiving the message.
 	Ok() bool
+
+	// ComposedMsg that started the current Message -- it's contained by Message.
+	ComposedMsg() ComposedMsg
+
+	// Kernel returns reference to the Kernel connections from where this Message was created.
+	Kernel() *Kernel
 
 	// Publish creates a new ComposedMsg and sends it back to the return identities over the
 	// IOPub channel.
@@ -131,29 +137,32 @@ type MessageIf interface {
 	Reply(msgType string, content interface{}) error
 }
 
-// Message represents a received message or an Error, with its return identities, and
+// MessageImpl represents a received message or an Error, with its return identities, and
 // a reference to the kernel for communication.
-type Message struct {
+type MessageImpl struct {
 	err        error
 	Composed   ComposedMsg
 	Identities [][]byte
-	Kernel     *Kernel
-
-	// Special Message requests.
-	Silent, StoreHistory bool // From "execute_request" message.
+	kernel     *Kernel
 }
 
 // Error returns the error receiving the message, or nil if no error.
-func (m *Message) Error() error { return m.err }
+func (m *MessageImpl) Error() error { return m.err }
 
 // Ok returns whether there were no errors receiving the message.
-func (m *Message) Ok() bool { return m.err == nil }
+func (m *MessageImpl) Ok() bool { return m.err == nil }
+
+// ComposedMsg that started the current Message -- it's contained by Message.
+func (m *MessageImpl) ComposedMsg() ComposedMsg { return m.Composed }
+
+// Kernel returns reference to the Kernel connections from where this Message was created.
+func (m *MessageImpl) Kernel() *Kernel { return m.kernel }
 
 // sendMessage sends a message to jupyter (response or request). Used original received
 // message for identification.
-func (m *Message) sendMessage(socket zmq4.Socket, msg *ComposedMsg) error {
+func (m *MessageImpl) sendMessage(socket zmq4.Socket, msg *ComposedMsg) error {
 
-	msgParts, err := m.Kernel.ToWireMsg(msg)
+	msgParts, err := m.kernel.ToWireMsg(msg)
 	if err != nil {
 		return err
 	}
@@ -194,20 +203,20 @@ func NewComposed(msgType string, parent ComposedMsg) (*ComposedMsg, error) {
 
 // Publish creates a new ComposedMsg and sends it back to the return identities over the
 // IOPub channel.
-func (m *Message) Publish(msgType string, content interface{}) error {
+func (m *MessageImpl) Publish(msgType string, content interface{}) error {
 	msg, err := NewComposed(msgType, m.Composed)
 	if err != nil {
 		return err
 	}
 	msg.Content = content
-	return m.Kernel.sockets.IOPubSocket.RunLocked(func(socket zmq4.Socket) error {
+	return m.kernel.sockets.IOPubSocket.RunLocked(func(socket zmq4.Socket) error {
 		return m.sendMessage(socket, msg)
 	})
 }
 
 // OnInputFn is the callback function. It receives the original shell execute
 // message and the message with the incoming input value.
-type OnInputFn func(original, input *Message) error
+type OnInputFn func(original, input *MessageImpl) error
 
 // PromptInput sends a request for input from the front-end. The text in prompt is shown
 // to the user, and password indicates whether the input is a password (input shouldn't
@@ -215,35 +224,35 @@ type OnInputFn func(original, input *Message) error
 //
 // onInputFn is the callback function. It receives the original shell execute
 // message (m) and the message with the incoming input value.
-func (m *Message) PromptInput(prompt string, password bool, onInput OnInputFn) error {
-	log.Printf("Message.PromptInput(%q, %v)", prompt, password)
+func (m *MessageImpl) PromptInput(prompt string, password bool, onInput OnInputFn) error {
+	log.Printf("MessageImpl.PromptInput(%q, %v)", prompt, password)
 	inputRequest, err := NewComposed("input_request", m.Composed)
 	if err != nil {
-		return errors.WithMessagef(err, "Message.PromptInput(): creating an input_request message")
+		return errors.WithMessagef(err, "MessageImpl.PromptInput(): creating an input_request message")
 	}
 	inputRequest.Content = map[string]any{
 		"prompt":   prompt,
 		"password": password,
 	}
 	log.Printf("Stdin(%v) input request", inputRequest.Content)
-	err = m.Kernel.sockets.StdinSocket.RunLocked(
+	err = m.kernel.sockets.StdinSocket.RunLocked(
 		func(socket zmq4.Socket) error {
 			return m.sendMessage(socket, inputRequest)
 		})
 	if err != nil {
-		return errors.WithMessagef(err, "Message.PromptInput(): sending input_request message")
+		return errors.WithMessagef(err, "MessageImpl.PromptInput(): sending input_request message")
 	}
 
 	// Register callback.
-	m.Kernel.stdinMsg = m
-	m.Kernel.stdinFn = onInput
+	m.kernel.stdinMsg = m
+	m.kernel.stdinFn = onInput
 
 	return nil
 }
 
 // CancelInput will cancel any `input_request` message sent by PromptInput.
-func (m *Message) CancelInput() error {
-	log.Printf("Message.CancelInput()")
+func (m *MessageImpl) CancelInput() error {
+	log.Printf("MessageImpl.CancelInput()")
 	// TODO: Check for any answers in the cross-posted question:
 	// https://discourse.jupyter.org/t/cancelling-input-request-at-end-of-execution/17637
 	// https://stackoverflow.com/questions/75206276/kernel-cancelling-a-input-request-at-the-end-of-the-execution-of-a-cell
@@ -253,17 +262,17 @@ func (m *Message) CancelInput() error {
 // DeliverInput should be called if a message is received in Stdin channel. It will
 // check if there is any running process listening to it, in which case it is delivered.
 // Still the user has to handle its delivery.
-func (m *Message) DeliverInput() error {
-	log.Printf("Message.DeliverInput()")
-	if m.Kernel.stdinMsg == nil {
+func (m *MessageImpl) DeliverInput() error {
+	log.Printf("MessageImpl.DeliverInput()")
+	if m.kernel.stdinMsg == nil {
 		return nil
 	}
-	return m.Kernel.stdinFn(m.Kernel.stdinMsg, m)
+	return m.kernel.stdinFn(m.kernel.stdinMsg, m)
 }
 
 // Reply creates a new ComposedMsg and sends it back to the return identities over the
 // Shell channel.
-func (m *Message) Reply(msgType string, content interface{}) error {
+func (m *MessageImpl) Reply(msgType string, content interface{}) error {
 	msg, err := NewComposed(msgType, m.Composed)
 	if err != nil {
 		return err
@@ -271,7 +280,7 @@ func (m *Message) Reply(msgType string, content interface{}) error {
 
 	msg.Content = content
 	log.Printf("Reply(%s):", msgType)
-	return m.Kernel.sockets.ShellSocket.RunLocked(func(shell zmq4.Socket) error {
+	return m.kernel.sockets.ShellSocket.RunLocked(func(shell zmq4.Socket) error {
 		return m.sendMessage(shell, msg)
 	})
 }
@@ -297,8 +306,8 @@ func EnsureMIMEMap(bundle MIMEMap) MIMEMap {
 //}
 
 // PublishExecutionResult publishes the result of the `execCount` execution as a string.
-func (m *Message) PublishExecutionResult(execCount int, data Data) error {
-	return m.Publish("execute_result", struct {
+func PublishExecutionResult(msg Message, execCount int, data Data) error {
+	return msg.Publish("execute_result", struct {
 		ExecCount int     `json:"execution_count"`
 		Data      MIMEMap `json:"data"`
 		Metadata  MIMEMap `json:"metadata"`
@@ -310,8 +319,8 @@ func (m *Message) PublishExecutionResult(execCount int, data Data) error {
 }
 
 // PublishExecutionError publishes a serialized error that was encountered during execution.
-func (m *Message) PublishExecutionError(err string, trace []string) error {
-	return m.Publish("error",
+func PublishExecutionError(msg Message, err string, trace []string) error {
+	return msg.Publish("error",
 		struct {
 			Name  string   `json:"ename"`
 			Value string   `json:"evalue"`
@@ -325,9 +334,9 @@ func (m *Message) PublishExecutionError(err string, trace []string) error {
 }
 
 // PublishDisplayData publishes a single image.
-func (m *Message) PublishDisplayData(data Data) error {
+func PublishDisplayData(msg Message, data Data) error {
 	// copy Data in a struct with appropriate json tags
-	return m.Publish("display_data", struct {
+	return msg.Publish("display_data", struct {
 		Data      MIMEMap `json:"data"`
 		Metadata  MIMEMap `json:"metadata"`
 		Transient MIMEMap `json:"transient"`
@@ -339,7 +348,7 @@ func (m *Message) PublishDisplayData(data Data) error {
 }
 
 // PublishDisplayDataWithHTML is a shortcut to PublishDisplayData for HTML content.
-func (m *Message) PublishDisplayDataWithHTML(html string) error {
+func PublishDisplayDataWithHTML(msg Message, html string) error {
 	msgData := Data{
 		Data:      make(MIMEMap, 1),
 		Metadata:  make(MIMEMap),
@@ -347,7 +356,7 @@ func (m *Message) PublishDisplayDataWithHTML(html string) error {
 	}
 	msgData.Data[string(protocol.MIMETextHTML)] = html
 	logDisplayData(msgData.Data)
-	return m.PublishDisplayData(msgData)
+	return PublishDisplayData(msg, msgData)
 }
 
 const (
@@ -362,8 +371,8 @@ const (
 
 // PublishWriteStream prints the data string to a stream on the front-end. This is
 // either `StreamStdout` or `StreamStderr`.
-func (m *Message) PublishWriteStream(stream string, data string) error {
-	return m.Publish("stream",
+func PublishWriteStream(msg Message, stream string, data string) error {
+	return msg.Publish("stream",
 		struct {
 			Stream string `json:"name"`
 			Data   string `json:"text"`
@@ -378,20 +387,20 @@ func (m *Message) PublishWriteStream(stream string, data string) error {
 // front-end.
 type jupyterStreamWriter struct {
 	stream string
-	msg    *Message
+	msg    Message
 }
 
 // NewJupyterStreamWriter returns an io.Writer that forwards what is written to the Jupyter client,
 // under the given stream name.
-func (m *Message) NewJupyterStreamWriter(stream string) io.Writer {
-	return &jupyterStreamWriter{stream, m}
+func NewJupyterStreamWriter(msg Message, stream string) io.Writer {
+	return &jupyterStreamWriter{stream, msg}
 }
 
 // Write implements `io.Writer.Write` by publishing the data via `PublishWriteStream`
 func (w *jupyterStreamWriter) Write(p []byte) (int, error) {
 	data := string(p)
 	n := len(p)
-	if err := w.msg.PublishWriteStream(w.stream, data); err != nil {
+	if err := PublishWriteStream(w.msg, w.stream, data); err != nil {
 		return 0, errors.WithMessagef(err, "failed to stream %d bytes of data to stream %q", n, w.stream)
 	}
 	return n, nil
@@ -399,7 +408,7 @@ func (w *jupyterStreamWriter) Write(p []byte) (int, error) {
 
 // PublishKernelStatus publishes a status message notifying front-ends of the state the kernel
 // is in. It supports the states "starting", "busy", and "idle".
-func PublishKernelStatus(msg MessageIf, status string) error {
+func PublishKernelStatus(msg Message, status string) error {
 	return msg.Publish("status",
 		struct {
 			ExecutionState string `json:"execution_state"`
@@ -410,7 +419,7 @@ func PublishKernelStatus(msg MessageIf, status string) error {
 }
 
 // SendKernelInfo sends a kernel_info_reply message.
-func SendKernelInfo(msg MessageIf, version string) error {
+func SendKernelInfo(msg Message, version string) error {
 	return msg.Reply("kernel_info_reply",
 		KernelInfo{
 			ProtocolVersion:       ProtocolVersion,
@@ -432,7 +441,7 @@ func SendKernelInfo(msg MessageIf, version string) error {
 
 // PublishExecutionInput publishes a status message notifying front-ends of what code is
 // currently being executed.
-func PublishExecutionInput(msg MessageIf, execCount int, code string) error {
+func PublishExecutionInput(msg Message, execCount int, code string) error {
 	return msg.Publish("execute_input",
 		struct {
 			ExecCount int    `json:"execution_count"`

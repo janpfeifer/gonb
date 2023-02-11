@@ -18,7 +18,7 @@ var (
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
 )
 
-// UniqueID uniquely identifies a Kernel execution. Used for logging and creating temporary directories.
+// UniqueID uniquely identifies a kernel execution. Used for logging and creating temporary directories.
 // Set by SetUpLogging.
 var UniqueID string
 
@@ -45,9 +45,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create a Kernel.
+	// Create a kernel.
 	k, err := kernel.NewKernel(*flagKernel)
-	log.Printf("Kernel created\n")
+	log.Printf("kernel created\n")
 	if err != nil {
 		log.Fatalf("Failed to start kernel: %+v", err)
 	}

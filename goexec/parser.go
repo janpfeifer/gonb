@@ -37,7 +37,7 @@ func extractContentOfNode(filesContents map[string]string, fileSet *token.FileSe
 }
 
 // ParseImportsFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
-func (s *State) ParseImportsFromMainGo(msg *kernel.Message, decls *Declarations) error {
+func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) error {
 	fileSet := token.NewFileSet()
 	packages, err := parser.ParseDir(fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
 	if err != nil {

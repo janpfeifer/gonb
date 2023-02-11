@@ -86,7 +86,7 @@ type cellStatus struct {
 // from the code will be returned in usedLines -- so they can be excluded from other executors.
 //
 // If any errors happen, it is returned in err.
-func Exec(msg *kernel.Message, goExec *goexec.State, codeLines []string, usedLines map[int]bool) (err error) {
+func Exec(msg kernel.Message, goExec *goexec.State, codeLines []string, usedLines map[int]bool) (err error) {
 	status := &cellStatus{}
 	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
 		if usedLines[lineNum] {
@@ -141,11 +141,11 @@ func joinLine(lines []string, fromLine int, usedLines map[int]bool) (cmdStr stri
 
 // execInternal executes internal configuration commands, see HelpMessage for details.
 //
-// It only returns errors for system errors that will lead to the Kernel restart. Syntax errors
+// It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
-func execInternal(msg *kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
+func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
 	_ = goExec
-	content := msg.Composed.Content.(map[string]any)
+	content := msg.ComposedMsg().Content.(map[string]any)
 	parts := splitCmd(cmdStr)
 	switch parts[0] {
 	case "%":
@@ -159,12 +159,15 @@ func execInternal(msg *kernel.Message, goExec *goexec.State, cmdStr string, stat
 	case "noautoget":
 		goExec.AutoGet = false
 	case "help":
-		msg.PublishWriteStream(kernel.StreamStdout, HelpMessage)
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStdout, HelpMessage)
 	case "main":
 		// Handled by goexec, nothing to do here.
 	case "reset":
 		goExec.Reset()
-		msg.PublishWriteStream(kernel.StreamStdout, "* State reset: all memorized declarations discarded.\n")
+		err := kernel.PublishWriteStream(msg, kernel.StreamStdout, "* State reset: all memorized declarations discarded.\n")
+		if err != nil {
+			log.Printf("Error while reseting kernel: %+v", err)
+		}
 	case "with_inputs":
 		allowInput := content["allow_stdin"].(bool)
 		if !allowInput && (status.withInputs || status.withPassword) {
@@ -178,16 +181,19 @@ func execInternal(msg *kernel.Message, goExec *goexec.State, cmdStr string, stat
 		}
 		status.withPassword = true
 	default:
-		msg.PublishWriteStream(kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
+		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
+		if err != nil {
+			log.Printf("Error while reporting back on unimplmented message command \"%%%s\" kernel: %+v", parts[0], err)
+		}
 	}
 	return nil
 }
 
 // execInternal executes internal configuration commands, see HelpMessage for details.
 //
-// It only returns errors for system errors that will lead to the Kernel restart. Syntax errors
+// It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
-func execShell(msg *kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
+func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
 	var execDir string // Default "", means current directory.
 	if cmdStr[0] == '*' {
 		cmdStr = cmdStr[1:]
@@ -196,13 +202,13 @@ func execShell(msg *kernel.Message, goExec *goexec.State, cmdStr string, status 
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return msg.PipeExecToJupyterWithInput(execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyterWithInput(msg, execDir, "/bin/bash", "-c", cmdStr)
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return msg.PipeExecToJupyterWithPassword(execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyterWithPassword(msg, execDir, "/bin/bash", "-c", cmdStr)
 	} else {
-		return msg.PipeExecToJupyter(execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyter(msg, execDir, "/bin/bash", "-c", cmdStr)
 	}
 }
 
@@ -252,7 +258,7 @@ func splitCmd(cmd string) (parts []string) {
 			case 't':
 				c = '\t'
 			default:
-				// No effect. But it allows \" to render a quote within quotes.
+				// No effect. But it allows backslash+quote to render a quote within quotes.
 			}
 		}
 

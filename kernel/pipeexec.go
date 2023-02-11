@@ -14,14 +14,14 @@ import (
 )
 
 // PipeExecToJupyter executes the given command (command plus arguments) and pipe the output
-// to Jupyter stdout and stderr streams.
+// to Jupyter stdout and stderr streams connected to msg.
 //
 // If dir is not empty, before running the command the current directory is changed to dir.
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
 // program returns an error for any reason.
-func (m *Message) PipeExecToJupyter(dir, name string, args ...string) error {
-	return m.pipeExecToJupyter(dir, name, args, -1, false)
+func PipeExecToJupyter(msg Message, dir, name string, args ...string) error {
+	return pipeExecToJupyter(msg, dir, name, args, -1, false)
 }
 
 // PipeExecToJupyterWithInput executes the given command (command plus arguments) and
@@ -33,8 +33,8 @@ func (m *Message) PipeExecToJupyter(dir, name string, args ...string) error {
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
 // program returns an error for any reason.
-func (m *Message) PipeExecToJupyterWithInput(dir, name string, args ...string) error {
-	return m.pipeExecToJupyter(dir, name, args, 500, false)
+func PipeExecToJupyterWithInput(msg Message, dir, name string, args ...string) error {
+	return pipeExecToJupyter(msg, dir, name, args, 500, false)
 }
 
 // PipeExecToJupyterWithPassword executes the given command (command plus arguments) and
@@ -42,11 +42,11 @@ func (m *Message) PipeExecToJupyterWithInput(dir, name string, args ...string) e
 // one input from Jupyter input set as a password (input hidden).
 //
 // If dir is not empty, before running the command the current directory is changed to dir.
-func (m *Message) PipeExecToJupyterWithPassword(dir, name string, args ...string) error {
-	return m.pipeExecToJupyter(dir, name, args, 1, true)
+func PipeExecToJupyterWithPassword(msg Message, dir, name string, args ...string) error {
+	return pipeExecToJupyter(msg, dir, name, args, 1, true)
 }
 
-func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecondsToInput int, inputPassword bool) error {
+func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecondsToInput int, inputPassword bool) error {
 	log.Printf("Executing: %s %v", name, args)
 
 	cmd := exec.Command(name, args...)
@@ -62,8 +62,8 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 	}
 
 	// Pipe all stdout and stderr to Jupyter.
-	jupyterStdout := m.NewJupyterStreamWriter(StreamStdout)
-	jupyterStderr := m.NewJupyterStreamWriter(StreamStderr)
+	jupyterStdout := NewJupyterStreamWriter(msg, StreamStdout)
+	jupyterStderr := NewJupyterStreamWriter(msg, StreamStderr)
 	var streamersWG sync.WaitGroup
 	streamersWG.Add(2)
 	go func() {
@@ -89,7 +89,7 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 	if millisecondsToInput > 0 {
 		// Set function to handle incoming content.
 		var writeStdinFn OnInputFn
-		writeStdinFn = func(original, input *Message) error {
+		writeStdinFn = func(original, input *MessageImpl) error {
 			muDone.Lock()
 			defer muDone.Unlock()
 			if done {
@@ -110,7 +110,7 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 			}()
 			// Reschedule itself for the next message.
 			if !inputPassword {
-				m.PromptInput(" ", inputPassword, writeStdinFn)
+				msg.PromptInput(" ", inputPassword, writeStdinFn)
 			}
 			return err
 		}
@@ -120,14 +120,14 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 			time.Sleep(time.Duration(millisecondsToInput) * time.Millisecond)
 			muDone.Lock()
 			if !done {
-				m.PromptInput(" ", inputPassword, writeStdinFn)
+				msg.PromptInput(" ", inputPassword, writeStdinFn)
 			}
 			muDone.Unlock()
 		}()
 	}
 
 	// Prepare named-pipe to use for rich-data display.
-	if err = m.StartNamedPipe(dir, doneChan); err != nil {
+	if err = StartNamedPipe(msg, dir, doneChan); err != nil {
 		return errors.WithMessagef(err, "failed to create named pipe for display content")
 	}
 
@@ -136,7 +136,7 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 		muDone.Lock()
 		done = true
 		if millisecondsToInput > 0 {
-			m.CancelInput()
+			msg.CancelInput()
 		}
 		cmdStdin.Close()
 		close(doneChan)
@@ -155,10 +155,10 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 	streamersWG.Wait()
 	if err := cmd.Wait(); err != nil {
 		errMsg := err.Error() + "\n"
-		if m.Kernel.Interrupted.Load() {
+		if msg.Kernel().Interrupted.Load() {
 			errMsg = "^C\n" + errMsg
 		}
-		m.PublishWriteStream(StreamStderr, errMsg)
+		PublishWriteStream(msg, StreamStderr, errMsg)
 	}
 	doneFn()
 
@@ -166,7 +166,7 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 	return nil
 }
 
-// StartNamedPipe creates a named pipe in `dir` and start the starts a listener (on a separate goroutine) that reads
+// StartNamedPipe creates a named pipe in `dir` and starts a listener (on a separate goroutine) that reads
 // the pipe and displays rich content. It also exports environment variable GONB_FIFO announcing the name of the
 // named pipe.
 //
@@ -174,7 +174,7 @@ func (m *Message) pipeExecToJupyter(dir, name string, args []string, millisecond
 // remove it and quit.
 //
 // TODO: make this more secure, maybe with a secret key also passed by the environment.
-func (m *Message) StartNamedPipe(dir string, doneChan <-chan struct{}) error {
+func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 	// Create a temporary file name.
 	f, err := os.CreateTemp(dir, "gonb_pipe_")
 	if err != nil {
@@ -231,7 +231,7 @@ func (m *Message) StartNamedPipe(dir string, doneChan <-chan struct{}) error {
 		muFifo.Lock()
 		fifoOpenedForReading = true
 		muFifo.Unlock()
-		go m.PollDisplayRequests(pipeReader)
+		go PollDisplayRequests(msg, pipeReader)
 
 		// Wait till channel is closed and then close reader.
 		<-doneChan

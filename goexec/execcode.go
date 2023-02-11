@@ -21,7 +21,7 @@ var autoLine = PosInJupyter{Line: -1}
 // ExecuteCell takes the contents of a cell, parses it, merges new declarations with the ones
 // from previous definitions, render a final main.go code with the whole content,
 // compiles and runs it.
-func (s *State) ExecuteCell(msg *kernel.Message, lines []string, skipLines map[int]bool) error {
+func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]bool) error {
 	// Find declarations on unchanged cell contents.
 	linesPos, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines)
 	if err != nil {
@@ -78,15 +78,15 @@ func (s *State) MainPath() string {
 	return path.Join(s.TempDir, "main.go")
 }
 
-func (s *State) Execute(msg *kernel.Message) error {
-	return msg.PipeExecToJupyter("", s.BinaryPath(), s.Args...)
+func (s *State) Execute(msg kernel.Message) error {
+	return kernel.PipeExecToJupyter(msg, "", s.BinaryPath(), s.Args...)
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.
 //
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
-func (s *State) Compile(msg *kernel.Message, linesPos []PosInJupyter) error {
+func (s *State) Compile(msg kernel.Message, linesPos []PosInJupyter) error {
 	_ = linesPos
 	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
 	cmd.Dir = s.TempDir
@@ -101,10 +101,10 @@ func (s *State) Compile(msg *kernel.Message, linesPos []PosInJupyter) error {
 
 // GoImports execute `goimports` which adds imports to non-declared imports automatically.
 // It also runs "go get" to download any missing dependencies.
-func (s *State) GoImports(msg *kernel.Message) error {
+func (s *State) GoImports(msg kernel.Message) error {
 	goimportsPath, err := exec.LookPath("goimports")
 	if err != nil {
-		_ = msg.PublishWriteStream(kernel.StreamStderr, `
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, `
 Program goimports is not installed. It is used to automatically import
 missing standard packages, and is a standard Go toolkit package. You
 can install it from the notebook with:

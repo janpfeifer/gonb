@@ -35,7 +35,6 @@ Many! Contributions are welcome. Some from the top of my head:
 * Mac and Windows: 
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
-* Example in [colab.research.google.com](http://colab.research.google.com)
 * Tracking of lines on generated Go files back to cell, so reported errors are easy to
   follow. In the meantime the errors can be moused over and will display the lines
   surrounding them.

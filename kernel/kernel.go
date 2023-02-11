@@ -34,6 +34,8 @@ const (
 	StatusIdle     = "idle"
 )
 
+var _ = StatusStarting
+
 // connectionInfo stores the contents of the kernel connection
 // file created by Jupyter.
 type connectionInfo struct {
@@ -82,7 +84,7 @@ type Kernel struct {
 	sockets *SocketGroup
 
 	// Channels with incoming messages.
-	shell, stdin, control chan *Message
+	shell, stdin, control chan Message
 
 	// Wait group for the various polling goroutines.
 	pollingWait sync.WaitGroup
@@ -96,8 +98,8 @@ type Kernel struct {
 	// Interrupted indicates whether shell currently being executed was Interrupted.
 	Interrupted atomic.Bool
 
-	// stdinMsg holds the Message that last asked from input from stdin (Message.PromptInput).
-	stdinMsg *Message
+	// stdinMsg holds the MessageImpl that last asked from input from stdin (MessageImpl.PromptInput).
+	stdinMsg *MessageImpl
 	stdinFn  OnInputFn // Callback when stdin input is received.
 }
 
@@ -134,17 +136,20 @@ func (k *Kernel) HandleInterrupt() {
 		k.sigintC = make(chan os.Signal, 1)
 		signal.Notify(k.sigintC, os.Interrupt)
 		go func() {
+			// At exit reset notification.
+			defer func() {
+				signal.Reset(os.Interrupt)
+				k.sigintC = nil
+			}()
 			for {
 				select {
 				case <-k.sigintC:
 					k.Interrupted.Store(true)
 					log.Printf("INTERRUPT received")
 				case <-k.stop:
-					break // Kernel stopped.
+					return // kernel stopped.
 				}
 			}
-			signal.Reset(os.Interrupt)
-			k.sigintC = nil
 		}()
 	}
 }
@@ -169,9 +174,9 @@ type MsgOrError struct {
 // connection to kernel was closed.
 //
 // These are messages received from a console like input, while executing
-// a command. For Message.PipeExecToJupyterWithInput to work, you need
-// to call Message.DeliverInput() on these messages.
-func (k *Kernel) Stdin() <-chan *Message {
+// a command. For MessageImpl.PipeExecToJupyterWithInput to work, you need
+// to call MessageImpl.DeliverInput() on these messages.
+func (k *Kernel) Stdin() <-chan Message {
 	return k.stdin
 }
 
@@ -180,7 +185,7 @@ func (k *Kernel) Stdin() <-chan *Message {
 //
 // One should also select for the Kernel.StoppedChan, to check if
 // connection to kernel was closed.
-func (k *Kernel) Shell() <-chan *Message {
+func (k *Kernel) Shell() <-chan Message {
 	return k.shell
 }
 
@@ -189,7 +194,7 @@ func (k *Kernel) Shell() <-chan *Message {
 //
 // One should also select for the Kernel.StoppedChan, to check if
 // connection to kernel was closed.
-func (k *Kernel) Control() <-chan *Message {
+func (k *Kernel) Control() <-chan Message {
 	return k.control
 }
 
@@ -205,9 +210,9 @@ func (k *Kernel) Control() <-chan *Message {
 func NewKernel(connectionFile string) (*Kernel, error) {
 	k := &Kernel{
 		stop:    make(chan struct{}),
-		shell:   make(chan *Message, 1),
-		stdin:   make(chan *Message, 1),
-		control: make(chan *Message, 1),
+		shell:   make(chan Message, 1),
+		stdin:   make(chan Message, 1),
+		control: make(chan Message, 1),
 	}
 
 	// Parse the connection info.
@@ -228,15 +233,15 @@ func NewKernel(connectionFile string) (*Kernel, error) {
 
 	// Set polling functions that will listen to the sockets and forward
 	// messages (or errors) to the corresponding channels.
-	poll := func(msgChan chan *Message, sck zmq4.Socket) {
+	poll := func(msgChan chan Message, sck zmq4.Socket) {
 		k.pollingWait.Add(1)
 		go func() {
 			defer close(msgChan)
 			for {
 				zmqMsg, err := sck.Recv()
-				var msg *Message
+				var msg Message
 				if err != nil {
-					msg = &Message{Kernel: k, err: err}
+					msg = &MessageImpl{kernel: k, err: err}
 				} else {
 					msg = k.FromWireMsg(zmqMsg)
 				}
@@ -283,7 +288,7 @@ func (k *Kernel) pollHeartbeat() {
 			})
 		}
 		// Only breaks for loop if err != nil:
-		log.Printf("*** Kernel heartbeat failed: %+v", err)
+		log.Printf("*** kernel heartbeat failed: %+v", err)
 		log.Printf("*** Stopping kernel")
 		k.Stop()
 	}()
@@ -351,10 +356,10 @@ func bindSockets(connInfo connectionInfo) (sg *SocketGroup, err error) {
 // FromWireMsg translates a multipart ZMQ messages received from a socket into
 // a ComposedMsg struct and a slice of return identities. This includes verifying the
 // message signature.
-func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) *Message {
+func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) Message {
 	parts := zmqMsg.Frames
 	signKey := k.sockets.Key
-	m := &Message{Kernel: k}
+	m := &MessageImpl{kernel: k}
 
 	i := 0
 	for string(parts[i]) != "<IDS|MSG>" {

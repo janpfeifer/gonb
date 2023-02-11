@@ -7,6 +7,7 @@ go.work
 # Spurious test notebook files and temporary checkpoints.
 .ipynb_checkpoints/
 Untitled*.ipynb
+experimental.ipynb
 
 # Binaries for programs and plugins
 *.exe

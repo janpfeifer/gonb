@@ -65,10 +65,10 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
 {{if .HasContext}}
-<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
+<span class="gonb-error-location">{{.Location}}</span> {{.MessageImpl}}
 <div class="gonb-error-context">{{.Context}}</div>
 {{else}}
-<pre>{{.Message}}</pre>
+<pre>{{.MessageImpl}}</pre>
 {{end}}
 <br/>
 {{end}}
@@ -82,12 +82,12 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 //
 // Any errors within here are logged and simply ignored, since this is already
 // used to report errors
-func (s *State) DisplayErrorWithContext(msg *kernel.Message, errorMsg string) {
+func (s *State) DisplayErrorWithContext(msg kernel.Message, errorMsg string) {
 	// Default report, and makes sure display is called at the end.
 	reportHTML := "<pre>" + errorMsg + "</pre>" // If anything goes wrong, simply display the error message.
 	defer func() {
 		// Display HTML report on exit.
-		err := msg.PublishDisplayDataWithHTML(reportHTML)
+		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
 		if err != nil {
 			log.Printf("Failed to publish data in DisplayErrorWithContext: %+v", err)
 		}

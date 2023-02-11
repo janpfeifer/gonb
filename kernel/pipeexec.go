@@ -225,7 +225,7 @@ func (m *Message) StartNamedPipe(dir string, doneChan <-chan struct{}) error {
 		var pipeReader *os.File
 		pipeReader, err = os.Open(pipePath)
 		if err != nil {
-			log.Printf("Failed to open pipe (Mkfifo) %q for reading: %+v", err)
+			log.Printf("Failed to open pipe (Mkfifo) %q for reading: %+v", pipePath, err)
 			return
 		}
 		muFifo.Lock()

@@ -498,7 +498,7 @@ func (w *jupyterStreamWriter) Write(p []byte) (int, error) {
 	data := string(p)
 	n := len(p)
 	if err := w.msg.PublishWriteStream(w.stream, data); err != nil {
-		return 0, errors.WithMessagef(err, "failed to stream %d bytes of data to stream %q", w.stream)
+		return 0, errors.WithMessagef(err, "failed to stream %d bytes of data to stream %q", n, w.stream)
 	}
 	return n, nil
 }

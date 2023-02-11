@@ -85,7 +85,14 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 					// Incorporate functions.
 					key := typedDecl.Name.Name
 					if typedDecl.Recv != nil && len(typedDecl.Recv.List) > 0 {
-						key = fmt.Sprintf("%s~%s", typedDecl.Recv.List[0].Type.(*ast.Ident).Name, key)
+						typeName := "unknown"
+						switch fieldType := typedDecl.Recv.List[0].Type.(type) {
+						case *ast.Ident:
+							typeName = fieldType.Name
+						case *ast.StarExpr:
+							typeName = extractContentOfNode(filesContents, fileSet, fieldType)
+						}
+						key = fmt.Sprintf("%s~%s", typeName, key)
 					}
 					f := &Function{Key: key, Definition: extractContentOfNode(filesContents, fileSet, typedDecl)}
 					decls.Functions[f.Key] = f

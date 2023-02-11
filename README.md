@@ -1,6 +1,6 @@
 # GoNB - A Go Notebook Kernel for Jupyter
 
-To quick start, see the very simple [tutorial](examples/tutorial.ipynb)! And
+To quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)! And
 [here live version in Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing)
 that one can interact with (make a copy first).
 

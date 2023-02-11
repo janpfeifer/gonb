@@ -1,6 +1,9 @@
 package goexec
 
-import "path"
+import (
+	"github.com/janpfeifer/gonb/kernel"
+	"path"
+)
 
 // This file implements saving to a inspect.go file, and then using `gopls` to
 // inspect a requested token.
@@ -9,4 +12,8 @@ import "path"
 // message from Jupyter).
 func (s *State) InspectPath() string {
 	return path.Join(s.TempDir, "inspect.go")
+}
+
+func (s *State) InspectCell(msg kernel.Message, lines []string, usedLines map[int]bool, line, col int) error {
+	return nil
 }

@@ -98,7 +98,7 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 			err = errors.WithMessagef(err, "replying to 'execute_request'")
 		}
 	case "inspect_request":
-		if err = handleInspectRequest(msg, goExec); err != nil {
+		if err = HandleInspectRequest(msg, goExec); err != nil {
 			err = errors.WithMessagef(err, "replying to 'inspect_request'")
 		}
 	case "is_complete_request":
@@ -137,57 +137,6 @@ type OutErr struct {
 	err io.Writer
 }
 
-// handleInspectRequest presents rich data (HTML?) with contextual information for the
-// contents under the cursor.
-func handleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
-	_ = goExec
-	// TODO: Implementing this likely requiring generating the main.go -- and tracking
-	//       the adjusted cursor position -- and using `gopls` to request contextual information.
-	//       Similar to handleIsCompleteRequest.
-	content := msg.ComposedMsg().Content.(map[string]interface{})
-	code := content["code"].(string)
-	cursorPos := content["cursor_pos"].(float64)
-	detailLevel := content["detail_level"].(float64)
-	_ = code
-	_ = cursorPos
-	_ = detailLevel
-
-	log.Printf("inspect_request: cursorPos=%f, detailLevel=%f", cursorPos, detailLevel)
-	replyContent := fmt.Sprintf("<div>Cursor at %f<br/>\n<pre>%s</pre></div>", cursorPos, code)
-	reply := &kernel.InspectReply{
-		Status:   "ok",
-		Found:    false,
-		Data:     make(kernel.MIMEMap),
-		Metadata: make(kernel.MIMEMap),
-	}
-	reply.Data[string(protocol.MIMETextHTML)] = replyContent
-	return msg.Reply("inspect_reply", reply)
-}
-
-// handleCompleteRequest replies with a `complete_reply` message, to auto-complete code.
-func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) error {
-	_ = goExec
-	// TODO: Implementing this likely requiring generating the main.go -- and tracking
-	//       the adjusted cursor position -- and using `gopls` to request contextual information.
-	//       Similar to handleInspectRequest.
-	// Extract the data from the request.
-	content := msg.ComposedMsg().Content.(map[string]interface{})
-	code := content["code"].(string)
-	cursorPos := content["cursor_pos"].(float64)
-	_ = code
-	_ = cursorPos
-
-	log.Printf("\tCompleteRequest")
-	reply := &kernel.CompleteReply{
-		Status:      "ok",
-		Matches:     []string{},
-		CursorStart: 0,
-		CursorEnd:   0,
-		Metadata:    make(kernel.MIMEMap),
-	}
-	return msg.Reply("complete_reply", reply)
-}
-
 // handleExecuteRequest runs code from an execute_request method,
 // and sends the various reply messages.
 func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
@@ -216,7 +165,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	lines := strings.Split(code, "\n")
 	usedLines := make(map[int]bool)
 	var executionErr error
-	if err := specialcmd.Exec(msg, goExec, lines, usedLines); err != nil {
+	if err := specialcmd.Parse(msg, goExec, true, lines, usedLines); err != nil {
 		executionErr = errors.WithMessagef(err, "executing special commands in cell")
 	}
 	hasMoreToRun := len(usedLines) < len(lines)
@@ -246,4 +195,71 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		return errors.WithMessagef(err, "publish 'execute_reply`")
 	}
 	return nil
+}
+
+// HandleInspectRequest presents rich data (HTML?) with contextual information for the
+// contents under the cursor.
+func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
+	_ = goExec
+	// TODO: Implementing this likely requiring generating the main.go -- and tracking
+	//       the adjusted cursor position -- and using `gopls` to request contextual information.
+	//       Similar to handleIsCompleteRequest.
+	content := msg.ComposedMsg().Content.(map[string]interface{})
+	code := content["code"].(string)
+	cursorPos := int(content["cursor_pos"].(float64))
+	detailLevel := int(content["detail_level"].(float64))
+	log.Printf("inspect_request: cursorPos=%d, detailLevel=%d", cursorPos, detailLevel)
+
+	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
+	lines := strings.Split(code, "\n")
+	var cursorLine, cursorCol int
+	for pos := 0; cursorLine < len(lines) && pos < cursorPos; pos += 1 + len(lines[cursorLine]) {
+		if pos+len(lines[cursorLine]) > cursorPos {
+			cursorCol = cursorPos - pos
+			break
+		}
+		cursorLine++
+	}
+	log.Printf("inspect_request: Line, Col=(%d, %d)", cursorLine+1, cursorCol+1)
+
+	// Separate special commands from Go commands.
+	usedLines := make(map[int]bool)
+	if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
+		return errors.WithMessagef(err, "executing special commands in cell")
+	}
+	goExec.InspectCell(msg, lines, usedLines, cursorLine, cursorPos)
+
+	replyContent := fmt.Sprintf("<div>Cursor at %d<br/>\n<pre>%s</pre></div>", cursorPos, code)
+	reply := &kernel.InspectReply{
+		Status:   "ok",
+		Found:    false,
+		Data:     make(kernel.MIMEMap),
+		Metadata: make(kernel.MIMEMap),
+	}
+	reply.Data[string(protocol.MIMETextHTML)] = replyContent
+	return msg.Reply("inspect_reply", reply)
+}
+
+// handleCompleteRequest replies with a `complete_reply` message, to auto-complete code.
+func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) error {
+	_ = goExec
+	// TODO: Implementing this likely requiring generating the main.go -- and tracking
+	//       the adjusted cursor position -- and using `gopls` to request contextual information.
+	//       Similar to HandleInspectRequest.
+	// Extract the data from the request.
+	content := msg.ComposedMsg().Content.(map[string]interface{})
+	code := content["code"].(string)
+	cursorPos := content["cursor_pos"].(float64)
+	_ = code
+	_ = cursorPos
+
+	log.Printf("\tCompleteRequest")
+	reply := &kernel.CompleteReply{
+		Status:      "ok",
+		Matches:     []string{},
+		CursorStart: 0,
+		CursorEnd:   0,
+		Metadata:    make(kernel.MIMEMap),
+	}
+	return msg.Reply("complete_reply", reply)
 }

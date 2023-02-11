@@ -12,6 +12,7 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"log"
+	"os"
 )
 
 const HelpMessage = `GoNB is a Go kernel that compiles and executed on-the-fly Go code. 
@@ -51,6 +52,8 @@ Special non-Go commands:
   use flags as a normal program.
 - "%autoget" and "%noautoget": Default is "%autoget", which automatically does "go get" for
   packages not yet available.
+- "%env VAR value": Sets the environment variable VAR to the given value. These variables
+  will be available both for Go code as well as for shell scripts.
 - "%reset": clears all memorized declarations (imports, functions, variables, types and 
   constants).
 - "%with_inputs": will prompt for inputs for the next shell command. Use this if
@@ -79,14 +82,13 @@ type cellStatus struct {
 	withInputs, withPassword bool
 }
 
-// Exec will check whether the given code to be executed has any special
-// commands.
+// Parse will check whether the given code to be executed has any special commands.
 //
-// Any special commands found in the code will be executed and the corresponding lines used
-// from the code will be returned in usedLines -- so they can be excluded from other executors.
+// Any special commands found in the code will be executed (if execute is set to true) and the corresponding lines used
+// from the code will be returned in usedLines -- so they can be excluded from other executors (goexec).
 //
 // If any errors happen, it is returned in err.
-func Exec(msg kernel.Message, goExec *goexec.State, codeLines []string, usedLines map[int]bool) (err error) {
+func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines map[int]bool) (err error) {
 	status := &cellStatus{}
 	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
 		if usedLines[lineNum] {
@@ -105,16 +107,18 @@ func Exec(msg kernel.Message, goExec *goexec.State, codeLines []string, usedLine
 				// Skip empty commands.
 				continue
 			}
-			switch cmdType {
-			case '%':
-				err = execInternal(msg, goExec, cmdStr, status)
-				if err != nil {
-					return
-				}
-			case '!':
-				err = execShell(msg, goExec, cmdStr, status)
-				if err != nil {
-					return
+			if execute {
+				switch cmdType {
+				case '%':
+					err = execInternal(msg, goExec, cmdStr, status)
+					if err != nil {
+						return
+					}
+				case '!':
+					err = execShell(msg, goExec, cmdStr, status)
+					if err != nil {
+						return
+					}
 				}
 			}
 		}
@@ -154,6 +158,12 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
 		log.Printf("args=%+q", parts)
+	case "env":
+		// Set environment variables.
+		if len(parts) != 3 {
+			return errors.Errorf("`%%env FOO bar` takes 2 arguments, the variable name and it's content. %d were given", len(parts))
+		}
+		os.Setenv(parts[1], parts[2])
 	case "autoget":
 		goExec.AutoGet = true
 	case "noautoget":

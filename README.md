@@ -2,7 +2,8 @@
 
 To quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)! And
 [here live version in Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing)
-that one can interact with (make a copy first).
+that one can interact with (make a copy first) -- if link doesn't work (Google Drive sharing publicly
+is odd), [download it from github](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
 
 Go is a compiled language, but with very fast compilation, that allows one to use
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle

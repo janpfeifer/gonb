@@ -8,7 +8,7 @@ Go is a compiled language, but with very fast compilation, that allows one to us
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
 of the loop -- so it's a Read-Compile-Run-Print-Loop -- while still feeling very interactive. 
 
-**gonb** leverages that compilation speed to implement a full-featured (at least it's getting there)
+**GoNB** leverages that compilation speed to implement a full-featured (at least it's getting there)
 [Jupyter notebook](https://jupyter.org/) kernel.
 
 It's still **experimental**. This is very fresh from the oven, and likely there are many nuanced
@@ -17,7 +17,7 @@ fixes are very welcome.
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 
-**gonb** opens a named pipe (set in environment variable gonb_PIPE) that a program can use to directly
+**GoNB** opens a named pipe (set in environment variable `GONB_PIPE`) that a program can use to directly
 display any type of HTML content. 
 
 For the most cases, one can simply import 

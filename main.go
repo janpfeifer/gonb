@@ -16,6 +16,7 @@ var (
 	flagInstall  = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
 	flagKernel   = flag.String("kernel", "", "Run kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
+	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
 )
 
 // UniqueID uniquely identifies a kernel execution. Used for logging and creating temporary directories.
@@ -32,7 +33,7 @@ func main() {
 		if *flagExtraLog != "" {
 			extraArgs = []string{"--extra_log", *flagExtraLog}
 		}
-		err := kernel.Install(extraArgs)
+		err := kernel.Install(extraArgs, *flagForce)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)
 		}

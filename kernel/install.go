@@ -22,7 +22,7 @@ type jupyterKernelConfig struct {
 // Install gonb in users local Jupyter configuration, making it available. It assumes
 // the kernel is implemented by the same binary that is calling this function (os.Args[0])
 // and that the flag to pass the `connection_file` is `--kernel`.
-func Install(extraArgs []string) error {
+func Install(extraArgs []string, force bool) error {
 	config := jupyterKernelConfig{
 		Argv:        []string{os.Args[0], "--kernel", "{connection_file}"},
 		DisplayName: "Go (gonb)",
@@ -84,14 +84,18 @@ func Install(extraArgs []string) error {
 		_, err = exec.LookPath("gopls")
 	}
 	if err != nil {
-		log.Fatalf(`
+		msg := `
 Program goimports and/or gopls are not installed. They are required dependencies,
 and generally are standard Go toolkit packages. You can install them with:
 
 go install golang.org/x/tools/cmd/goimports@latest
 go install golang.org/x/tools/gopls@latest
 
-`)
+`
+		if force {
+			log.Fatal(msg)
+		}
+		log.Printf(msg)
 	}
 
 	log.Printf("Go (gonb) kernel configuration installed in %q.\n", configPath)

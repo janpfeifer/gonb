@@ -68,8 +68,8 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 			// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
 			if int32(line-1) == cursor.Line {
 				c := Cursor{int32(line - fromPos.Line), cursor.Col}
-				log.Printf("Found cursor at %v in definition:\n%s", c,
-					extractContentOfNode(filesContents, fileSet, node))
+				//log.Printf("Found cursor at %v in definition:\n%s", c,
+				//	extractContentOfNode(filesContents, fileSet, node))
 				return c
 			}
 		}

@@ -99,17 +99,18 @@ func (s *State) InspectCell(lines []string, skipLines map[int]bool, line, col in
 func goplsQuery(dir, command, filePath string, cursor Cursor) (map[string]any, error) {
 	goplsPath, err := exec.LookPath("gopls")
 	if err != nil {
-		err = errors.Wrap(err, `
+		msg := `
 Program gopls is not installed. It is used to inspect into code
 and provide contextual information and autocompletion. It is a 
 standard Go toolkit package. You can install it from the notebook
 with:
 
+` + "```" + `
 !go install golang.org/x/tools/gopls@latest
-
-`)
-		return nil, err
+` + "```\n"
+		return map[string]any{"description": any(msg)}, nil
 	}
+	log.Printf("gopls path=%q", goplsPath)
 	location := fmt.Sprintf("%s:%d:%d", filePath, cursor.Line+1, cursor.Col+1)
 	cmd := exec.Command(goplsPath, command, "-json", "-markdown", location)
 	cmd.Dir = dir

@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## v0.3.1
+
+* Improved error message (in contextual help side-bar) if `gopls` is not installed.
+* Added `--force` flag to allow installation even if `goimports` or `gopls` 
+  are missing.
+
 ## v0.3.0
 
 * Added support for **Contextual Help** (`control+I` in Jupyter), by servicing message `inpect_request`.

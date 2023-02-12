@@ -73,8 +73,12 @@ var _ = fmt.Printf
 type Kg int
 type N float64
 
-func (k Kg) Weight() N {
+func (k *Kg) Weight() N {
 	return N(k) * 9.8
+}
+
+func (k *Kg) Gain(lasagna Kg) {
+	*k += lasagna
 }
 
 func (n N) Weight() N { return n }
@@ -119,11 +123,12 @@ func init_c() {
 	assert.Contains(t, s.Decls.Imports, ".~gomlx/computation")
 
 	fmt.Printf("\ttest functions: %+v\n", s.Decls.Functions)
-	assert.Lenf(t, s.Decls.Functions, 5, "Expected 2 functions, got %+v", s.Decls.Functions)
+	assert.Lenf(t, s.Decls.Functions, 6, "Expected 2 functions, got %+v", s.Decls.Functions)
 	assert.Contains(t, s.Decls.Functions, "f")
 	assert.Contains(t, s.Decls.Functions, "sum")
 	assert.Contains(t, s.Decls.Functions, "init_c")
-	assert.Contains(t, s.Decls.Functions, "Kg~Weight")
+	assert.Contains(t, s.Decls.Functions, "*Kg~Weight")
+	assert.Contains(t, s.Decls.Functions, "*Kg~Gain")
 	assert.Contains(t, s.Decls.Functions, "N~Weight")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)
@@ -184,7 +189,10 @@ func init_c() {
 	assert.Equal(t, wantVariablesRendering, buf.String())
 
 	// Checks functions rendering.
-	wantFunctionsRendering := `func (k Kg) Weight() N {
+	wantFunctionsRendering := `func (k *Kg) Gain(lasagna Kg) {
+	*k += lasagna
+}
+func (k *Kg) Weight() N {
 	return N(k) * 9.8
 }
 func (n N) Weight() N { return n }

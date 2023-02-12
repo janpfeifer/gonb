@@ -58,7 +58,8 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 	}
 
 	// getCursor returns the cursor position within this declaration, if the original cursor falls in there.
-	getCursor := func(from, to token.Pos) Cursor {
+	getCursor := func(node ast.Node) Cursor {
+		from, to := node.Pos(), node.End()
 		if !cursor.HasCursor() {
 			return NoCursor
 		}
@@ -66,7 +67,10 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 		for line := fromPos.Line; line <= toPos.Line; line++ {
 			// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
 			if int32(line-1) == cursor.Line {
-				return Cursor{int32(line - fromPos.Line), cursor.Col}
+				c := Cursor{int32(line - fromPos.Line), cursor.Col}
+				log.Printf("Found cursor at %v in definition:\n%s", c,
+					extractContentOfNode(filesContents, fileSet, node))
+				return c
 			}
 		}
 		return NoCursor
@@ -99,7 +103,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 				value := entry.Path.Value
 				value = value[1 : len(value)-1] // Remove quotes.
 				importEntry := NewImport(value, alias)
-				importEntry.Cursor = getCursor(entry.Pos(), entry.End())
+				importEntry.Cursor = getCursor(entry)
 				decls.Imports[importEntry.Key] = importEntry
 			}
 
@@ -115,12 +119,12 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 						case *ast.Ident:
 							typeName = fieldType.Name
 						case *ast.StarExpr:
-							typeName = extractContentOfNode(filesContents, fileSet, fieldType)
+							typeName = extractContentOfNode(filesContents, fileSet, fieldType.X)
 						}
 						key = fmt.Sprintf("%s~%s", typeName, key)
 					}
 					f := &Function{Key: key, Definition: extractContentOfNode(filesContents, fileSet, typedDecl)}
-					f.Cursor = getCursor(typedDecl.Pos(), typedDecl.End())
+					f.Cursor = getCursor(typedDecl)
 					decls.Functions[f.Key] = f
 				case *ast.GenDecl:
 					if typedDecl.Tok == token.IMPORT {
@@ -132,7 +136,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 						var prevConstDecl *Constant
 
 						for _, spec := range typedDecl.Specs {
-							newCursor := getCursor(spec.Pos(), spec.End())
+							newCursor := getCursor(spec)
 
 							// Each spec may be a list of variables (comma separated).
 							vSpec := spec.(*ast.ValueSpec)
@@ -176,7 +180,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 							name := tSpec.Name.Name
 							tDef := extractContentOfNode(filesContents, fileSet, tSpec.Type)
 							tDecl := &TypeDecl{Key: name, TypeDefinition: tDef}
-							tDecl.Cursor = getCursor(spec.Pos(), spec.End())
+							tDecl.Cursor = getCursor(spec)
 							decls.Types[name] = tDecl
 						}
 					} else {
@@ -193,6 +197,12 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 
 // RenderImports writes out `import ( ... )` for all imports in Declarations.
 func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
+	cursor = NoCursor
+	newLineNum = lineNum
+	if len(d.Imports) == 0 {
+		return
+	}
+
 	// Enumerate imports sorted by keys.
 	keys := make([]string, 0, len(d.Imports))
 	for key := range d.Imports {
@@ -205,12 +215,18 @@ func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum 
 		if err != nil {
 			return
 		}
-		_, err = fmt.Fprintf(writer, format, args...)
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(writer, strBuf)
 	}
 
 	w("import (\n")
 	for _, key := range keys {
 		importDecl := d.Imports[key]
+		if importDecl.HasCursor() {
+			cursor = importDecl.Cursor
+			cursor.Line += int32(lineNum)
+		}
 		if importDecl.Alias != "" {
 			w("\t%s %q\n", importDecl.Alias, importDecl.Path)
 		} else {
@@ -218,11 +234,18 @@ func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum 
 		}
 	}
 	w(")\n")
+	newLineNum = lineNum
 	return
 }
 
 // RenderVariables writes out `var ( ... )` for all variables in Declarations.
 func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
+	cursor = NoCursor
+	newLineNum = lineNum
+	if len(d.Variables) == 0 {
+		return
+	}
+
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Variables))
 	for key := range d.Variables {
@@ -247,6 +270,10 @@ func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNu
 		if varDecl.TypeDefinition != "" {
 			typeStr = " " + varDecl.TypeDefinition
 		}
+		if varDecl.HasCursor() {
+			cursor = varDecl.Cursor
+			cursor.Line += int32(lineNum)
+		}
 		w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
 	}
 	w(")\n")
@@ -256,6 +283,12 @@ func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNu
 
 // RenderFunctions without comments, for all functions in Declarations.
 func (d *Declarations) RenderFunctions(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
+	cursor = NoCursor
+	newLineNum = lineNum
+	if len(d.Functions) == 0 {
+		return
+	}
+
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Functions))
 	for key := range d.Functions {
@@ -296,6 +329,10 @@ func (d *Declarations) RenderFunctions(lineNum int, writer io.Writer) (newLineNu
 // RenderTypes without comments.
 func (d *Declarations) RenderTypes(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
 	cursor = NoCursor
+	newLineNum = lineNum
+	if len(d.Types) == 0 {
+		return
+	}
 
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Types))
@@ -334,6 +371,12 @@ func (d *Declarations) RenderTypes(lineNum int, writer io.Writer) (newLineNum in
 //
 // The ordering is given by the sort order of the first element of each `const` block.
 func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
+	cursor = NoCursor
+	newLineNum = lineNum
+	if len(d.Constants) == 0 {
+		return
+	}
+
 	// Enumerate heads of const blocks.
 	headKeys := make([]string, 0, len(d.Constants))
 	for key, constDecl := range d.Constants {

@@ -5,6 +5,7 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -172,6 +173,9 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			}
 			if lineInCell == cursorInCell.Line {
 				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
+				cursorInFile.Col = cursorInCell.Col + deltaColumn
+				modLine := line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
+				log.Printf("Cursor in parse file line %d (cell line %d): %s", cursorInFile.Line, lineInCell, modLine)
 			}
 		}
 		addEmptyLine := func() {
@@ -252,38 +256,46 @@ func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (cu
 		return
 	}
 
-	update := func(fn func(lineNum int, w io.Writer) (int, Cursor, error)) bool {
+	update := func(fn func(lineNum int, w io.Writer) (int, Cursor, error), name string) bool {
 		var newCursor Cursor
-		lineNum, newCursor, err = fn(lineNum, f)
+		var newLineNum int
+		newLineNum, newCursor, err = fn(lineNum, f)
+		if newLineNum != lineNum {
+			//log.Printf("Block %q: lines (%d - %d)", name, lineNum, newLineNum)
+			lineNum = newLineNum
+		}
 		if err != nil {
+			err = errors.WithMessagef(err, "in block %q", name)
 			return true
 		}
 		if newCursor.HasCursor() {
 			cursor = newCursor
+			//log.Printf("Cursor found in %q: %v", name, cursor)
 		}
 		return false
 	}
 
-	if update(decls.RenderImports) {
+	if update(decls.RenderImports, "imports") {
 		return
 	}
-	if update(decls.RenderTypes) {
+	if update(decls.RenderTypes, "types") {
 		return
 	}
-	if update(decls.RenderConstants) {
+	if update(decls.RenderConstants, "constants") {
 		return
 	}
-	if update(decls.RenderVariables) {
+	if update(decls.RenderVariables, "variables") {
 		return
 	}
-	if update(decls.RenderFunctions) {
+	if update(decls.RenderFunctions, "functions") {
 		return
 	}
 	w("\n")
 	if mainDecl.HasCursor() {
 		cursor = mainDecl.Cursor
 		cursor.Line += int32(lineNum)
+		//log.Printf("Cursor in \"main\": %v", cursor)
 	}
-	w("\n%s\n", mainDecl.Definition)
+	w("%s\n", mainDecl.Definition)
 	return
 }

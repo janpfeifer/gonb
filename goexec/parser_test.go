@@ -127,8 +127,8 @@ func init_c() {
 	assert.Contains(t, s.Decls.Functions, "f")
 	assert.Contains(t, s.Decls.Functions, "sum")
 	assert.Contains(t, s.Decls.Functions, "init_c")
-	assert.Contains(t, s.Decls.Functions, "*Kg~Weight")
-	assert.Contains(t, s.Decls.Functions, "*Kg~Gain")
+	assert.Contains(t, s.Decls.Functions, "Kg~Weight")
+	assert.Contains(t, s.Decls.Functions, "Kg~Gain")
 	assert.Contains(t, s.Decls.Functions, "N~Weight")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)

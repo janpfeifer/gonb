@@ -64,6 +64,4 @@ func (m *TestMessage) Reply(msgType string, content interface{}) error {
 }
 
 func TestState_InspectPath(t *testing.T) {
-	_ = CreateTestState(t)
-	//msg := TestMessage{test: t}
 }

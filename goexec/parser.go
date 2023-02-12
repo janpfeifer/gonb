@@ -37,7 +37,7 @@ func extractContentOfNode(filesContents map[string]string, fileSet *token.FileSe
 }
 
 // ParseImportsFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
-func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) error {
+func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls *Declarations) error {
 	fileSet := token.NewFileSet()
 	packages, err := parser.ParseDir(fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
 	if err != nil {
@@ -47,6 +47,25 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 		return errors.Wrapf(err, "parsing go files in TempDir %s", s.TempDir)
 	}
 	filesContents := make(map[string]string)
+
+	if cursor.HasCursor() {
+		log.Printf("Cursor=%+v", cursor)
+	}
+
+	// getCursor returns the cursor position within this declaration, if the original cursor falls in there.
+	getCursor := func(from, to token.Pos) Cursor {
+		if !cursor.HasCursor() {
+			return NoCursor
+		}
+		fromPos, toPos := fileSet.Position(from), fileSet.Position(to)
+		for line := fromPos.Line; line <= toPos.Line; line++ {
+			// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
+			if int32(line-1) == cursor.Line {
+				return Cursor{int32(line - fromPos.Line), cursor.Col}
+			}
+		}
+		return NoCursor
+	}
 
 	// Debugging new types of parsing:
 	//  fmt.Printf("Parsing results:\n")
@@ -75,6 +94,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 				value := entry.Path.Value
 				value = value[1 : len(value)-1] // Remove quotes.
 				importEntry := NewImport(value, alias)
+				importEntry.Cursor = getCursor(entry.Pos(), entry.End())
 				decls.Imports[importEntry.Key] = importEntry
 			}
 
@@ -95,6 +115,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 						key = fmt.Sprintf("%s~%s", typeName, key)
 					}
 					f := &Function{Key: key, Definition: extractContentOfNode(filesContents, fileSet, typedDecl)}
+					f.Cursor = getCursor(typedDecl.Pos(), typedDecl.End())
 					decls.Functions[f.Key] = f
 				case *ast.GenDecl:
 					if typedDecl.Tok == token.IMPORT {
@@ -106,6 +127,8 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 						var prevConstDecl *Constant
 
 						for _, spec := range typedDecl.Specs {
+							newCursor := getCursor(spec.Pos(), spec.End())
+
 							// Each spec may be a list of variables (comma separated).
 							vSpec := spec.(*ast.ValueSpec)
 							vType := vSpec.Type
@@ -127,6 +150,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 										// Each un-named reference has a unique key.
 										v.Key = "_~" + strconv.Itoa(rand.Int()%0xFFFF)
 									}
+									v.Cursor = newCursor // TODO: Needs to adjust column position, if multiple definitions in the same line.
 									decls.Variables[v.Key] = v
 								} else {
 									c := &Constant{Key: name.Name, TypeDefinition: typeDefinition, ValueDefinition: valueDefinition}
@@ -135,6 +159,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 										c.Prev.Next = c
 									}
 									prevConstDecl = c
+									c.Cursor = newCursor // TODO: Needs to adjust column position, if multiple definitions in the same line.
 									decls.Constants[c.Key] = c
 								}
 							}
@@ -145,7 +170,9 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, decls *Declarations) 
 							tSpec := spec.(*ast.TypeSpec)
 							name := tSpec.Name.Name
 							tDef := extractContentOfNode(filesContents, fileSet, tSpec.Type)
-							decls.Types[name] = &TypeDecl{Key: name, TypeDefinition: tDef}
+							tDecl := &TypeDecl{Key: name, TypeDefinition: tDef}
+							tDecl.Cursor = getCursor(spec.Pos(), spec.End())
+							decls.Types[name] = tDecl
 						}
 					} else {
 						fmt.Printf("Dropped unknown generic declaration of type %s\n", typedDecl.Tok)

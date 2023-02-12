@@ -13,8 +13,6 @@ import (
 	"regexp"
 )
 
-type CellId string
-
 type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
@@ -104,6 +102,21 @@ func copyMap[K comparable, V any](dst, src map[K]V) {
 	}
 }
 
+// ClearCursor wherever declaration it may be.
+func (d *Declarations) ClearCursor() {
+	clearCursor(d.Imports)
+	clearCursor(d.Functions)
+	clearCursor(d.Variables)
+	clearCursor(d.Types)
+	clearCursor(d.Constants)
+}
+
+func clearCursor[K comparable, V interface{ ClearCursor() }](data map[K]V) {
+	for _, v := range data {
+		v.ClearCursor()
+	}
+}
+
 //go:generate stringer -type=ElementType goexec.go
 
 type ElementType int
@@ -116,26 +129,57 @@ const (
 	ConstType
 )
 
+// Cursor represents a cursor position, that we want to preserve when we render our declarations to a file.
+type Cursor struct {
+	Line, Col int32
+}
+
+const NoCursorLine = int32(-1)
+
+var NoCursor = Cursor{Line: NoCursorLine, Col: 0}
+
+func (c *Cursor) HasCursor() bool {
+	return c.Line != NoCursorLine
+}
+
+// CursorFrom returns a new Cursor adjusted
+func (c *Cursor) CursorFrom(line int) Cursor {
+	if !c.HasCursor() {
+		return *c
+	}
+	return Cursor{Line: c.Line + int32(line), Col: c.Col}
+}
+
+func (c *Cursor) ClearCursor() {
+	c.Line = -1
+}
+
+// Function definition.
 type Function struct {
+	Cursor
 	Key            string
 	Name, Receiver string
 	Definition     string // Multi-line definition, includes comments preceding definition.
+
 }
 
 type Variable struct {
+	Cursor
 	Key, Name                       string
 	TypeDefinition, ValueDefinition string // Type definition may be empty.
 }
 
 type TypeDecl struct {
+	Cursor
 	Key            string // Same as the name here.
 	TypeDefinition string // Type definition may be empty.
 }
 
 // Constant represents the declaration of a constant. Because when appearing in block
-// they inherit its definition form the previou line, we need to preserve the blocks.
+// they inherit its definition form the previous line, we need to preserve the blocks.
 // For this we use Next/Prev links.
 type Constant struct {
+	Cursor
 	Key                             string
 	TypeDefinition, ValueDefinition string    // Can be empty, if used as iota.
 	Next, Prev                      *Constant // Next and previous declaration in same Const block.
@@ -144,6 +188,7 @@ type Constant struct {
 // Import represents an import to be included -- if not used it's automatically removed by
 // `goimports`.
 type Import struct {
+	Cursor
 	Key         string
 	Path, Alias string
 }

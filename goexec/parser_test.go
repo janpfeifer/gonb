@@ -106,7 +106,7 @@ func init_c() {
 	if err != nil {
 		t.Fatalf("Failed to create main.go: %+v", err)
 	}
-	err = s.ParseImportsFromMainGo(nil, s.Decls)
+	err = s.ParseImportsFromMainGo(nil, NoCursor, s.Decls)
 	if err != nil {
 		t.Fatalf("Failed to parse imports from main.go: %+v", err)
 	}

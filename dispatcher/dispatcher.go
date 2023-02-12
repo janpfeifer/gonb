@@ -213,30 +213,45 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines := strings.Split(code, "\n")
 	var cursorLine, cursorCol int
-	for pos := 0; cursorLine < len(lines) && pos < cursorPos; pos += 1 + len(lines[cursorLine]) {
+	for pos := 0; cursorLine < len(lines) && pos < cursorPos; {
 		if pos+len(lines[cursorLine]) > cursorPos {
 			cursorCol = cursorPos - pos
 			break
 		}
+		pos += 1 + len(lines[cursorLine])
 		cursorLine++
 	}
-	log.Printf("inspect_request: Line, Col=(%d, %d)", cursorLine+1, cursorCol+1)
 
 	// Separate special commands from Go commands.
 	usedLines := make(map[int]bool)
 	if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
 		return errors.WithMessagef(err, "executing special commands in cell")
 	}
-	goExec.InspectCell(msg, lines, usedLines, cursorLine, cursorPos)
 
-	replyContent := fmt.Sprintf("<div>Cursor at %d<br/>\n<pre>%s</pre></div>", cursorPos, code)
+	// Get data contents for reply.
+	var data kernel.MIMEMap
+	if usedLines[cursorLine] {
+		// If special command, use our help message as inspect content.
+		data = kernel.MIMEMap{protocol.MIMETextPlain: any(specialcmd.HelpMessage)}
+	} else {
+		// Parse Go.
+		var err error
+		data, err = goExec.InspectCell(lines, usedLines, cursorLine, cursorCol)
+		if err != nil {
+			data = kernel.MIMEMap{
+				protocol.MIMETextPlain: any(
+					fmt.Sprintf("Failed to inspect(line=%d, col=%d):\n%+v", cursorLine+1, cursorCol+1, err)),
+			}
+		}
+	}
+
+	// Send reply.
 	reply := &kernel.InspectReply{
 		Status:   "ok",
-		Found:    false,
-		Data:     make(kernel.MIMEMap),
+		Found:    true,
+		Data:     data,
 		Metadata: make(kernel.MIMEMap),
 	}
-	reply.Data[string(protocol.MIMETextHTML)] = replyContent
 	return msg.Reply("inspect_reply", reply)
 }
 

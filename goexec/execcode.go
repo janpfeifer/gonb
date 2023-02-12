@@ -10,25 +10,17 @@ import (
 	"strings"
 )
 
-// PosInJupyter is the position on the original Jupyter cell.
-type PosInJupyter struct {
-	// Line in original Jupyter cell, or -1 if line is automatically generated.
-	Line int
-}
-
-var autoLine = PosInJupyter{Line: -1}
-
 // ExecuteCell takes the contents of a cell, parses it, merges new declarations with the ones
 // from previous definitions, render a final main.go code with the whole content,
 // compiles and runs it.
 func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]bool) error {
 	// Find declarations on unchanged cell contents.
-	linesPos, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines)
+	_, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 	newDecls := NewDeclarations()
-	if err = s.ParseImportsFromMainGo(msg, newDecls); err != nil {
+	if err = s.ParseImportsFromMainGo(msg, NoCursor, newDecls); err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell() while parsing cell")
 	}
 
@@ -59,7 +51,7 @@ func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[in
 	}
 
 	// And then compile it.
-	if err := s.Compile(msg, linesPos); err != nil {
+	if err := s.Compile(msg); err != nil {
 		return err
 	}
 
@@ -86,8 +78,7 @@ func (s *State) Execute(msg kernel.Message) error {
 //
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
-func (s *State) Compile(msg kernel.Message, linesPos []PosInJupyter) error {
-	_ = linesPos
+func (s *State) Compile(msg kernel.Message) error {
 	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
 	cmd.Dir = s.TempDir
 	var output []byte
@@ -137,16 +128,16 @@ can install it from the notebook with:
 	return nil
 }
 
-func (s *State) createGoFileFromChan(filePath string, lines <-chan string) (err error) {
+func (s *State) writeLinesToFile(filePath string, lines <-chan string) (err error) {
 	var f *os.File
 	f, err = os.Create(filePath)
 	if err != nil {
-		return errors.Wrapf(err, "creating main.go")
+		return errors.Wrapf(err, "creating %q", filePath)
 	}
 	defer func() {
 		newErr := f.Close()
 		if newErr != nil && err == nil {
-			err = errors.Wrapf(newErr, "closing main.go")
+			err = errors.Wrapf(newErr, "closing %q", filePath)
 		}
 	}()
 	for line := range lines {
@@ -156,30 +147,38 @@ func (s *State) createGoFileFromChan(filePath string, lines <-chan string) (err 
 		}
 		_, err = fmt.Fprintf(f, "%s\n", line)
 		if err != nil {
-			err = errors.Wrap(err, "writing to main.go")
+			err = errors.Wrapf(err, "writing to %q", filePath)
 		}
 	}
 	return err
 }
 
 // createGoFileFromLines implements CreateMainGo with no extra functionality (like auto-import).
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]bool) (linesPos []PosInJupyter, err error) {
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]bool, cursorInCell Cursor) (cursorInFile Cursor, err error) {
 	linesChan := make(chan string, 1)
 
+	cursorInFile = cursorInCell
+	lineInFile := int32(0)
 	go func() {
 		defer close(linesChan)
-		// Reserve space for original lines + package + func main().
-		linesPos = make([]PosInJupyter, 0, 5+len(lines))
-		addLine := func(line string, pos PosInJupyter) {
+		// addLine checks for the new cursorInFile position.
+		addLine := func(line string, lineInCell int32, deltaColumn int32) {
 			linesChan <- line
-			linesPos = append(linesPos, pos)
+			lineInFile++
+
+			if !cursorInCell.HasCursor() || lineInCell == NoCursorLine {
+				return
+			}
+			if lineInCell == cursorInCell.Line {
+				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
+			}
 		}
 		addEmptyLine := func() {
-			addLine("", autoLine)
+			addLine("", NoCursorLine, 0)
 		}
 
 		// Insert package.
-		addLine("package main", autoLine)
+		addLine("package main", NoCursorLine, 0)
 		addEmptyLine()
 
 		var createdFuncMain bool
@@ -187,8 +186,8 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			line = strings.TrimRight(line, " ")
 			if line == "%main" || line == "%%" {
 				addEmptyLine()
-				addLine("func main() {", autoLine)
-				addLine("\tflag.Parse()", autoLine)
+				addLine("func main() {", NoCursorLine, 0)
+				addLine("\tflag.Parse()", NoCursorLine, 0)
 				createdFuncMain = true
 				continue
 			}
@@ -198,20 +197,22 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			if createdFuncMain {
 				// Indent following lines.
 				line = "\t" + line
+				addLine(line, int32(ii), 1)
+			} else {
+				addLine(line, int32(ii), 0)
 			}
-			addLine(line, PosInJupyter{Line: ii})
 		}
 		if createdFuncMain {
-			addLine("}", autoLine)
+			addLine("}", NoCursorLine, 0)
 		}
 	}()
 
 	// Pipe linesChan to main.go file.
-	err = s.createGoFileFromChan(filePath, linesChan)
+	err = s.writeLinesToFile(filePath, linesChan)
 
 	// Check for any error only at the end.
 	if err != nil {
-		return nil, err
+		return NoCursor, err
 	}
 	return
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -42,7 +43,7 @@ func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[in
 	tmpDecls.MergeFrom(newDecls)
 
 	// Render declarations to main.go.
-	if err = s.createMainFromDecls(tmpDecls, mainDecl); err != nil {
+	if _, err = s.createMainFromDecls(tmpDecls, mainDecl); err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell() while generating main.go with all declarations")
 	}
 	// Run goimports (or the code that implements it)
@@ -217,7 +218,9 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 	return
 }
 
-func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (err error) {
+func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+	cursor = NoCursor
+
 	var f *os.File
 	f, err = os.Create(s.MainPath())
 	if err != nil {
@@ -234,27 +237,53 @@ func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (er
 		}
 	}()
 
-	_, err = fmt.Fprintf(f, "package main\n\n")
+	lineNum := 0
+	w := func(format string, args ...any) {
+		if err != nil {
+			return
+		}
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(f, strBuf)
+	}
+
+	w("package main\n\n")
 	if err != nil {
 		return
 	}
-	if err = decls.RenderImports(f); err != nil {
+
+	update := func(fn func(lineNum int, w io.Writer) (int, Cursor, error)) bool {
+		var newCursor Cursor
+		lineNum, newCursor, err = fn(lineNum, f)
+		if err != nil {
+			return true
+		}
+		if newCursor.HasCursor() {
+			cursor = newCursor
+		}
+		return false
+	}
+
+	if update(decls.RenderImports) {
 		return
 	}
-	if err = decls.RenderTypes(f); err != nil {
+	if update(decls.RenderTypes) {
 		return
 	}
-	if err = decls.RenderConstants(f); err != nil {
+	if update(decls.RenderConstants) {
 		return
 	}
-	if err = decls.RenderVariables(f); err != nil {
+	if update(decls.RenderVariables) {
 		return
 	}
-	if err = decls.RenderFunctions(f); err != nil {
+	if update(decls.RenderFunctions) {
 		return
 	}
-	if _, err = fmt.Fprintf(f, "\n%s\n", mainDecl.Definition); err != nil {
-		return
+	w("\n")
+	if mainDecl.HasCursor() {
+		cursor = mainDecl.Cursor
+		cursor.Line += int32(lineNum)
 	}
+	w("\n%s\n", mainDecl.Definition)
 	return
 }

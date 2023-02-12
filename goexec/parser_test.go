@@ -164,7 +164,8 @@ func init_c() {
 )
 `
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
-	require.NoErrorf(t, s.Decls.RenderImports(buf), "Declarations.RenderImports()")
+	_, _, err = s.Decls.RenderImports(0, buf)
+	require.NoErrorf(t, err, "Declarations.RenderImports()")
 	assert.Equal(t, wantImportsRendering, buf.String())
 
 	// Checks variables rendering.
@@ -178,7 +179,8 @@ func init_c() {
 )
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 512))
-	require.NoErrorf(t, s.Decls.RenderVariables(buf), "Declarations.RenderVariables()")
+	_, _, err = s.Decls.RenderVariables(0, buf)
+	require.NoErrorf(t, err, "Declarations.RenderVariables()")
 	assert.Equal(t, wantVariablesRendering, buf.String())
 
 	// Checks functions rendering.
@@ -197,7 +199,8 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 }
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	require.NoErrorf(t, s.Decls.RenderFunctions(buf), "Declarations.RenderFunctions()")
+	_, _, err = s.Decls.RenderFunctions(0, buf)
+	require.NoErrorf(t, err, "Declarations.RenderFunctions()")
 	assert.Equal(t, wantFunctionsRendering, buf.String())
 
 	// Checks types rendering.
@@ -206,7 +209,8 @@ type N float64
 type XY struct { x, y float64 }
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	require.NoErrorf(t, s.Decls.RenderTypes(buf), "Declarations.RenderTypes()")
+	_, _, err = s.Decls.RenderTypes(0, buf)
+	require.NoErrorf(t, err, "Declarations.RenderTypes()")
 	assert.Equal(t, wantTypesRendering, buf.String())
 
 	// Checks constants rendering.
@@ -223,27 +227,8 @@ const (
 )
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	require.NoErrorf(t, s.Decls.RenderConstants(buf), "Declarations.RenderConstants()")
+	_, _, err = s.Decls.RenderConstants(0, buf)
+	require.NoErrorf(t, err, "Declarations.RenderConstants()")
 	assert.Equal(t, wantConstantsRendering, buf.String())
 	//fmt.Printf("Constants:\n%s\n", buf.String())
 }
-
-/*
-func Test(t *testing.T) {
-	code := `package main
-
-import "fmt"
-
-`
-	s := emptyState()
-	var err error
-	s.TempDir, err = createTestGoMain(code)
-	if err != nil {
-		t.Fatalf("Failed to create main.go: %+v", err)
-	}
-	err = s.ParseImportsFromMainGo(&s.Decls)
-	if err != nil {
-		t.Fatalf("Failed to parse imports from main.go: %+v", err)
-	}
-}
-*/

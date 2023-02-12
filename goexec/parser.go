@@ -36,6 +36,11 @@ func extractContentOfNode(filesContents map[string]string, fileSet *token.FileSe
 	return contents[from:to]
 }
 
+// countLines returns the number of "\n" in the string.
+func countLines(definition string) int {
+	return strings.Count(definition, "\n")
+}
+
 // ParseImportsFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
 func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls *Declarations) error {
 	fileSet := token.NewFileSet()
@@ -187,7 +192,7 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 }
 
 // RenderImports writes out `import ( ... )` for all imports in Declarations.
-func (d *Declarations) RenderImports(writer io.Writer) (err error) {
+func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
 	// Enumerate imports sorted by keys.
 	keys := make([]string, 0, len(d.Imports))
 	for key := range d.Imports {
@@ -217,7 +222,7 @@ func (d *Declarations) RenderImports(writer io.Writer) (err error) {
 }
 
 // RenderVariables writes out `var ( ... )` for all variables in Declarations.
-func (d *Declarations) RenderVariables(writer io.Writer) (err error) {
+func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Variables))
 	for key := range d.Variables {
@@ -230,7 +235,9 @@ func (d *Declarations) RenderVariables(writer io.Writer) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = fmt.Fprintf(writer, format, args...)
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(writer, strBuf)
 	}
 
 	w("var (\n")
@@ -243,11 +250,12 @@ func (d *Declarations) RenderVariables(writer io.Writer) (err error) {
 		w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
 	}
 	w(")\n")
+	newLineNum = lineNum
 	return
 }
 
 // RenderFunctions without comments, for all functions in Declarations.
-func (d *Declarations) RenderFunctions(writer io.Writer) (err error) {
+func (d *Declarations) RenderFunctions(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Functions))
 	for key := range d.Functions {
@@ -260,22 +268,35 @@ func (d *Declarations) RenderFunctions(writer io.Writer) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = fmt.Fprintf(writer, format, args...)
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(writer, strBuf)
 	}
 
 	for _, key := range keys {
 		funcDecl := d.Functions[key]
 		def := funcDecl.Definition
+		if funcDecl.HasCursor() {
+			cursor = funcDecl.Cursor
+			cursor.Line += int32(lineNum)
+		}
 		if strings.HasPrefix(key, "init_") {
 			def = strings.Replace(def, key, "init", 1)
+			if funcDecl.HasCursor() && cursor.Line == int32(lineNum) && cursor.Col >= 9 {
+				// Shift the cursor position the characters removed from the key.
+				cursor.Col -= int32(len(key) - len("init"))
+			}
 		}
 		w("%s\n", def)
 	}
+	newLineNum = lineNum
 	return
 }
 
 // RenderTypes without comments.
-func (d *Declarations) RenderTypes(writer io.Writer) (err error) {
+func (d *Declarations) RenderTypes(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
+	cursor = NoCursor
+
 	// Enumerate variables sorted by keys.
 	keys := make([]string, 0, len(d.Types))
 	for key := range d.Types {
@@ -288,13 +309,20 @@ func (d *Declarations) RenderTypes(writer io.Writer) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = fmt.Fprintf(writer, format, args...)
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(writer, strBuf)
 	}
 
 	for _, key := range keys {
 		typeDecl := d.Types[key]
+		if typeDecl.HasCursor() {
+			cursor = typeDecl.Cursor
+			cursor.Line += int32(lineNum)
+		}
 		w("type %s %s\n", key, typeDecl.TypeDefinition)
 	}
+	newLineNum = lineNum
 	return
 }
 
@@ -305,7 +333,7 @@ func (d *Declarations) RenderTypes(writer io.Writer) (err error) {
 // and blocks as they were originally parsed.
 //
 // The ordering is given by the sort order of the first element of each `const` block.
-func (d *Declarations) RenderConstants(writer io.Writer) (err error) {
+func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNum int, cursor Cursor, err error) {
 	// Enumerate heads of const blocks.
 	headKeys := make([]string, 0, len(d.Constants))
 	for key, constDecl := range d.Constants {
@@ -321,24 +349,35 @@ func (d *Declarations) RenderConstants(writer io.Writer) (err error) {
 		if err != nil {
 			return
 		}
-		_, err = fmt.Fprintf(writer, format, args...)
+		strBuf := fmt.Sprintf(format, args...)
+		lineNum += countLines(strBuf)
+		_, err = fmt.Fprint(writer, strBuf)
 	}
 
 	for _, headKey := range headKeys {
 		constDecl := d.Constants[headKey]
 		if constDecl.Next == nil {
 			// Render individual const declaration.
+			if constDecl.HasCursor() {
+				cursor = constDecl.Cursor
+				cursor.Line += int32(lineNum)
+			}
 			w("const %s\n", constDecl.Render())
 			continue
 		}
 		// Render block of constants.
 		w("const (\n")
 		for constDecl != nil {
+			if constDecl.HasCursor() {
+				cursor = constDecl.Cursor
+				cursor.Line += int32(lineNum)
+			}
 			w("\t%s\n", constDecl.Render())
 			constDecl = constDecl.Next
 		}
 		w(")\n")
 	}
+	newLineNum = lineNum
 	return
 }
 

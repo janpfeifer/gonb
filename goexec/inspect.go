@@ -3,6 +3,7 @@ package goexec
 import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"log"
 	"path"
 )
 
@@ -22,12 +23,12 @@ func (s *State) InspectCell(lines []string, skipLines map[int]bool, line, col in
 	}
 
 	cursorInCell := Cursor{int32(line), int32(col)}
-	cursorInFile, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	cursorInTmpFile, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "in goexec.InspectCell()")
 	}
 	newDecls := NewDeclarations()
-	if err = s.ParseImportsFromMainGo(nil, cursorInFile, newDecls); err != nil {
+	if err = s.ParseImportsFromMainGo(nil, cursorInTmpFile, newDecls); err != nil {
 		return nil, errors.WithMessagef(err, "in goexec.InspectCell() while parsing cell")
 	}
 
@@ -50,9 +51,11 @@ func (s *State) InspectCell(lines []string, skipLines map[int]bool, line, col in
 	tmpDecls.MergeFrom(newDecls)
 
 	// Render declarations to main.go.
-	if err = s.createMainFromDecls(tmpDecls, mainDecl); err != nil {
+	var cursorInFile Cursor
+	cursorInFile, err = s.createMainFromDecls(tmpDecls, mainDecl)
+	if err != nil {
 		return nil, errors.WithMessagef(err, "in goexec.InspectCell() while generating main.go with all declarations")
 	}
-
+	log.Printf("CursorInFile: %+v", cursorInFile)
 	return nil, errors.Errorf("Unable to inspect: line %d, col %d", line, col)
 }

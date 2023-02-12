@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.2
+
+* Added mybinder.org configuration
+
 ## v0.3.1
 
 * Improved error message (in contextual help side-bar) if `gopls` is not installed.

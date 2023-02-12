@@ -174,7 +174,12 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			if lineInCell == cursorInCell.Line {
 				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
 				cursorInFile.Col = cursorInCell.Col + deltaColumn
-				modLine := line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
+				var modLine string
+				if cursorInFile.Col < int32(len(line)) {
+					modLine = line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
+				} else {
+					modLine = line + "*"
+				}
 				log.Printf("Cursor in parse file line %d (cell line %d): %s", cursorInFile.Line, lineInCell, modLine)
 			}
 		}

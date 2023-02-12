@@ -1,9 +1,14 @@
 package goexec
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"log"
+	"os/exec"
 	"path"
 )
 
@@ -29,7 +34,9 @@ func (s *State) InspectCell(lines []string, skipLines map[int]bool, line, col in
 	}
 	newDecls := NewDeclarations()
 	if err = s.ParseImportsFromMainGo(nil, cursorInTmpFile, newDecls); err != nil {
-		return nil, errors.WithMessagef(err, "in goexec.InspectCell() while parsing cell")
+		// If cell is in an un-parseable state, just returns empty context. User can try to
+		// run cell to get an error.
+		return make(kernel.MIMEMap), nil
 	}
 
 	// Checks whether there is a "main" function defined in the code.
@@ -56,6 +63,67 @@ func (s *State) InspectCell(lines []string, skipLines map[int]bool, line, col in
 	if err != nil {
 		return nil, errors.WithMessagef(err, "in goexec.InspectCell() while generating main.go with all declarations")
 	}
+	if !cursorInFile.HasCursor() {
+		// Returns empty data, which returns a "not found".
+		return make(kernel.MIMEMap), nil
+	}
 	log.Printf("CursorInFile: %+v", cursorInFile)
-	return nil, errors.Errorf("Unable to inspect: line %d, col %d", line, col)
+
+	// Execute `gopls` with the given path.
+	var jsonData map[string]any
+	jsonData, err = goplsQuery(s.TempDir, "definition", s.MainPath(), cursorInFile)
+	if err != nil {
+		log.Printf("Failed to find definition with `gopls` for symbol under cursor: %v", err)
+		// If gopls fails, just returns empty data, which returns a "not found".
+		return make(kernel.MIMEMap), nil
+	}
+	descAny, found := jsonData["description"]
+	if !found {
+		log.Printf("gopls without description, returned %q", jsonData)
+		// Returns empty data, which returns a "not found".
+		return make(kernel.MIMEMap), nil
+	}
+	desc, ok := descAny.(string)
+	if !ok {
+		log.Printf("gopls description not a string: %q", desc)
+		// Returns empty data, which returns a "not found".
+		return make(kernel.MIMEMap), nil
+	}
+
+	// Return MIMEMap with markdown.
+	return kernel.MIMEMap{protocol.MIMETextMarkdown: desc}, nil
+}
+
+// goplsQuery invokes gopls to find the definition of a function.
+// TODO: run gopls as a service, as opposed to invoking it every time.
+func goplsQuery(dir, command, filePath string, cursor Cursor) (map[string]any, error) {
+	goplsPath, err := exec.LookPath("gopls")
+	if err != nil {
+		err = errors.Wrap(err, `
+Program gopls is not installed. It is used to inspect into code
+and provide contextual information and autocompletion. It is a 
+standard Go toolkit package. You can install it from the notebook
+with:
+
+!go install golang.org/x/tools/gopls@latest
+
+`)
+		return nil, err
+	}
+	location := fmt.Sprintf("%s:%d:%d", filePath, cursor.Line+1, cursor.Col+1)
+	cmd := exec.Command(goplsPath, command, "-json", "-markdown", location)
+	cmd.Dir = dir
+	var output []byte
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to run %q: %q", cmd.String(), output)
+	}
+
+	jsonData := make(map[string]any)
+	dec := json.NewDecoder(bytes.NewReader(output))
+	err = dec.Decode(&jsonData)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to decode json from gopls output: %q", output)
+	}
+	return jsonData, nil
 }

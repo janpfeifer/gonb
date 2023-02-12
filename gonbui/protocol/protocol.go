@@ -9,6 +9,7 @@ type MIMEType string
 const (
 	MIMETextHTML       MIMEType = "text/html"
 	MIMETextJavascript          = "text/javascript"
+	MIMETextMarkdown            = "text/markdown"
 	MIMETextPlain               = "text/plain"
 	MIMEImagePNG                = "image/png"
 	MIMEImageSVG                = "image/svg+xml"

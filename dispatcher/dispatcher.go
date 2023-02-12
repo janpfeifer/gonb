@@ -225,7 +225,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Separate special commands from Go commands.
 	usedLines := make(map[int]bool)
 	if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
-		return errors.WithMessagef(err, "executing special commands in cell")
+		return errors.WithMessagef(err, "parsing special commands in cell")
 	}
 
 	// Get data contents for reply.
@@ -248,7 +248,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Send reply.
 	reply := &kernel.InspectReply{
 		Status:   "ok",
-		Found:    true,
+		Found:    len(data) > 0,
 		Data:     data,
 		Metadata: make(kernel.MIMEMap),
 	}

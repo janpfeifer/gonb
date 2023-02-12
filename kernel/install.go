@@ -80,13 +80,16 @@ func Install(extraArgs []string) error {
 	}
 
 	_, err = exec.LookPath("goimports")
+	if err == nil {
+		_, err = exec.LookPath("gopls")
+	}
 	if err != nil {
 		log.Fatalf(`
-Program goimports is not installed. It is used to automatically import
-missing standard packages, and is a standard Go toolkit package. You
-can install it with:
+Program goimports and/or gopls are not installed. They are required dependencies,
+and generally are standard Go toolkit packages. You can install them with:
 
 go install golang.org/x/tools/cmd/goimports@latest
+go install golang.org/x/tools/gopls@latest
 
 `)
 	}

@@ -15,6 +15,18 @@ It's still **experimental**. This is very fresh from the oven, and likely there 
 (or not so nuanced) situations where it may not work as expected. Reports of issues and even better
 fixes are very welcome.
 
+# Installation
+
+The [**tutorial**](examples/tutorial.ipynb) explains, but in short:
+
+```
+$ go install github.com/janpfeifer/gonb@latest
+$ go install golang.org/x/tools/cmd/goimports@latest
+$ gonb --install
+```
+
+And then (re-)start Jupyter.
+
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 
 **GoNB** opens a named pipe (set in environment variable `GONB_PIPE`) that a program can use to directly

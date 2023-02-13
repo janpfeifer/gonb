@@ -233,7 +233,7 @@ func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum 
 			w("\t%q\n", importDecl.Path)
 		}
 	}
-	w(")\n")
+	w(")\n\n")
 	newLineNum = lineNum
 	return
 }
@@ -276,7 +276,7 @@ func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNu
 		}
 		w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
 	}
-	w(")\n")
+	w(")\n\n")
 	newLineNum = lineNum
 	return
 }
@@ -320,7 +320,7 @@ func (d *Declarations) RenderFunctions(lineNum int, writer io.Writer) (newLineNu
 				cursor.Col -= int32(len(key) - len("init"))
 			}
 		}
-		w("%s\n", def)
+		w("%s\n\n", def)
 	}
 	newLineNum = lineNum
 	return
@@ -359,6 +359,7 @@ func (d *Declarations) RenderTypes(lineNum int, writer io.Writer) (newLineNum in
 		}
 		w("type %s %s\n", key, typeDecl.TypeDefinition)
 	}
+	w("\n")
 	newLineNum = lineNum
 	return
 }
@@ -405,7 +406,7 @@ func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNu
 				cursor = constDecl.Cursor
 				cursor.Line += int32(lineNum)
 			}
-			w("const %s\n", constDecl.Render())
+			w("const %s\n\n", constDecl.Render())
 			continue
 		}
 		// Render block of constants.
@@ -418,7 +419,7 @@ func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNu
 			w("\t%s\n", constDecl.Render())
 			constDecl = constDecl.Next
 		}
-		w(")\n")
+		w(")\n\n")
 	}
 	newLineNum = lineNum
 	return

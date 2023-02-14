@@ -5,7 +5,6 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -174,13 +173,13 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			if lineInCell == cursorInCell.Line {
 				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
 				cursorInFile.Col = cursorInCell.Col + deltaColumn
-				var modLine string
-				if cursorInFile.Col < int32(len(line)) {
-					modLine = line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
-				} else {
-					modLine = line + "*"
-				}
-				log.Printf("Cursor in parse file line %d (cell line %d): %s", cursorInFile.Line, lineInCell, modLine)
+				//var modLine string
+				//if cursorInFile.Col < int32(len(line)) {
+				//	modLine = line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
+				//} else {
+				//	modLine = line + "*"
+				//}
+				//log.Printf("Cursor in parse file %+v (cell line %d): %s", cursorInFile, lineInCell, modLine)
 			}
 		}
 		addEmptyLine := func() {

@@ -208,17 +208,20 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	code := content["code"].(string)
 	cursorPos := int(content["cursor_pos"].(float64))
 	detailLevel := int(content["detail_level"].(float64))
-	log.Printf("inspect_request: cursorPos=%d, detailLevel=%d", cursorPos, detailLevel)
+	log.Printf("inspect_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
+	cursorPos = kernel.CursorPosToBytePos(code, cursorPos) // UTF16 pos to byte pos
+	log.Printf("inspect_request: cursorPos(bytes)=%d", cursorPos)
 	lines := strings.Split(code, "\n")
 	var cursorLine, cursorCol int
 	for pos := 0; cursorLine < len(lines) && pos < cursorPos; {
-		if pos+len(lines[cursorLine]) > cursorPos {
+		nextLinePos := pos + len(lines[cursorLine]) + 1
+		if cursorPos < nextLinePos {
 			cursorCol = cursorPos - pos
 			break
 		}
-		pos += 1 + len(lines[cursorLine])
+		pos = nextLinePos
 		cursorLine++
 	}
 
@@ -240,7 +243,8 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 		if err != nil {
 			data = kernel.MIMEMap{
 				protocol.MIMETextPlain: any(
-					fmt.Sprintf("Failed to inspect(line=%d, col=%d):\n%+v", cursorLine+1, cursorCol+1, err)),
+					fmt.Sprintf("%s", err.Error())),
+				//fmt.Sprintf("Failed to inspect: in cell=[line=%d, col=%d]:\n%+v", cursorLine+1, cursorCol+1, err)),
 			}
 		}
 	}

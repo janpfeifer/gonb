@@ -270,7 +270,11 @@ func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNu
 			cursor = varDecl.Cursor
 			cursor.Line += int32(lineNum)
 		}
-		w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
+		if varDecl.ValueDefinition != "" {
+			w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
+		} else {
+			w("\t%s%s\n", varDecl.Name, typeStr)
+		}
 	}
 	w(")\n\n")
 	newLineNum = lineNum

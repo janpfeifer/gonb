@@ -1,7 +1,15 @@
 # GoNB Changelog
 
-## v0.3.2
+## v0.3.3
 
+* Fixed support of variables declared only with type but no value.
+* Invoke `gopls` as a service, and talk LanguageServiceProtocol with it, to get inspection
+  of symbol -- and upcoming auto-complete.
+* Improved handling of cursor position: Jupyter sends UTF16 based positions (as opposed to bytes 
+  or unicode runes). Still not perfect: regeneration of the Go code may get the cursor shifted.
+
+## v0.3.2
+* 
 * Added mybinder.org configuration
 
 ## v0.3.1

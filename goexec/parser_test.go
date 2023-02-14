@@ -66,6 +66,8 @@ var (
 		34.0)
 )
 
+var z float64
+
 type XY struct { x, y float64 }
 
 var _ = fmt.Printf
@@ -132,9 +134,10 @@ func init_c() {
 	assert.Contains(t, s.Decls.Functions, "N~Weight")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)
-	assert.Lenf(t, s.Decls.Variables, 5, "Expected 4 variables, got %+v", s.Decls.Variables)
+	assert.Lenf(t, s.Decls.Variables, 6, "Expected 4 variables, got %+v", s.Decls.Variables)
 	assert.Contains(t, s.Decls.Variables, "x")
 	assert.Contains(t, s.Decls.Variables, "y")
+	assert.Contains(t, s.Decls.Variables, "z")
 	assert.Contains(t, s.Decls.Variables, "b")
 	assert.Contains(t, s.Decls.Variables, "c")
 	// The 5th var is "_", which gets a random key.
@@ -167,6 +170,7 @@ func init_c() {
 	fmtOther "fmt"
 	"math"
 )
+
 `
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	_, _, err = s.Decls.RenderImports(0, buf)
@@ -181,7 +185,9 @@ func init_c() {
 	c = "blah, blah, blah"
 	x float32 = 1
 	y float32 = 2
+	z float64
 )
+
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 512))
 	_, _, err = s.Decls.RenderVariables(0, buf)
@@ -192,19 +198,25 @@ func init_c() {
 	wantFunctionsRendering := `func (k *Kg) Gain(lasagna Kg) {
 	*k += lasagna
 }
+
 func (k *Kg) Weight() N {
 	return N(k) * 9.8
 }
+
 func (n N) Weight() N { return n }
+
 func f(x int) {
 	return g(x)+1  // g not defined in this file, but we still want to parse this.
 }
+
 func init() {
 	c += ", blah"
 }
+
 func sum[T interface{int | float32 | float64}](a, b T) T {
 	return a + b
 }
+
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	_, _, err = s.Decls.RenderFunctions(0, buf)
@@ -215,6 +227,7 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 	wantTypesRendering := `type Kg int
 type N float64
 type XY struct { x, y float64 }
+
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	_, _, err = s.Decls.RenderTypes(0, buf)
@@ -227,12 +240,15 @@ type XY struct { x, y float64 }
 	K1
 	K2
 )
+
 const PI = 3.1415
+
 const (
 	PI32 float32 = 3.1415
 	E = 2.71828
 	ToBe = "Or Not To Be"
 )
+
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	_, _, err = s.Decls.RenderConstants(0, buf)

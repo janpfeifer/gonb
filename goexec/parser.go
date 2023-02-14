@@ -53,10 +53,6 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 	}
 	filesContents := make(map[string]string)
 
-	if cursor.HasCursor() {
-		log.Printf("Cursor=%+v", cursor)
-	}
-
 	// getCursor returns the cursor position within this declaration, if the original cursor falls in there.
 	getCursor := func(node ast.Node) Cursor {
 		from, to := node.Pos(), node.End()

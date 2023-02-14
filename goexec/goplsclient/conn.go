@@ -11,18 +11,56 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 )
 
 var _ = lsp.MethodInitialize
+
+var (
+	ConnectTimeout       = 2000 * time.Millisecond
+	CommunicationTimeout = 500 * time.Millisecond
+)
 
 // jsonrpc2Handler implements jsonrpc2.Handler, listening to incoming events.
 type jsonrpc2Handler struct {
 	client *Client
 }
 
+func (c *Client) ConnClose() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.connCloseLocked()
+}
+
+// connCloseLocked assumes Client.mu lock is acquired.
+func (c *Client) connCloseLocked() {
+	// Wait for any pending concurrent connection attempt.
+	if c.conn != nil {
+		c.conn.Close()
+		c.conn = nil
+	}
+}
+
+func minTimeout(ctx context.Context, timeout time.Duration) context.Context {
+	minDeadline := time.Now().Add(timeout)
+	if deadline, ok := ctx.Deadline(); !ok || deadline.After(minDeadline) {
+		ctx, _ = context.WithDeadline(ctx, minDeadline)
+	}
+	return ctx
+}
+
 // Connect to the `gopls` in address given by `c.Address()`. It also starts
 // a goroutine to monitor receiving requests.
 func (c *Client) Connect(ctx context.Context) error {
+	ctx = minTimeout(ctx, ConnectTimeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Already connected ?
+	if c.conn != nil {
+		return nil
+	}
+
 	netMethod := "tcp"
 	addr := c.address
 	if strings.HasPrefix(addr, "/") {
@@ -32,8 +70,9 @@ func (c *Client) Connect(ctx context.Context) error {
 		addr = addr[5:]
 	}
 	var err error
-	c.conn, err = net.Dial(netMethod, addr)
+	c.conn, err = net.DialTimeout(netMethod, addr, ConnectTimeout)
 	if err != nil {
+		c.conn = nil
 		return errors.Wrapf(err, "failed to connect to gopls in %q", addr)
 	}
 
@@ -41,10 +80,17 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.jsonConn = jsonrpc2.NewConn(jsonStream)
 	c.jsonHandler = &jsonrpc2Handler{}
 	c.jsonConn.AddHandler(c.jsonHandler)
-	go func() {
+	go func(currentConn net.Conn) {
+		// Run should use a non-expiring context.
+		ctx := context.Background()
 		_ = c.jsonConn.Run(ctx)
-		log.Printf("- jsonrpc2 connection stopped")
-	}()
+		log.Printf("- gopls connection stopped")
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.conn == currentConn {
+			c.connCloseLocked()
+		}
+	}(c.conn)
 
 	err = c.jsonConn.Call(ctx, lsp.MethodInitialize, &lsp.InitializeParams{
 		ProcessID: 0,
@@ -66,10 +112,32 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
+func (c *Client) ResetFile(filePath string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, found := c.fileCache[filePath]; found {
+		delete(c.fileCache, filePath)
+	}
+}
+
 // NotifyDidOpen sends a notification to `gopls` with the open file, which also sends the
 // file content (from `Client.fileCache` if available).
 // File version sent is incremented.
 func (c *Client) NotifyDidOpen(ctx context.Context, filePath string) (err error) {
+	if !c.WaitConnection(ctx) {
+		// Silently do nothing, if no connection available.
+		return
+	}
+	ctx = minTimeout(ctx, CommunicationTimeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return
+	}
+	return c.notifyDidOpenLocked(ctx, filePath)
+}
+
+func (c *Client) notifyDidOpenLocked(ctx context.Context, filePath string) (err error) {
 	var fileData *FileData
 	fileData, err = c.FileData(filePath)
 	if err != nil {
@@ -97,8 +165,22 @@ func (c *Client) NotifyDidOpen(ctx context.Context, filePath string) (err error)
 //
 // This will automatically call NotifyDidOpen, if file hasn't been sent yet.
 func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
+	if !c.WaitConnection(ctx) {
+		// Silently do nothing, if no connection available.
+		return
+	}
+	ctx = minTimeout(ctx, CommunicationTimeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return
+	}
+	return c.callDefinitionLocked(ctx, filePath, line, col)
+}
+
+func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
 	if _, found := c.fileVersions[filePath]; !found {
-		err = c.NotifyDidOpen(ctx, filePath)
+		err = c.notifyDidOpenLocked(ctx, filePath)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +197,7 @@ func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col 
 	}
 	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentDefinition, params, &results)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed Client.GoplsOpenFile notification for %q", filePath)
+		return nil, errors.Cause(err)
 	}
 	return
 }
@@ -127,8 +209,22 @@ func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col 
 //
 // This will automatically call NotifyDidOpen, if file hasn't been sent yet.
 func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
+	if !c.WaitConnection(ctx) {
+		// Silently do nothing, if no connection available.
+		return
+	}
+	ctx = minTimeout(ctx, CommunicationTimeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return
+	}
+	return c.callHoverLocked(ctx, filePath, line, col)
+}
+
+func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
 	if _, found := c.fileVersions[filePath]; !found {
-		err = c.NotifyDidOpen(ctx, filePath)
+		err = c.notifyDidOpenLocked(ctx, filePath)
 		if err != nil {
 			return
 		}
@@ -143,6 +239,7 @@ func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) 
 			Character: float64(col),
 		},
 	}
+
 	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentHover, params, &hover)
 	if err != nil {
 		err = errors.Wrapf(err, "Failed Client.CallHover notification for %q", filePath)

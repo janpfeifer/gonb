@@ -27,18 +27,27 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path"
+	"sync"
 )
 
 type Client struct {
 	dir     string // directory with contents.
 	address string // where to connect to `gopls`.
 
+	// Guard server state.
+	mu sync.Mutex
+
 	// Connection attributes.
 	conn            net.Conn
 	jsonConn        *jsonrpc2.Conn
 	jsonHandler     *jsonrpc2Handler
 	lspCapabilities lsp.ServerCapabilities
+
+	// gopls execution
+	goplsExec      *exec.Cmd
+	waitConnecting bool
 
 	// File cache.
 	fileVersions map[string]int       // Every open file that has been sent to gopls has a version, that is bumped when it is sent again.
@@ -69,16 +78,17 @@ func (c *Client) Address() string { return c.address }
 // If the address is empty, it defaults to a unix socket configured as
 // `dir+"/gopls_socket".
 //
-// This may have no effect if `gopls` is already started or connected to.
+// This may have no effect if `gopls` is already started or connectingLatch to.
 func (c *Client) SetAddress(address string) {
 	c.address = address
 }
 
-// Shutdown closes connection and stops `gopls` (if connected/started).
+// Shutdown closes connection and stops `gopls` (if connectingLatch/started).
 func (c *Client) Shutdown() {
-	if c.conn != nil {
-		c.conn.Close()
-	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.connCloseLocked()
+	c.stopLocked()
 }
 
 // FileData retrieves the file data, including its contents.
@@ -130,21 +140,25 @@ func (c *Client) FileData(filePath string) (content *FileData, err error) {
 // Definition return the definition for the identifier at the given position, rendered
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
-	locs, err := c.CallDefinition(ctx, filePath, line, col)
+	err = c.NotifyDidOpen(ctx, filePath)
 	if err != nil {
 		return "", err
 	}
-	if len(locs) == 0 {
+	_, err = c.CallDefinition(ctx, filePath, line, col)
+	if err != nil {
 		return "", err
 	}
 	hover, err := c.CallHover(ctx, filePath, line, col)
+	if err != nil {
+		return "", err
+	}
 	if hover.Contents.Kind != lsp.Markdown {
 		log.Printf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
 	}
 	return hover.Contents.Value, nil
 }
 
-// Span returns the text spanning the given location (it represents a range).
+// Span returns the text spanning the given location (`lsp.Location` represents a range).
 func (c *Client) Span(loc lsp.Location) (string, error) {
 	fileData, err := c.FileData(loc.URI.Filename())
 	if err != nil {

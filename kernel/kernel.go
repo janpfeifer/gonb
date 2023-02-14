@@ -25,7 +25,10 @@ import (
 
 var (
 	// ProtocolVersion defines the Jupyter protocol version.
-	ProtocolVersion = "5.0"
+	// Version 5.2 encodes cursor pos as one position per unicode character.
+	// (https://jupyter-client.readthedocs.io/en/stable/messaging.html#cursor-pos-and-unicode-offsets)
+	// But still Juypter lab is using UTF-16 encoding for cursor-pos.
+	ProtocolVersion = "5.2"
 )
 
 const (

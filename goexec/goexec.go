@@ -5,6 +5,7 @@
 package goexec
 
 import (
+	"github.com/janpfeifer/gonb/goexec/goplsclient"
 	"github.com/pkg/errors"
 	"log"
 	"os"
@@ -23,6 +24,9 @@ type State struct {
 
 	// Global elements defined mapped by their keys.
 	Decls *Declarations
+
+	// gopls client
+	gopls *goplsclient.Client
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.
@@ -58,6 +62,34 @@ func New(uniqueID string) (*State, error) {
 	if err != nil {
 		log.Printf("Failed to run `go mod init %s`:\n%s", s.Package, output)
 		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+
+	if _, err = exec.LookPath("gopls"); err == nil {
+		s.gopls = goplsclient.New(s.TempDir)
+		err = s.gopls.Start()
+		if err != nil {
+			log.Printf("Failed to start `gopls`: %v", err)
+		}
+		log.Printf("Started `gopls`.")
+		//s.gopls.SetAddress("/tmp/gopls-daemon-socket")
+		//err = s.gopls.Connect(context.Background())
+		//if err != nil {
+		//	log.Printf("Failed to connect to `gopls`: %v", err)
+		//}
+		//log.Printf("Connected to `gopls`.")
+
+	} else {
+		msg := `
+Program gopls is not installed. It is used to inspect into code
+and provide contextual information and autocompletion. It is a 
+standard Go toolkit package. You can install it from the notebook
+with:
+
+` + "```" + `
+!go install golang.org/x/tools/gopls@latest
+` + "```\n"
+		log.Printf(msg)
+		err = nil
 	}
 
 	log.Printf("Initialized goexec.State in %s", s.TempDir)

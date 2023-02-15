@@ -62,8 +62,8 @@ func (s *State) ParseImportsFromMainGo(msg kernel.Message, cursor Cursor, decls 
 		fromPos, toPos := fileSet.Position(from), fileSet.Position(to)
 		for line := fromPos.Line; line <= toPos.Line; line++ {
 			// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
-			if int32(line-1) == cursor.Line {
-				c := Cursor{int32(line - fromPos.Line), cursor.Col}
+			if line-1 == cursor.Line {
+				c := Cursor{line - fromPos.Line, cursor.Col}
 				//log.Printf("Found cursor at %v in definition:\n%s", c,
 				//	extractContentOfNode(filesContents, fileSet, node))
 				return c
@@ -221,7 +221,7 @@ func (d *Declarations) RenderImports(lineNum int, writer io.Writer) (newLineNum 
 		importDecl := d.Imports[key]
 		if importDecl.HasCursor() {
 			cursor = importDecl.Cursor
-			cursor.Line += int32(lineNum)
+			cursor.Line += lineNum
 		}
 		if importDecl.Alias != "" {
 			w("\t%s %q\n", importDecl.Alias, importDecl.Path)
@@ -268,7 +268,7 @@ func (d *Declarations) RenderVariables(lineNum int, writer io.Writer) (newLineNu
 		}
 		if varDecl.HasCursor() {
 			cursor = varDecl.Cursor
-			cursor.Line += int32(lineNum)
+			cursor.Line += lineNum
 		}
 		if varDecl.ValueDefinition != "" {
 			w("\t%s%s = %s\n", varDecl.Name, typeStr, varDecl.ValueDefinition)
@@ -311,13 +311,13 @@ func (d *Declarations) RenderFunctions(lineNum int, writer io.Writer) (newLineNu
 		def := funcDecl.Definition
 		if funcDecl.HasCursor() {
 			cursor = funcDecl.Cursor
-			cursor.Line += int32(lineNum)
+			cursor.Line += lineNum
 		}
 		if strings.HasPrefix(key, "init_") {
 			def = strings.Replace(def, key, "init", 1)
-			if funcDecl.HasCursor() && cursor.Line == int32(lineNum) && cursor.Col >= 9 {
+			if funcDecl.HasCursor() && cursor.Line == lineNum && cursor.Col >= 9 {
 				// Shift the cursor position the characters removed from the key.
-				cursor.Col -= int32(len(key) - len("init"))
+				cursor.Col -= len(key) - len("init")
 			}
 		}
 		w("%s\n\n", def)
@@ -355,7 +355,7 @@ func (d *Declarations) RenderTypes(lineNum int, writer io.Writer) (newLineNum in
 		typeDecl := d.Types[key]
 		if typeDecl.HasCursor() {
 			cursor = typeDecl.Cursor
-			cursor.Line += int32(lineNum)
+			cursor.Line += lineNum
 		}
 		w("type %s %s\n", key, typeDecl.TypeDefinition)
 	}
@@ -404,7 +404,7 @@ func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNu
 			// Render individual const declaration.
 			if constDecl.HasCursor() {
 				cursor = constDecl.Cursor
-				cursor.Line += int32(lineNum)
+				cursor.Line += lineNum
 			}
 			w("const %s\n\n", constDecl.Render())
 			continue
@@ -414,7 +414,7 @@ func (d *Declarations) RenderConstants(lineNum int, writer io.Writer) (newLineNu
 		for constDecl != nil {
 			if constDecl.HasCursor() {
 				cursor = constDecl.Cursor
-				cursor.Line += int32(lineNum)
+				cursor.Line += lineNum
 			}
 			w("\t%s\n", constDecl.Render())
 			constDecl = constDecl.Next

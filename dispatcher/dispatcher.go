@@ -211,19 +211,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	log.Printf("inspect_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
-	cursorPos = kernel.CursorPosToBytePos(code, cursorPos) // UTF16 pos to byte pos
-	log.Printf("inspect_request: cursorPos(bytes)=%d", cursorPos)
-	lines := strings.Split(code, "\n")
-	var cursorLine, cursorCol int
-	for pos := 0; cursorLine < len(lines) && pos < cursorPos; {
-		nextLinePos := pos + len(lines[cursorLine]) + 1
-		if cursorPos < nextLinePos {
-			cursorCol = cursorPos - pos
-			break
-		}
-		pos = nextLinePos
-		cursorLine++
-	}
+	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
 	// Separate special commands from Go commands.
 	usedLines := make(map[int]bool)
@@ -239,7 +227,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	} else {
 		// Parse Go.
 		var err error
-		data, err = goExec.InspectCell(lines, usedLines, cursorLine, cursorCol)
+		data, err = goExec.InspectIdentifierInCell(lines, usedLines, cursorLine, cursorCol)
 		if err != nil {
 			data = kernel.MIMEMap{
 				protocol.MIMETextPlain: any(

@@ -161,12 +161,13 @@ const (
 	ConstType
 )
 
-// Cursor represents a cursor position, that we want to preserve when we render our declarations to a file.
+// Cursor represents a cursor position in a cell or file.
+// The Col is given as bytes in the line expected to be encoded as UTF-8.
 type Cursor struct {
-	Line, Col int32
+	Line, Col int
 }
 
-const NoCursorLine = int32(-1)
+const NoCursorLine = int(-1)
 
 var NoCursor = Cursor{Line: NoCursorLine, Col: 0}
 
@@ -179,7 +180,7 @@ func (c *Cursor) CursorFrom(line int) Cursor {
 	if !c.HasCursor() {
 		return *c
 	}
-	return Cursor{Line: c.Line + int32(line), Col: c.Col}
+	return Cursor{Line: c.Line + line, Col: c.Col}
 }
 
 func (c *Cursor) ClearCursor() {

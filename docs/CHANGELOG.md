@@ -9,7 +9,7 @@
   or unicode runes). Still not perfect: regeneration of the Go code may get the cursor shifted.
 
 ## v0.3.2
-* 
+
 * Added mybinder.org configuration
 
 ## v0.3.1

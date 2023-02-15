@@ -67,7 +67,6 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	if !msg.Ok() {
 		return errors.WithMessagef(msg.Error(), "shell message error")
 	}
-	//log.Printf("\tReceived message from shell: %+v\n", msg.Composed)
 
 	// Tell the front-end that the kernel is working and when finished notify the
 	// front-end that the kernel is idle again.
@@ -75,6 +74,7 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
 		return
 	}
+	log.Printf("\tReceived message %q from shell", msg.ComposedMsg().Header.MsgType)
 
 	// Defer publishing of status idle again, before returning.
 	defer func() {
@@ -249,8 +249,7 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	content := msg.ComposedMsg().Content.(map[string]interface{})
 	code := content["code"].(string)
 	cursorPos := int(content["cursor_pos"].(float64))
-	detailLevel := int(content["detail_level"].(float64))
-	log.Printf("complete_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
+	log.Printf("complete_request: cursorPos(utf16)=%d", cursorPos)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
@@ -259,8 +258,8 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	reply := &kernel.CompleteReply{
 		Status:      "ok",
 		Matches:     []string{},
-		CursorStart: 0,
-		CursorEnd:   0,
+		CursorStart: cursorPos,
+		CursorEnd:   cursorPos,
 		Metadata:    make(kernel.MIMEMap),
 	}
 	// Makes sure reply is sent at the end.

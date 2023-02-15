@@ -70,9 +70,12 @@ func (s *State) AutoCompleteOptionsInCell(lines []string, skipLines map[int]bool
 	}
 
 	// Query `gopls`.
-	ctx := context.Background()
+	//ctx := context.Background()
+	_ = cursorInFile
 	s.gopls.ResetFile(s.MainPath())
-	desc, err = s.gopls.Complete(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	//desc, err = s.gopls.Complete(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	reply.CursorStart -= 1
+	reply.Matches = []string{"abc", "def", "123"}
 	if err != nil {
 		err = errors.Cause(err)
 		return

@@ -246,23 +246,15 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 // handleCompleteRequest replies with a `complete_reply` message, to auto-complete code.
 func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error) {
 	log.Printf("`complete_request`:")
-	content := msg.ComposedMsg().Content.(map[string]interface{})
-	code := content["code"].(string)
-	cursorPos := int(content["cursor_pos"].(float64))
-	log.Printf("complete_request: cursorPos(utf16)=%d", cursorPos)
 
-	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
-	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
-
-	// Build reply.
+	// Start with emtpy reply, and makes sure reply is sent at the end.
 	reply := &kernel.CompleteReply{
 		Status:      "ok",
 		Matches:     []string{},
-		CursorStart: cursorPos,
-		CursorEnd:   cursorPos,
+		CursorStart: 0,
+		CursorEnd:   0,
 		Metadata:    make(kernel.MIMEMap),
 	}
-	// Makes sure reply is sent at the end.
 	defer func() {
 		if err != nil {
 			log.Printf("Handling `complete_request` failed: %+v", err)
@@ -271,6 +263,22 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 		log.Printf("`complete_reply`: %s, %d matches", reply.Status, len(reply.Matches))
 		err = msg.Reply("complete_reply", reply)
 	}()
+
+	content := msg.ComposedMsg().Content.(map[string]interface{})
+	if _, found := content["code"]; !found {
+		return
+	}
+	if _, found := content["cursor_pos"]; !found {
+		return
+	}
+	code := content["code"].(string)
+	cursorPos := int(content["cursor_pos"].(float64))
+	reply.CursorStart = cursorPos
+	reply.CursorEnd = cursorPos
+	log.Printf("complete_request: cursorPos(utf16)=%d", cursorPos)
+
+	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
+	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
 	// Separate special commands from Go commands.
 	usedLines := make(map[int]bool)

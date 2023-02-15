@@ -197,7 +197,7 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 	}
 	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentDefinition, params, &results)
 	if err != nil {
-		return nil, errors.Cause(err)
+		return nil, errors.Wrapf(err, "failed call to `gopls` \"definition_request\"")
 	}
 	return
 }
@@ -244,6 +244,50 @@ func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col
 	if err != nil {
 		err = errors.Wrapf(err, "Failed Client.CallHover notification for %q", filePath)
 		return
+	}
+	return
+}
+
+func (c *Client) CallComplete(ctx context.Context, filePath string, line, col int) (items *lsp.CompletionList, err error) {
+	if !c.WaitConnection(ctx) {
+		// Silently do nothing, if no connection available.
+		return
+	}
+	ctx = minTimeout(ctx, CommunicationTimeout)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.conn == nil {
+		return
+	}
+	return c.callCompleteLocked(ctx, filePath, line, col)
+}
+
+func (c *Client) callCompleteLocked(ctx context.Context, filePath string, line, col int) (items *lsp.CompletionList, err error) {
+	if _, found := c.fileVersions[filePath]; !found {
+		err = c.notifyDidOpenLocked(ctx, filePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	params := &lsp.CompletionParams{
+		TextDocumentPositionParams: lsp.TextDocumentPositionParams{
+			TextDocument: lsp.TextDocumentIdentifier{
+				URI: uri.File(filePath),
+			},
+			Position: lsp.Position{
+				Line:      float64(line),
+				Character: float64(col),
+			},
+		},
+		Context: &lsp.CompletionContext{
+			TriggerKind: lsp.Invoked,
+		},
+	}
+	items = &lsp.CompletionList{}
+	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentCompletion, params, items)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed call to `gopls` \"complete_request\"")
 	}
 	return
 }

@@ -158,6 +158,48 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	return hover.Contents.Value, nil
 }
 
+// Complete request auto-complete suggestions from `gopls`. It returns the text
+// of the matches and the number of characters before the cursor position that should
+// be replaced by the matches (the same value for every entry).
+func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (matches []string, replaceLength int, err error) {
+	err = c.NotifyDidOpen(ctx, filePath)
+	if err != nil {
+		return
+	}
+	var items *lsp.CompletionList
+	items, err = c.CallComplete(ctx, filePath, line, col)
+	if err != nil {
+		return
+	}
+
+	replaceLength = -1
+	for _, item := range items.Items {
+		edit := item.TextEdit
+		if edit == nil {
+			continue
+		}
+		if int(edit.Range.End.Line) != line || int(edit.Range.End.Character) != col {
+			// Not exactly a complement, so we drop -- don't know what to do.
+			continue
+		}
+		if int(edit.Range.Start.Line) != line {
+			// Multiple line edit we also don't know how to handle, skip.
+			continue
+		}
+		newReplaceLenth := int(edit.Range.End.Character) - int(edit.Range.Start.Character)
+		if replaceLength != -1 && newReplaceLenth != replaceLength {
+			// Jupyter only supports edits of one length. We take the first one always.
+			continue
+		}
+		replaceLength = newReplaceLenth
+		matches = append(matches, edit.NewText)
+	}
+	if len(items.Items) != len(matches) {
+		log.Printf("Complete found %d items, used only %d", len(items.Items), len(matches))
+	}
+	return
+}
+
 // Span returns the text spanning the given location (`lsp.Location` represents a range).
 func (c *Client) Span(loc lsp.Location) (string, error) {
 	fileData, err := c.FileData(loc.URI.Filename())

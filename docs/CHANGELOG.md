@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.4
+
+* Added auto-complete.
+
 ## v0.3.3
 
 * Fixed support of variables declared only with type but no value.

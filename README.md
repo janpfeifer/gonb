@@ -58,8 +58,7 @@ Many! Contributions are welcome. Some from the top of my head:
 * Tracking of lines on generated Go files back to cell, so reported errors are easy to
   follow. In the meantime the errors can be moused over and will display the lines
   surrounding them.
-* Logging controllable. 
-* Add auto-complete with [`gopls`](https://github.com/golang/tools/tree/master/gopls).
+* Controllable (per package or file) logging. 
 * Library to easily store/retrieve calculated content. When doing data analysis so 
   one doesn't need to re-generate some result at a next cell execution. Something
   like `func Save[T any](id string, fn func() (T, error)) T, error` that calls

@@ -13,6 +13,10 @@ of the loop -- so it's a Read-Compile-Run-Print-Loop -- while still feeling very
 **GoNB** leverages that compilation speed to implement a full-featured (at least it's getting there)
 [Jupyter notebook](https://jupyter.org/) kernel.
 
+It already includes many goodies: contextual help and auto-complete (with 
+[`gopls`](https://github.com/golang/tools/tree/master/gopls)), compilation error context (by
+mousing over), bash command execution, images, html, etc. See the [tutorial](examples/tutorial.ipynb).
+
 It's still **experimental**. This is very fresh from the oven, and likely there are many nuanced
 (or not so nuanced) situations where it may not work as expected. Reports of issues and even better
 fixes are very welcome.

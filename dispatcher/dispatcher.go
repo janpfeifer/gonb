@@ -200,10 +200,6 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 // HandleInspectRequest presents rich data (HTML?) with contextual information for the
 // contents under the cursor.
 func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
-	_ = goExec
-	// TODO: Implementing this likely requiring generating the main.go -- and tracking
-	//       the adjusted cursor position -- and using `gopls` to request contextual information.
-	//       Similar to handleIsCompleteRequest.
 	content := msg.ComposedMsg().Content.(map[string]interface{})
 	code := content["code"].(string)
 	cursorPos := int(content["cursor_pos"].(float64))
@@ -248,19 +244,18 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 }
 
 // handleCompleteRequest replies with a `complete_reply` message, to auto-complete code.
-func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) error {
-	_ = goExec
-	// TODO: Implementing this likely requiring generating the main.go -- and tracking
-	//       the adjusted cursor position -- and using `gopls` to request contextual information.
-	//       Similar to HandleInspectRequest.
-	// Extract the data from the request.
+func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error) {
+	log.Printf("`complete_request`:")
 	content := msg.ComposedMsg().Content.(map[string]interface{})
 	code := content["code"].(string)
-	cursorPos := content["cursor_pos"].(float64)
-	_ = code
-	_ = cursorPos
+	cursorPos := int(content["cursor_pos"].(float64))
+	detailLevel := int(content["detail_level"].(float64))
+	log.Printf("complete_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
 
-	log.Printf("\tCompleteRequest")
+	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
+	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
+
+	// Build reply.
 	reply := &kernel.CompleteReply{
 		Status:      "ok",
 		Matches:     []string{},
@@ -268,5 +263,27 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) error {
 		CursorEnd:   0,
 		Metadata:    make(kernel.MIMEMap),
 	}
-	return msg.Reply("complete_reply", reply)
+	// Makes sure reply is sent at the end.
+	defer func() {
+		if err != nil {
+			log.Printf("Handling `complete_request` failed: %+v", err)
+			reply.Status = "error"
+		}
+		log.Printf("`complete_reply`: %s, %d matches", reply.Status, len(reply.Matches))
+		err = msg.Reply("complete_reply", reply)
+	}()
+
+	// Separate special commands from Go commands.
+	usedLines := make(map[int]bool)
+	if err = specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
+		err = errors.WithMessagef(err, "parsing special commands in cell")
+		return
+	}
+	if usedLines[cursorLine] {
+		// No auto-complete for special commands.
+		return
+	}
+
+	err = goExec.AutoCompleteOptionsInCell(lines, usedLines, cursorLine, cursorCol, reply)
+	return
 }

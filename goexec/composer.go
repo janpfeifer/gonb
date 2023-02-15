@@ -187,6 +187,11 @@ func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (cu
 	return
 }
 
+var (
+	ParseError = fmt.Errorf("failed to parse cell contents")
+	CursorLost = fmt.Errorf("cursor position not rendered in main.go")
+)
+
 // parseLinesAndComposeMain parses the cell (given in lines and skipLines), merges with
 // currently memorized declarations (from previous Cell runs) and compose a `main.go`.
 //

@@ -2,7 +2,6 @@ package goexec
 
 import (
 	"context"
-	"fmt"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
@@ -44,7 +43,40 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]bool, 
 	return kernel.MIMEMap{protocol.MIMETextMarkdown: desc}, nil
 }
 
-var (
-	ParseError = fmt.Errorf("failed to parse cell contents")
-	CursorLost = fmt.Errorf("cursor position not rendered in main.go")
-)
+// AutoCompleteOptionsInCell implements an `complete_request` from Jupyter, using `gopls`.
+// It updates `main.go` with the cell contents (given as lines)
+func (s *State) AutoCompleteOptionsInCell(lines []string, skipLines map[int]bool,
+	cursorLine, cursorCol int, reply *kernel.CompleteReply) (err error) {
+	if s.gopls == nil {
+		// gopls not installed.
+		return
+	}
+	if skipLines[cursorLine] {
+		// Only Go code can be inspected here.
+		err = errors.Errorf("goexec.AutoCompleteOptionsInCell() can only auto-complete Go code, line %d is a secial command line: %q", cursorLine, lines[cursorLine])
+		return
+	}
+
+	// Generate `main.go` with contents of current cell.
+	cursorInCell := Cursor{cursorLine, cursorCol}
+	var cursorInFile Cursor
+	_, cursorInFile, err = s.parseLinesAndComposeMain(lines, skipLines, cursorInCell)
+	if err != nil {
+		if errors.Is(err, ParseError) || errors.Is(err, CursorLost) {
+			// Simply return no auto-complete.
+			err = nil
+		}
+		return
+	}
+
+	// Query `gopls`.
+	ctx := context.Background()
+	s.gopls.ResetFile(s.MainPath())
+	desc, err = s.gopls.Complete(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	if err != nil {
+		err = errors.Cause(err)
+		return
+	}
+
+	return
+}

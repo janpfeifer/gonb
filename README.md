@@ -62,9 +62,11 @@ Many! Contributions are welcome. Some from the top of my head:
 * Add auto-complete with [`gopls`](https://github.com/golang/tools/tree/master/gopls).
 * Library to easily store/retrieve calculated content. When doing data analysis so 
   one doesn't need to re-generate some result at a next cell execution. Something
-  like `func CacheResult[T any](id string, fn func() (T, error)) T, error` that will
-  either load `T` from some storage, and if not stored, call `fn()` to generate the
-  result and save it again. This way results can easily be reused on different cells. 
+  like `func Save[T any](id string, fn func() (T, error)) T, error` that calls
+  fn, and if successful, saves the result before returning it. And the accompanying
+  `func Load[T any](id string) T, error` and 
+  `func LoadOrRun[T any](id string, fn func() (T, error)) T, error` which will 
+  load the result if available or run `fn` to regenerate it (and then save it).
 
 # Implementation
 

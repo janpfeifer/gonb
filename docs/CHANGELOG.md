@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.5
+
+* Display parsing errors that were disabled accidentally displaying.
+
 ## v0.3.4
 
 * Added auto-complete.

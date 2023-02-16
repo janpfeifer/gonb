@@ -11,7 +11,7 @@ import (
 // from previous definitions, render a final main.go code with the whole content,
 // compiles and runs it.
 func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]bool) error {
-	updatedDecls, _, err := s.parseLinesAndComposeMain(lines, skipLines, NoCursor)
+	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}

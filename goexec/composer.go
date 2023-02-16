@@ -2,6 +2,7 @@ package goexec
 
 import (
 	"fmt"
+	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"io"
 	"log"
@@ -200,7 +201,7 @@ var (
 //
 // If cursorInCell defines a cursor (it can be set to NoCursor), but the cursor position
 // is not rendered in the resulting `main.go`, a CursorLost error is returned.
-func (s *State) parseLinesAndComposeMain(lines []string, skipLines map[int]bool, cursorInCell Cursor) (
+func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]bool, cursorInCell Cursor) (
 	updatedDecls *Declarations, cursorInFile Cursor, err error) {
 	if cursorInCell.HasCursor() {
 		log.Printf("Cursor in cell (%+v)", cursorInCell)
@@ -211,7 +212,7 @@ func (s *State) parseLinesAndComposeMain(lines []string, skipLines map[int]bool,
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
 	}
 	newDecls := NewDeclarations()
-	if err = s.ParseImportsFromMainGo(nil, cursorInTmpFile, newDecls); err != nil {
+	if err = s.ParseImportsFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
 		// If cell is in an un-parseable state, just returns empty context. User can try to
 		// run cell to get an error.
 		return nil, NoCursor, errors.WithStack(ParseError)

@@ -1,5 +1,8 @@
 # GoNB Changelog
 
+* Better handling of gopls dying.
+* Cleaned up and improved cursor mapping to generated Go file.
+
 ## v0.3.5
 
 * Display parsing errors that were disabled accidentally displaying.

@@ -38,8 +38,7 @@ func emptyState() *State {
 	}
 }
 
-func TestState_ParseImportsFromMainGo(t *testing.T) {
-	code := `package main
+var sampleCellCode = `package main
 
 import "fmt"
 
@@ -47,7 +46,7 @@ import "fmt"
 
 import (
   "math"
-  fmtOther "fmt"
+  fmtOther    "fmt"
   "github.com/pkg/errors"
   . "gomlx/computation"
 )
@@ -56,13 +55,13 @@ const PI = 3.1415
 
 const (
 	PI32 float32 = 3.1415
-	E = 2.71828
-	ToBe = "Or Not To Be"
+	E            = 2.71828
+	ToBe         = "Or Not To Be"
 )
 
 var (
 	x, y float32 = 1, 2
-	b = math.Sqrt(30.0 +
+	b            = math.Sqrt(30.0 +
 		34.0)
 )
 
@@ -106,13 +105,15 @@ func init_c() {
 	c += ", blah"
 }
 `
+
+func TestState_ParseFromMainGo(t *testing.T) {
 	s := emptyState()
 	var err error
-	s.TempDir, err = createTestGoMain(code)
+	s.TempDir, err = createTestGoMain(sampleCellCode)
 	if err != nil {
 		t.Fatalf("Failed to create main.go: %+v", err)
 	}
-	err = s.ParseImportsFromMainGo(nil, NoCursor, s.Decls)
+	err = s.ParseFromMainGo(nil, NoCursor, s.Decls)
 	if err != nil {
 		t.Fatalf("Failed to parse imports from main.go: %+v", err)
 	}
@@ -172,9 +173,11 @@ func init_c() {
 )
 
 `
-	buf := bytes.NewBuffer(make([]byte, 0, 512))
-	_, _, err = s.Decls.RenderImports(0, buf)
-	require.NoErrorf(t, err, "Declarations.RenderImports()")
+	buf := bytes.NewBuffer(make([]byte, 0, 1024))
+	w := &WriterWithCursor{w: buf}
+	cursor := s.Decls.RenderImports(w)
+	assert.False(t, cursor.HasCursor())
+	require.NoErrorf(t, w.Error(), "Declarations.RenderImports()")
 	assert.Equal(t, wantImportsRendering, buf.String())
 
 	// Checks variables rendering.
@@ -189,9 +192,11 @@ func init_c() {
 )
 
 `
-	buf = bytes.NewBuffer(make([]byte, 0, 512))
-	_, _, err = s.Decls.RenderVariables(0, buf)
-	require.NoErrorf(t, err, "Declarations.RenderVariables()")
+	buf = bytes.NewBuffer(make([]byte, 0, 1024))
+	w = &WriterWithCursor{w: buf}
+	cursor = s.Decls.RenderVariables(w)
+	assert.False(t, cursor.HasCursor())
+	require.NoErrorf(t, w.Error(), "Declarations.RenderVariables()")
 	assert.Equal(t, wantVariablesRendering, buf.String())
 
 	// Checks functions rendering.
@@ -219,8 +224,10 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	_, _, err = s.Decls.RenderFunctions(0, buf)
-	require.NoErrorf(t, err, "Declarations.RenderFunctions()")
+	w = &WriterWithCursor{w: buf}
+	cursor = s.Decls.RenderFunctions(w)
+	assert.False(t, cursor.HasCursor())
+	require.NoErrorf(t, w.Error(), "Declarations.RenderFunctions()")
 	assert.Equal(t, wantFunctionsRendering, buf.String())
 
 	// Checks types rendering.
@@ -230,8 +237,10 @@ type XY struct { x, y float64 }
 
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	_, _, err = s.Decls.RenderTypes(0, buf)
-	require.NoErrorf(t, err, "Declarations.RenderTypes()")
+	w = &WriterWithCursor{w: buf}
+	cursor = s.Decls.RenderTypes(w)
+	assert.False(t, cursor.HasCursor())
+	require.NoErrorf(t, w.Error(), "Declarations.RenderTypes()")
 	assert.Equal(t, wantTypesRendering, buf.String())
 
 	// Checks constants rendering.
@@ -251,8 +260,60 @@ const (
 
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
-	_, _, err = s.Decls.RenderConstants(0, buf)
+	w = &WriterWithCursor{w: buf}
+	cursor = s.Decls.RenderConstants(w)
+	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, err, "Declarations.RenderConstants()")
 	assert.Equal(t, wantConstantsRendering, buf.String())
 	//fmt.Printf("Constants:\n%s\n", buf.String())
+}
+
+func TestCursorPositioning(t *testing.T) {
+	// Test cursor positioning in generated lines.
+	s := emptyState()
+	var err error
+	s.TempDir, err = createTestGoMain(sampleCellCode)
+	if err != nil {
+		t.Fatalf("Failed to create main.go: %+v", err)
+	}
+
+	testLines := []struct {
+		cursor Cursor
+		Line   string
+	}{
+		// Imports lines.
+		{Cursor{Line: 2, Col: 7}, `	‸"fmt"`},
+		{Cursor{Line: 8, Col: 3}, `	f‸mtOther "fmt"`},
+		{Cursor{Line: 8, Col: 16}, `	fmtOther "f‸mt"`},
+
+		// Variables lines:
+		{Cursor{Line: 18, Col: 3}, `	To‸Be = "Or Not To Be"`},
+		{Cursor{Line: 24, Col: 3}, `		3‸4.0)`},
+
+		// Constants lines:
+		{Cursor{Line: 47, Col: 15}, `	K0 Kg = 1 << i‸ota`},
+		{Cursor{Line: 47, Col: 4}, `	K0 ‸Kg = 1 << iota`},
+		{Cursor{Line: 48, Col: 1}, `	‸K1`},
+
+		// Types lines:
+		{Cursor{Line: 29, Col: 6}, `type X‸Y struct { x, y float64 }`},
+		{Cursor{Line: 29, Col: 23}, `type XY struct { x, y f‸loat64 }`},
+
+		// Functions lines:
+		{Cursor{Line: 59, Col: 12}, `func sum[T i‸nterface{int | float32 | float64}](a, b T) T {`},
+	}
+	for _, testLine := range testLines {
+		buf := bytes.NewBuffer(make([]byte, 0, 16384))
+		err = s.ParseFromMainGo(nil, testLine.cursor, s.Decls)
+		if err != nil {
+			t.Fatalf("Failed to parse imports from main.go: %+v", err)
+		}
+
+		cursorInFile, err := s.createMainContentsFromDecls(buf, s.Decls, nil)
+		require.NoError(t, err)
+		content := buf.String()
+		l := lineWithCursor(content, cursorInFile)
+		assert.Equalf(t, testLine.Line, l, "Missed cursor, got:\n\tIn cell: %v\n\tIn file: %v\n\tLine got: [%s]\n\tLine wanted: [%s]\n",
+			testLine.cursor, cursorInFile, l, testLine.Line)
+	}
 }

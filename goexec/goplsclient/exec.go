@@ -77,6 +77,20 @@ func (c *Client) Start() error {
 			}
 		}
 	}()
+
+	// In parallel wait for command to finish.
+	go func() {
+		err := c.goplsExec.Wait()
+		if err != nil {
+			log.Printf("gopls failed with: %+v", err)
+		} else {
+			log.Printf("gopls terminated normally.")
+		}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.stopLocked()
+	}()
+
 	return nil
 }
 
@@ -111,9 +125,9 @@ func (c *Client) stopLocked() {
 	if c.goplsExec != nil {
 		c.goplsExec.Process.Kill()
 		c.goplsExec = nil
-		c.waitConnecting = false
-		c.removeUnixSocketFile()
 	}
+	c.waitConnecting = false
+	c.removeUnixSocketFile()
 	return
 }
 
@@ -124,7 +138,7 @@ func (c *Client) removeUnixSocketFile() {
 		addr = addr[5:]
 	}
 	if strings.HasPrefix(addr, "/") {
-		// Remove unix socket file, if it exists.
-		os.Remove(addr)
+		// Remove unix socket file, if it exists -- we ignore any errors.
+		_ = os.Remove(addr)
 	}
 }

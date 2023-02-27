@@ -8,7 +8,7 @@ import (
 )
 
 // ExecuteCell takes the contents of a cell, parses it, merges new declarations with the ones
-// from previous definitions, render a final main.go code with the whole content,
+// from previous definitions, render a final main.go sampleCellCode with the whole content,
 // compiles and runs it.
 func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]bool) error {
 	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, lines, skipLines, NoCursor)
@@ -16,7 +16,7 @@ func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[in
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
-	// Run `goimports` (or the code that implements it)
+	// Run `goimports` (or the sampleCellCode that implements it)
 	if err = s.GoImports(msg); err != nil {
 		return errors.WithMessagef(err, "goimports failed")
 	}
@@ -29,7 +29,7 @@ func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[in
 	// Compilation successful: save merged declarations into current State.
 	s.Decls = updatedDecls
 
-	// Execute compiled code.
+	// Execute compiled sampleCellCode.
 	return s.Execute(msg)
 }
 

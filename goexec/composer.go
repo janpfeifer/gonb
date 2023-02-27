@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// This file holds the various functions used to compose the go code that
+// This file holds the various functions used to compose the go sampleCellCode that
 // will be compiled, from the parsed cells.
 
 func (s *State) writeLinesToFile(filePath string, lines <-chan string) (err error) {
@@ -110,81 +110,69 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 	return
 }
 
-func (s *State) createMainFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
-	cursor = NoCursor
-
+func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
 	var f *os.File
 	f, err = os.Create(s.MainPath())
 	if err != nil {
 		return
 	}
-	defer func() {
-		if err != nil {
-			err = errors.Wrapf(err, "creating main.go")
-			return
-		}
-		err = f.Close()
-		if err != nil {
-			err = errors.Wrapf(err, "closing main.go")
-		}
-	}()
-
-	lineNum := 0
-	w := func(format string, args ...any) {
-		if err != nil {
-			return
-		}
-		strBuf := fmt.Sprintf(format, args...)
-		lineNum += countLines(strBuf)
-		_, err = fmt.Fprint(f, strBuf)
+	cursor, err = s.createMainContentsFromDecls(f, decls, mainDecl)
+	err2 := f.Close()
+	if err != nil {
+		err = errors.Wrapf(err, "creating main.go")
+		return
 	}
+	err = err2
+	if err != nil {
+		err = errors.Wrapf(err, "closing main.go")
+		return
+	}
+	return
+}
 
-	w("package main\n\n")
+func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+	cursor = NoCursor
+	w := NewWriterWithCursor(writer)
+	w.Format("package main\n\n")
 	if err != nil {
 		return
 	}
 
-	update := func(fn func(lineNum int, w io.Writer) (int, Cursor, error), name string) bool {
-		var newCursor Cursor
-		var newLineNum int
-		newLineNum, newCursor, err = fn(lineNum, f)
-		if newLineNum != lineNum {
-			//log.Printf("Block %q: lines (%d - %d)", name, lineNum, newLineNum)
-			lineNum = newLineNum
-		}
-		if err != nil {
+	mergeCursorAndReportError := func(w *WriterWithCursor, cursorInFile Cursor, name string) bool {
+		if w.Error() != nil {
 			err = errors.WithMessagef(err, "in block %q", name)
 			return true
 		}
-		if newCursor.HasCursor() {
-			cursor = newCursor
-			//log.Printf("Cursor found in %q: %v", name, cursor)
+		if cursorInFile.HasCursor() {
+			cursor = cursorInFile
 		}
 		return false
 	}
+	if mergeCursorAndReportError(w, decls.RenderImports(w), "imports") {
+		return
+	}
+	if mergeCursorAndReportError(w, decls.RenderTypes(w), "types") {
+		return
+	}
+	if mergeCursorAndReportError(w, decls.RenderConstants(w), "constants") {
+		return
+	}
+	if mergeCursorAndReportError(w, decls.RenderVariables(w), "variables") {
+		return
+	}
+	if mergeCursorAndReportError(w, decls.RenderFunctions(w), "functions") {
+		return
+	}
 
-	if update(decls.RenderImports, "imports") {
-		return
+	if mainDecl != nil {
+		w.Format("\n")
+		if mainDecl.HasCursor() {
+			cursor = mainDecl.Cursor
+			cursor.Line += w.Line
+			//log.Printf("Cursor in \"main\": %v", cursor)
+		}
+		w.Format("%s\n", mainDecl.Definition)
 	}
-	if update(decls.RenderTypes, "types") {
-		return
-	}
-	if update(decls.RenderConstants, "constants") {
-		return
-	}
-	if update(decls.RenderVariables, "variables") {
-		return
-	}
-	if update(decls.RenderFunctions, "functions") {
-		return
-	}
-	w("\n")
-	if mainDecl.HasCursor() {
-		cursor = mainDecl.Cursor
-		cursor.Line += lineNum
-		//log.Printf("Cursor in \"main\": %v", cursor)
-	}
-	w("%s\n", mainDecl.Definition)
 	return
 }
 
@@ -212,20 +200,20 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, ski
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
 	}
 	newDecls := NewDeclarations()
-	if err = s.ParseImportsFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
+	if err = s.ParseFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
 		// If cell is in an un-parseable state, just returns empty context. User can try to
 		// run cell to get an error.
 		return nil, NoCursor, errors.WithStack(ParseError)
 	}
 
-	// Checks whether there is a "main" function defined in the code.
+	// Checks whether there is a "main" function defined in the sampleCellCode.
 	mainDecl, hasMain := newDecls.Functions["main"]
 	if hasMain {
 		// Remove "main" from newDecls: this should not be stored from one cell execution from
 		// another.
 		delete(newDecls.Functions, "main")
 	} else {
-		// Declare a stub main function, just so we can try to compile the final code.
+		// Declare a stub main function, just so we can try to compile the final sampleCellCode.
 		mainDecl = &Function{Key: "main", Name: "main", Definition: "func main() { flag.Parse() }"}
 	}
 	_ = mainDecl
@@ -237,7 +225,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, ski
 	updatedDecls.MergeFrom(newDecls)
 
 	// Render declarations to main.go.
-	cursorInFile, err = s.createMainFromDecls(updatedDecls, mainDecl)
+	cursorInFile, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
 	if err != nil {
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.InspectIdentifierInCell() while generating main.go with all declarations")
 	}
@@ -257,19 +245,26 @@ const cursorStr = "‸"
 // "*" where the
 func (s *State) logCursor(cursor Cursor) {
 	content, err := s.readMainGo()
-	var modLine string
 	if err != nil {
 		log.Printf("Failed to read main.go, for debugging.")
 	} else {
-		lines := strings.Split(content, "\n")
-		if cursor.Line < len(lines) {
-			line := lines[cursor.Line]
-			if cursor.Col < len(line) {
-				modLine = line[:cursor.Col] + cursorStr + line[cursor.Col:]
-			} else {
-				modLine = line + cursorStr
-			}
+		log.Printf("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
+	}
+}
+
+func lineWithCursor(content string, cursor Cursor) string {
+	if !cursor.HasCursor() {
+		return "cursor position non-existent"
+	}
+	var modLine string
+	lines := strings.Split(content, "\n")
+	if cursor.Line < len(lines) {
+		line := lines[cursor.Line]
+		if cursor.Col < len(line) {
+			modLine = line[:cursor.Col] + cursorStr + line[cursor.Col:]
+		} else {
+			modLine = line + cursorStr
 		}
 	}
-	log.Printf("Cursor in main.go (%+v): %s", cursor, modLine)
+	return modLine
 }

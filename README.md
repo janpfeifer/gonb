@@ -54,7 +54,7 @@ details.
 
 # TODOs
 
-Many! Contributions are welcome. Some from the top of my head:
+Contributions are welcome! 
 
 * Mac and Windows: 
   * Installation.
@@ -62,7 +62,7 @@ Many! Contributions are welcome. Some from the top of my head:
 * Tracking of lines on generated Go files back to cell, so reported errors are easy to
   follow. In the meantime the errors can be moused over and will display the lines
   surrounding them.
-* Controllable (per package or file) logging. 
+* Controllable (per package or file) logging in GoNB code. 
 * Library to easily store/retrieve calculated content. When doing data analysis so 
   one doesn't need to re-generate some result at a next cell execution. Something
   like `func Save[T any](id string, fn func() (T, error)) T, error` that calls
@@ -74,6 +74,6 @@ Many! Contributions are welcome. Some from the top of my head:
 # Implementation
 
 The Jupyter kernel started from [gophernotes](https://github.com/gopherdata/gophernotes)
-implementation, but was heavily modified. Also, the execution loop and mechanisms are completely
-different and new.
-
+implementation, but was heavily modified and very little is left. Also, the execution loop
+and mechanisms are completely different and new: GoNB compiles and executes on-the-fly,
+instead of using a REPL engine.

@@ -1,4 +1,4 @@
-// Package goexec executes cells with Go code for the gonb kernel.
+// Package goexec executes cells with Go sampleCellCode for the gonb kernel.
 //
 // It defines a State object, that carries all the globals defined so far. It provides
 // the ExecuteCell method, to run a new cell.
@@ -18,7 +18,7 @@ type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
 
-	// Building and executing go code configuration:
+	// Building and executing go sampleCellCode configuration:
 	Args    []string // Args to be passed to the program, after being executed.
 	AutoGet bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
 
@@ -80,7 +80,7 @@ func New(uniqueID string) (*State, error) {
 
 	} else {
 		msg := `
-Program gopls is not installed. It is used to inspect into code
+Program gopls is not installed. It is used to inspect into sampleCellCode
 and provide contextual information and autocompletion. It is a 
 standard Go toolkit package. You can install it from the notebook
 with:
@@ -176,11 +176,11 @@ func (c *Cursor) HasCursor() bool {
 }
 
 // CursorFrom returns a new Cursor adjusted
-func (c *Cursor) CursorFrom(line int) Cursor {
+func (c *Cursor) CursorFrom(line, col int) Cursor {
 	if !c.HasCursor() {
 		return *c
 	}
-	return Cursor{Line: c.Line + line, Col: c.Col}
+	return Cursor{Line: c.Line + line, Col: c.Col + col}
 }
 
 func (c *Cursor) ClearCursor() {
@@ -198,14 +198,16 @@ type Function struct {
 
 type Variable struct {
 	Cursor
-	Key, Name                       string
-	TypeDefinition, ValueDefinition string // Type definition may be empty.
+	CursorInName, CursorInType, CursorInValue bool
+	Key, Name                                 string
+	TypeDefinition, ValueDefinition           string // Type definition may be empty.
 }
 
 type TypeDecl struct {
 	Cursor
-	Key            string // Same as the name here.
-	TypeDefinition string // Type definition may be empty.
+	Key                       string // Same as the name here.
+	TypeDefinition            string // Type definition may be empty.
+	CursorInKey, CursorInType bool
 }
 
 // Constant represents the declaration of a constant. Because when appearing in block
@@ -213,17 +215,19 @@ type TypeDecl struct {
 // For this we use Next/Prev links.
 type Constant struct {
 	Cursor
-	Key                             string
-	TypeDefinition, ValueDefinition string    // Can be empty, if used as iota.
-	Next, Prev                      *Constant // Next and previous declaration in same Const block.
+	Key                                      string
+	TypeDefinition, ValueDefinition          string // Can be empty, if used as iota.
+	CursorInKey, CursorInType, CursorInValue bool
+	Next, Prev                               *Constant // Next and previous declaration in same Const block.
 }
 
 // Import represents an import to be included -- if not used it's automatically removed by
 // `goimports`.
 type Import struct {
 	Cursor
-	Key         string
-	Path, Alias string
+	Key                         string
+	Path, Alias                 string
+	CursorInPath, CursorInAlias bool
 }
 
 var reDefaultImportPathAlias = regexp.MustCompile(`^.*?(\w[\w0-9_]*)\s*$`)

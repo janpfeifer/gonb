@@ -18,8 +18,8 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]bool, 
 		return make(kernel.MIMEMap), nil
 	}
 	if skipLines[cursorLine] {
-		// Only Go code can be inspected here.
-		return nil, errors.Errorf("goexec.InspectIdentifierInCell() can only inspect Go code, line %d is a secial command line: %q", cursorLine, lines[cursorLine])
+		// Only Go sampleCellCode can be inspected here.
+		return nil, errors.Errorf("goexec.InspectIdentifierInCell() can only inspect Go sampleCellCode, line %d is a secial command line: %q", cursorLine, lines[cursorLine])
 	}
 
 	// Generate `main.go` with contents of current cell.
@@ -53,8 +53,8 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 		return
 	}
 	if skipLines[cursorLine] {
-		// Only Go code can be inspected here.
-		err = errors.Errorf("goexec.AutoCompleteOptionsInCell() can only auto-complete Go code, line %d is a secial command line: %q", cursorLine, cellLines[cursorLine])
+		// Only Go sampleCellCode can be inspected here.
+		err = errors.Errorf("goexec.AutoCompleteOptionsInCell() can only auto-complete Go sampleCellCode, line %d is a secial command line: %q", cursorLine, cellLines[cursorLine])
 		return
 	}
 

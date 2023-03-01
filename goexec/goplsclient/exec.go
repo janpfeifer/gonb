@@ -2,12 +2,13 @@ package goplsclient
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // This file implements the management of (re-)starting `gopls`
@@ -88,6 +89,8 @@ func (c *Client) Start() error {
 		}
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		c.goplsExec = nil
+		c.removeUnixSocketFile()
 		c.stopLocked()
 	}()
 
@@ -125,9 +128,9 @@ func (c *Client) stopLocked() {
 	if c.goplsExec != nil {
 		c.goplsExec.Process.Kill()
 		c.goplsExec = nil
+		c.removeUnixSocketFile()
 	}
 	c.waitConnecting = false
-	c.removeUnixSocketFile()
 	return
 }
 
@@ -138,6 +141,7 @@ func (c *Client) removeUnixSocketFile() {
 		addr = addr[5:]
 	}
 	if strings.HasPrefix(addr, "/") {
+		log.Printf("Removing %s", addr)
 		// Remove unix socket file, if it exists -- we ignore any errors.
 		_ = os.Remove(addr)
 	}

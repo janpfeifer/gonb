@@ -1,7 +1,13 @@
 # GoNB Changelog
 
+## v0.3.6
+
 * Better handling of gopls dying.
 * Cleaned up and improved cursor mapping to generated Go file.
+* Better handling of "didOpen" and "didChange" language server protocol with gopls.
+* Monitor changes in files contents (for files being edited locally in parallel) 
+  for gopls contextual help.
+* Started instrumenting logs using `github.com/golang/glog`
 
 ## v0.3.5
 

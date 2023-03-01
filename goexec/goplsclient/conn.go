@@ -7,6 +7,7 @@ import (
 	jsonrpc2 "github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
+	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"log"
 	"net"
@@ -36,11 +37,13 @@ func (c *Client) ConnClose() {
 func (c *Client) connCloseLocked() {
 	// Wait for any pending concurrent connection attempt.
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 		c.conn = nil
 	}
 }
 
+// minTimeout extends (or returns a new context with extended Deadline), discarding the
+// previous one -- not the correct use of context, but will do for now.
 func minTimeout(ctx context.Context, timeout time.Duration) context.Context {
 	minDeadline := time.Now().Add(timeout)
 	if deadline, ok := ctx.Deadline(); !ok || deadline.After(minDeadline) {
@@ -78,7 +81,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	jsonStream := jsonrpc2.NewStream(c.conn, c.conn)
 	c.jsonConn = jsonrpc2.NewConn(jsonStream)
-	c.jsonHandler = &jsonrpc2Handler{}
+	c.jsonHandler = &jsonrpc2Handler{client: c}
 	c.jsonConn.AddHandler(c.jsonHandler)
 	go func(currentConn net.Conn) {
 		// Run should use a non-expiring context.
@@ -98,32 +101,28 @@ func (c *Client) Connect(ctx context.Context) error {
 		// Capabilities:          lsp.ClientCapabilities{},
 	}, &c.lspCapabilities)
 	if err != nil {
-		c.conn.Close()
+		if closeErr := c.conn.Close(); closeErr != nil {
+			glog.Errorf("Failed to close connection: %+v", closeErr)
+		}
 		c.conn = nil
 		return errors.Wrapf(err, "failed \"initialize\" call to gopls in %q", addr)
 	}
 
 	err = c.jsonConn.Notify(ctx, lsp.MethodInitialized, &lsp.InitializedParams{})
 	if err != nil {
-		c.conn.Close()
+		if closeErr := c.conn.Close(); closeErr != nil {
+			glog.Errorf("Failed to close connection: %+v", closeErr)
+		}
 		c.conn = nil
 		return errors.Wrapf(err, "failed \"initialized\" notification to gopls in %q", addr)
 	}
 	return nil
 }
 
-func (c *Client) ResetFile(filePath string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, found := c.fileCache[filePath]; found {
-		delete(c.fileCache, filePath)
-	}
-}
-
-// NotifyDidOpen sends a notification to `gopls` with the open file, which also sends the
+// NotifyDidOpenOrChange sends a notification to `gopls` with the open file, which also sends the
 // file content (from `Client.fileCache` if available).
 // File version sent is incremented.
-func (c *Client) NotifyDidOpen(ctx context.Context, filePath string) (err error) {
+func (c *Client) NotifyDidOpenOrChange(ctx context.Context, filePath string) (err error) {
 	if !c.WaitConnection(ctx) {
 		// Silently do nothing, if no connection available.
 		return
@@ -134,28 +133,57 @@ func (c *Client) NotifyDidOpen(ctx context.Context, filePath string) (err error)
 	if c.conn == nil {
 		return
 	}
-	return c.notifyDidOpenLocked(ctx, filePath)
+	return c.notifyDidOpenOrChangeLocked(ctx, filePath)
 }
 
-func (c *Client) notifyDidOpenLocked(ctx context.Context, filePath string) (err error) {
+func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath string) (err error) {
 	var fileData *FileData
-	fileData, err = c.FileData(filePath)
+	var fileUpdated bool
+	fileData, fileUpdated, err = c.FileData(filePath)
 	if err != nil {
 		return err
 	}
-	fileVersion := c.fileVersions[filePath] + 1
+	fileVersion, previouslyOpened := c.fileVersions[filePath]
+	if previouslyOpened && !fileUpdated {
+		// File already opened, and it hasn't changed, nothing to do.
+		return nil
+	}
+	fileVersion += 1
 	c.fileVersions[filePath] = fileVersion
 
-	params := &lsp.DidOpenTextDocumentParams{
-		TextDocument: lsp.TextDocumentItem{
-			URI:        fileData.URI,
-			LanguageID: "go",
-			Version:    float64(fileVersion),
-			Text:       fileData.Content,
-		}}
-	err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidOpen, params)
-	if err != nil {
-		return errors.Wrapf(err, "Failed Client.NotifyDidOpen notification for %q", filePath)
+	if !previouslyOpened {
+		glog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file opened", fileData.URI)
+		params := &lsp.DidOpenTextDocumentParams{
+			TextDocument: lsp.TextDocumentItem{
+				URI:        fileData.URI,
+				LanguageID: "go",
+				Version:    float64(fileVersion),
+				Text:       fileData.Content,
+			}}
+		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidOpen, params)
+		if err != nil {
+			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange notification for %q", filePath)
+		}
+	} else {
+		glog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file changed at %s", fileData.URI, fileData.ContentTime)
+		version := uint64(fileVersion)
+		params := &lsp.DidChangeTextDocumentParams{
+			TextDocument: lsp.VersionedTextDocumentIdentifier{
+				TextDocumentIdentifier: lsp.TextDocumentIdentifier{
+					URI: fileData.URI,
+				},
+				Version: &version,
+			},
+			ContentChanges: []lsp.TextDocumentContentChangeEvent{
+				lsp.TextDocumentContentChangeEvent{
+					Text: fileData.Content,
+				},
+			},
+		}
+		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidChange, params)
+		if err != nil {
+			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange::change notification for %q", filePath)
+		}
 	}
 	return
 }
@@ -163,7 +191,7 @@ func (c *Client) notifyDidOpenLocked(ctx context.Context, filePath string) (err 
 // CallDefinition service in `gopls`. This returns just the range of where a symbol, under
 // the cursor, is defined. See `Definition()` for the full definition service.
 //
-// This will automatically call NotifyDidOpen, if file hasn't been sent yet.
+// This will automatically call NotifyDidOpenOrChange, if file hasn't been sent yet.
 func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
 	if !c.WaitConnection(ctx) {
 		// Silently do nothing, if no connection available.
@@ -179,8 +207,9 @@ func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col 
 }
 
 func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
+	glog.V(2).Infof("goplsclient.CallDefinition(ctx, %s, %d, %d)", uri.File(filePath), line, col)
 	if _, found := c.fileVersions[filePath]; !found {
-		err = c.notifyDidOpenLocked(ctx, filePath)
+		err = c.notifyDidOpenOrChangeLocked(ctx, filePath)
 		if err != nil {
 			return nil, err
 		}
@@ -199,6 +228,9 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed call to `gopls` \"definition_request\"")
 	}
+	for ii, r := range results {
+		log.Printf(" Result[%d].URI=%s\n", ii, r.URI)
+	}
 	return
 }
 
@@ -207,7 +239,7 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 //
 // Documentation was not very clear to me, but it's what gopls uses for Definition.
 //
-// This will automatically call NotifyDidOpen, if file hasn't been sent yet.
+// This will automatically call NotifyDidOpenOrChange, if file hasn't been sent yet.
 func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
 	if !c.WaitConnection(ctx) {
 		// Silently do nothing, if no connection available.
@@ -223,8 +255,9 @@ func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) 
 }
 
 func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
+	glog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d)", uri.File(filePath), line, col)
 	if _, found := c.fileVersions[filePath]; !found {
-		err = c.notifyDidOpenLocked(ctx, filePath)
+		err = c.notifyDidOpenOrChangeLocked(ctx, filePath)
 		if err != nil {
 			return
 		}
@@ -242,6 +275,7 @@ func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col
 
 	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentHover, params, &hover)
 	if err != nil {
+		glog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d): %+v", uri.File(filePath), line, col, err)
 		err = errors.Wrapf(err, "Failed Client.CallHover notification for %q", filePath)
 		return
 	}
@@ -264,7 +298,7 @@ func (c *Client) CallComplete(ctx context.Context, filePath string, line, col in
 
 func (c *Client) callCompleteLocked(ctx context.Context, filePath string, line, col int) (items *lsp.CompletionList, err error) {
 	if _, found := c.fileVersions[filePath]; !found {
-		err = c.notifyDidOpenLocked(ctx, filePath)
+		err = c.notifyDidOpenOrChangeLocked(ctx, filePath)
 		if err != nil {
 			return nil, err
 		}
@@ -290,6 +324,14 @@ func (c *Client) callCompleteLocked(ctx context.Context, filePath string, line, 
 		return nil, errors.Wrapf(err, "failed call to `gopls` \"complete_request\"")
 	}
 	return
+}
+
+func (c *Client) ConsumeMessages() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	messages := c.messages
+	c.messages = nil
+	return messages
 }
 
 func trimString(s string, maxLen int) string {
@@ -322,6 +364,7 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 			log.Printf("Failed to parse ShowMessageParams: %v", err)
 			return true
 		}
+		h.client.messages = append(h.client.messages, params.Message)
 		log.Printf("gopls message: %s", trimString(params.Message, 100))
 		return true
 	case lsp.MethodWindowLogMessage:
@@ -331,6 +374,7 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 			log.Printf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
+		h.client.messages = append(h.client.messages, params.Message)
 		log.Printf("gopls message: %s", trimString(params.Message, 100))
 		return true
 	case lsp.MethodTextDocumentPublishDiagnostics:
@@ -340,28 +384,35 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 			log.Printf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
+		h.client.messages = append(h.client.messages, fmt.Sprintf("Diagnostics:\n%+v", params))
 		log.Printf("gopls diagnostics: %s", trimString(fmt.Sprintf("%+v", params), 100))
 		return true
-
+	default:
+		log.Printf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
 	}
-	log.Printf("- jsonrpc2 Delivered and not handled: %q", r.Method)
 	return false
 }
 
 // Cancel implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc2.ID, canceled bool) bool {
+	_ = ctx
+	_ = conn
+	_ = canceled
 	log.Printf("- jsonrpc2 cancelled request id=%+v", id)
 	return false
 }
 
 // Request implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
+	_ = conn
+	_ = direction
 	//log.Printf("- jsonrpc2 Request(direction=%s) %q", direction, r.Method)
 	return ctx
 }
 
 // Response implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Response(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireResponse) context.Context {
+	_ = conn
 	var content string
 	if r.Result != nil && len(*r.Result) > 0 {
 		content = trimString(string(*r.Result), 100)
@@ -374,13 +425,12 @@ func (h *jsonrpc2Handler) Response(ctx context.Context, conn *jsonrpc2.Conn, dir
 func (h *jsonrpc2Handler) Done(context.Context, error) {}
 
 // Read implements jsonrpc2.Handler.
-func (h *jsonrpc2Handler) Read(ctx context.Context, n int64) context.Context { return ctx }
+func (h *jsonrpc2Handler) Read(ctx context.Context, _ int64) context.Context { return ctx }
 
 // Write implements jsonrpc2.Handler.
-func (h *jsonrpc2Handler) Write(ctx context.Context, n int64) context.Context { return ctx }
+func (h *jsonrpc2Handler) Write(ctx context.Context, _ int64) context.Context { return ctx }
 
 // Error implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Error(ctx context.Context, err error) {
 	log.Printf("- jsonrpc2 Error: %+v", err)
-
 }

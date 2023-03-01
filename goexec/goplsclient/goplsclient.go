@@ -19,10 +19,6 @@ package goplsclient
 
 import (
 	"context"
-	jsonrpc2 "github.com/go-language-server/jsonrpc2"
-	lsp "github.com/go-language-server/protocol"
-	"github.com/go-language-server/uri"
-	"github.com/pkg/errors"
 	"io"
 	"log"
 	"net"
@@ -30,6 +26,13 @@ import (
 	"os/exec"
 	"path"
 	"sync"
+	"time"
+
+	"github.com/go-language-server/jsonrpc2"
+	lsp "github.com/go-language-server/protocol"
+	"github.com/go-language-server/uri"
+	"github.com/golang/glog"
+	"github.com/pkg/errors"
 )
 
 type Client struct {
@@ -52,6 +55,9 @@ type Client struct {
 	// File cache.
 	fileVersions map[string]int       // Every open file that has been sent to gopls has a version, that is bumped when it is sent again.
 	fileCache    map[string]*FileData // Cache of files stored in disk.
+
+	// Messages: they should be reset whenever they have been consumed.
+	messages []string
 }
 
 // New returns a new Client in the directory. The returned Client does not yet start
@@ -91,65 +97,48 @@ func (c *Client) Shutdown() {
 	c.stopLocked()
 }
 
-// FileData retrieves the file data, including its contents.
-// It uses a cache system, so files don't need to be reloaded.
-func (c *Client) FileData(filePath string) (content *FileData, err error) {
-	var found bool
-	content, found = c.fileCache[filePath]
-	if found {
-		return
-	}
-
-	content = &FileData{
-		URI:  uri.File(filePath),
-		Path: filePath,
-	}
-	var f *os.File
-	f, err = os.Open(filePath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open %q for Client.FileData", filePath)
-	}
-	var b []byte
-	b, err = io.ReadAll(f)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read %q for Client.FileData", filePath)
-	}
-	content.Content = string(b)
-	if len(content.Content) == 0 {
-		return
-	}
-
-	// Fine line splits.
-	numLines := 1
-	for ii := 0; ii < len(content.Content)-1; ii++ {
-		if content.Content[ii] == '\n' {
-			numLines++
-		}
-	}
-	content.LineStarts = make([]int, numLines)
-	numLines = 1
-	for ii := 0; ii < len(content.Content)-1; ii++ {
-		if content.Content[ii] == '\n' {
-			content.LineStarts[numLines] = ii + 1
-			numLines++
-		}
-	}
-	return
+// isGoInternalOrCache returns whether if file is from Go implementation or
+// cached from a versioned library, in which case it's not expected to be changed
+// and we don't need to open the file in gopls.
+// TODO: implement, for now we always open all files.
+func isGoInternalOrCache(filePath string) bool {
+	_ = filePath
+	return false
 }
 
 // Definition return the definition for the identifier at the given position, rendered
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
-	err = c.NotifyDidOpen(ctx, filePath)
+	glog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
+	// Send "go.mod", in case it changes.
+	err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, "go.mod"))
 	if err != nil {
 		return "", err
 	}
-	_, err = c.CallDefinition(ctx, filePath, line, col)
+	// Send filePath.
+	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
 		return "", err
+	}
+
+	var results []lsp.Location
+	results, err = c.CallDefinition(ctx, filePath, line, col)
+	if err != nil {
+		log.Printf("c.CallDefinition failed: %+v", err)
+		return "", err
+	}
+	_ = results
+	for _, result := range results {
+		if result.URI.Filename() != filePath && !isGoInternalOrCache(result.URI.Filename()) {
+			err = c.NotifyDidOpenOrChange(ctx, result.URI.Filename())
+			if err != nil {
+				return "", err
+			}
+		}
 	}
 	hover, err := c.CallHover(ctx, filePath, line, col)
 	if err != nil {
+		log.Printf("c.CallHover failed: %+v", err)
 		return "", err
 	}
 	if hover.Contents.Kind != lsp.Markdown {
@@ -162,7 +151,8 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 // of the matches and the number of characters before the cursor position that should
 // be replaced by the matches (the same value for every entry).
 func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (matches []string, replaceLength int, err error) {
-	err = c.NotifyDidOpen(ctx, filePath)
+	glog.V(2).Infof("goplsclient.Complete(ctx, %s, %d, %d)", filePath, line, col)
+	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
 		return
 	}
@@ -186,12 +176,12 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 			// Multiple line edit we also don't know how to handle, skip.
 			continue
 		}
-		newReplaceLenth := int(edit.Range.End.Character) - int(edit.Range.Start.Character)
-		if replaceLength != -1 && newReplaceLenth != replaceLength {
+		newReplaceLength := int(edit.Range.End.Character) - int(edit.Range.Start.Character)
+		if replaceLength != -1 && newReplaceLength != replaceLength {
 			// Jupyter only supports edits of one length. We take the first one always.
 			continue
 		}
-		replaceLength = newReplaceLenth
+		replaceLength = newReplaceLength
 		matches = append(matches, edit.NewText)
 	}
 	if len(items.Items) != len(matches) {
@@ -202,7 +192,7 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 
 // Span returns the text spanning the given location (`lsp.Location` represents a range).
 func (c *Client) Span(loc lsp.Location) (string, error) {
-	fileData, err := c.FileData(loc.URI.Filename())
+	fileData, _, err := c.FileData(loc.URI.Filename())
 	if err != nil {
 		return "", err
 	}
@@ -220,8 +210,69 @@ func (c *Client) Span(loc lsp.Location) (string, error) {
 
 // FileData holds information about the contents of a file. It's built by `Client.FileContents`.
 type FileData struct {
-	Path       string
-	URI        uri.URI
-	Content    string
-	LineStarts []int
+	Path        string
+	URI         uri.URI
+	Content     string
+	ContentTime time.Time
+	LineStarts  []int
+}
+
+// FileData retrieves the file data, including its contents.
+// It uses a cache system, so files don't need to be reloaded.
+func (c *Client) FileData(filePath string) (content *FileData, updated bool, err error) {
+	content, updated = c.fileCache[filePath]
+	if updated {
+		// Check file hasn't changed.
+		var fileInfo os.FileInfo
+		fileInfo, err = os.Stat(filePath)
+		if err == nil && fileInfo.ModTime() == content.ContentTime {
+			// Fine not changed.
+			return
+		}
+		glog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
+			content.ContentTime, fileInfo.ModTime())
+	}
+
+	content = &FileData{
+		URI:  uri.File(filePath),
+		Path: filePath,
+	}
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to stat %q for Client.FileData", filePath)
+	}
+	content.ContentTime = fileInfo.ModTime()
+	var f *os.File
+	f, err = os.Open(filePath)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to open %q for Client.FileData", filePath)
+	}
+	var b []byte
+	b, err = io.ReadAll(f)
+	if err != nil {
+		return nil, false, errors.Wrapf(err, "failed to read %q for Client.FileData", filePath)
+	}
+	content.Content = string(b)
+	if len(content.Content) == 0 {
+		return
+	}
+
+	// Fine line splits.
+	numLines := 1
+	for ii := 0; ii < len(content.Content)-1; ii++ {
+		if content.Content[ii] == '\n' {
+			numLines++
+		}
+	}
+	content.LineStarts = make([]int, numLines)
+	numLines = 1
+	for ii := 0; ii < len(content.Content)-1; ii++ {
+		if content.Content[ii] == '\n' {
+			content.LineStarts[numLines] = ii + 1
+			numLines++
+		}
+	}
+	glog.V(2).Infof("goplsclient.FileData() loaded file %q", filePath)
+	c.fileCache[filePath] = content
+	return
 }

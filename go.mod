@@ -8,6 +8,7 @@ require (
 	github.com/go-language-server/uri v0.2.0
 	github.com/go-zeromq/zmq4 v0.15.0
 	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb

@@ -5,6 +5,8 @@ import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"log"
+	"strings"
 	"unicode/utf16"
 )
 
@@ -34,10 +36,16 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]bool, 
 	// Query `gopls`.
 	ctx := context.Background()
 	var desc string
-	s.gopls.ResetFile(s.MainPath())
+	log.Printf("Calling gopls.Definition(ctx, %s, %d, %d)",
+		s.MainPath(), cursorInFile.Line, cursorInFile.Col)
 	desc, err = s.gopls.Definition(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	messages := s.gopls.ConsumeMessages()
 	if err != nil {
-		return nil, errors.Cause(err)
+		parts := []string{errors.Cause(err).Error()}
+		if len(messages) > 0 {
+			parts = append(parts, messages...)
+		}
+		return kernel.MIMEMap{protocol.MIMETextPlain: strings.Join(parts, "\n\n")}, nil
 	}
 
 	// Return MIMEMap with markdown.
@@ -73,7 +81,6 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	// Query `gopls`.
 	ctx := context.Background()
 	_ = cursorInFile
-	s.gopls.ResetFile(s.MainPath())
 	var matches []string
 	var replaceLength int
 	matches, replaceLength, err = s.gopls.Complete(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)

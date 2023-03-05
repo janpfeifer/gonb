@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/janpfeifer/gonb)](https://goreportcard.com/report/github.com/janpfeifer/gonb)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/janpfeifer/gonb/HEAD?labpath=examples%2Ftutorial.ipynb)
 
-To quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)!
+## To quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)!
 
 Go is a compiled language, but with very fast compilation, that allows one to use
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
@@ -17,9 +17,9 @@ It already includes many goodies: contextual help and auto-complete (with
 [`gopls`](https://github.com/golang/tools/tree/master/gopls)), compilation error context (by
 mousing over), bash command execution, images, html, etc. See the [tutorial](examples/tutorial.ipynb).
 
-It's still **experimental**. This is very fresh from the oven, and likely there are many nuanced
-(or not so nuanced) situations where it may not work as expected. Reports of issues and even better
-fixes are very welcome.
+It's been heavily (and successfully) used by the author, but should still be seen as **experimental** -- 
+if we hear success stories from others we can change this. Reports of issues as well as fixes are 
+always welcome.
 
 There is also
 [a live version in Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing)

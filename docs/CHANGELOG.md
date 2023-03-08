@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.8
+
+* Fixed CSS for VSCode/Github Codespaces -- it doesn't play very well with Jupyter CSS.
+
 ## v0.3.7
 
 * Use standard Jupyter CSS color coding for error context -- should work on different themes (See #3).

@@ -89,7 +89,6 @@ with:
 !go install golang.org/x/tools/gopls@latest
 ` + "```\n"
 		log.Printf(msg)
-		err = nil
 	}
 
 	log.Printf("Initialized goexec.State in %s", s.TempDir)

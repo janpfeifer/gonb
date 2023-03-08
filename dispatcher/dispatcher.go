@@ -247,7 +247,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error) {
 	log.Printf("`complete_request`:")
 
-	// Start with emtpy reply, and makes sure reply is sent at the end.
+	// Start with empty reply, and makes sure reply is sent at the end.
 	reply := &kernel.CompleteReply{
 		Status:      "ok",
 		Matches:     []string{},

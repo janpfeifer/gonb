@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/janpfeifer/gonb)](https://goreportcard.com/report/github.com/janpfeifer/gonb)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/janpfeifer/gonb/HEAD?labpath=examples%2Ftutorial.ipynb)
 
-## To quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)!
+## For a quick start, see the very simple [**tutorial**](examples/tutorial.ipynb)!
 
 Go is a compiled language, but with very fast compilation, that allows one to use
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
@@ -26,6 +26,8 @@ There is also
 that one can interact with (make a copy first) -- if link doesn't work (Google Drive sharing publicly
 is odd), [download it from github](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
 
+It also works in VSCode and Github's Codespaces. Just follow the installation below.
+
 # Installation
 
 The [**tutorial**](examples/tutorial.ipynb) explains, but in short:
@@ -37,7 +39,15 @@ $ go install golang.org/x/tools/gopls@latest
 $ gonb --install
 ```
 
+Or all in one line that can be copy&pasted:
+
+```
+go install github.com/janpfeifer/gonb@latest && go install golang.org/x/tools/cmd/goimports@latest && go install golang.org/x/tools/gopls@latest && gonb --install
+```
+
 And then (re-)start Jupyter.
+
+In Github's Codespace, if Jupyter is already started, restarting the docker is an easy way to restart Jupyter.
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 

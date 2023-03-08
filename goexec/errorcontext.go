@@ -33,7 +33,6 @@ type errorLine struct {
 var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <style>
 .gonb-error-location {
-	color: var(--jp-content-font-color0);
 	background: var(--jp-error-color2);  
 	border-radius: 3px;
 	border-style: dotted;
@@ -49,7 +48,6 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	display: none;
 }
 .gonb-error-location:hover + .gonb-error-context {
-	color: var(--jp-content-font-color0);
 	background: var(--jp-dialog-background);  
 	border-radius: 3px;
 	border-style: solid;
@@ -185,7 +183,9 @@ func (s *State) readMainGo() (string, error) {
 	if err != nil {
 		return "", errors.Wrapf(err, "failed readMainGo()")
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close() // Ignoring error on closing file for reading.
+	}()
 	content, err := io.ReadAll(f)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed readMainGo()")

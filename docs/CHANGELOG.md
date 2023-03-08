@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.7
+
+* Use standard Jupyter CSS color coding for error context -- should work on different themes (See #3).
+
 ## v0.3.6
 
 * Better handling of gopls dying.

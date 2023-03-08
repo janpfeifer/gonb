@@ -28,29 +28,34 @@ type errorLine struct {
 	Context    string // Context to display on a mouse-over window, only if HasContext == true.
 }
 
+// To check the standard Jupyter colors to choose from, see:
+// https://github.com/jupyterlab/jupyterlab/blob/master/packages/theme-light-extension/style/variables.css
 var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <style>
 .gonb-error-location {
-	background: #f8f8e0; 
+	color: var(--jp-content-font-color0);
+	background: var(--jp-error-color2);  
 	border-radius: 3px;
 	border-style: dotted;
 	border-width: 1px;
-	border-color: black;
+	border-color: var(--jp-border-color2);
 }
 .gonb-error-location:hover {
 	border-width: 2px;
 	border-style: solid;
+	border-color: var(--jp-border-color2);
 }
 .gonb-error-context {
 	display: none;
 }
 .gonb-error-location:hover + .gonb-error-context {
+	color: var(--jp-content-font-color0);
+	background: var(--jp-dialog-background);  
 	border-radius: 3px;
 	border-style: solid;
 	border-width: 1px;
-	border-color: black;
+	border-color: var(--jp-border-color2);
 	display: block;
-	background: #e0e0e0;
 	white-space: pre;
 	font-family: monospace;
 }
@@ -58,6 +63,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	border-radius: 3px;
 	border-style: dotted;
 	border-width: 1px;	
+	border-color: var(--jp-border-color2);
 	font-weight: bold;
 }
 </style>

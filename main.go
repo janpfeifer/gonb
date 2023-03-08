@@ -93,7 +93,7 @@ func SetUpLogging() {
 	if *flagExtraLog != "" {
 		f, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
-			log.Fatalf("Failed to open log file %q for writting: %+v", *flagExtraLog, err)
+			log.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
 		}
 		f.Write([]byte("\n\n"))
 		w := io.MultiWriter(f, os.Stderr) // Write to STDERR and the newly open f.

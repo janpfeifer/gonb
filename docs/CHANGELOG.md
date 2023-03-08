@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.3.9
+
+* Small Go Report Card fixes (https://goreportcard.com/report/github.com/janpfeifer/gonb)
+
 ## v0.3.8
 
 * Fixed CSS for VSCode/Github Codespaces -- it doesn't play very well with Jupyter CSS.

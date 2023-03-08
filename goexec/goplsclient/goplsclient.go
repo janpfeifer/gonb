@@ -98,7 +98,7 @@ func (c *Client) Shutdown() {
 }
 
 // isGoInternalOrCache returns whether if file is from Go implementation or
-// cached from a versioned library, in which case it's not expected to be changed
+// cached from a versioned library, in which case it's not expected to be changed,
 // and we don't need to open the file in gopls.
 // TODO: implement, for now we always open all files.
 func isGoInternalOrCache(filePath string) bool {
@@ -230,7 +230,7 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 			return
 		}
 		glog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
-			content.ContentTime, fileInfo.ModTime())
+			filePath, content.ContentTime, fileInfo.ModTime())
 	}
 
 	content = &FileData{

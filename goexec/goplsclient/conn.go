@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
+	"strings"
+	"time"
+
 	jsonrpc2 "github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
-	"log"
-	"net"
-	"strings"
-	"time"
 )
 
 var _ = lsp.MethodInitialize
@@ -175,7 +176,7 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 				Version: &version,
 			},
 			ContentChanges: []lsp.TextDocumentContentChangeEvent{
-				lsp.TextDocumentContentChangeEvent{
+				{
 					Text: fileData.Content,
 				},
 			},
@@ -339,17 +340,6 @@ func trimString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-1] + `…`
-}
-
-// sampleRawJson returns a sample of the raw Json message (up to 100 bytes)
-// converted to string. For logging/debugging prints.
-func sampleRawJson(content json.RawMessage) string {
-	b := []byte(content)
-	if len(b) > 100 {
-		return string(b[:100]) + "..."
-
-	}
-	return string(b)
 }
 
 // Deliver implements jsonrpc2.Handler.

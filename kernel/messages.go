@@ -347,6 +347,21 @@ func PublishDisplayData(msg Message, data Data) error {
 	})
 }
 
+// PublishUpdateDisplayData is like PublishDisplayData, but expects `transient.display_id` to be set, and that a
+// previous `display_data` has already created this id.
+func PublishUpdateDisplayData(msg Message, data Data) error {
+	// copy Data in a struct with appropriate json tags
+	return msg.Publish("update_display_data", struct {
+		Data      MIMEMap `json:"data"`
+		Metadata  MIMEMap `json:"metadata"`
+		Transient MIMEMap `json:"transient"`
+	}{
+		Data:      data.Data,
+		Metadata:  EnsureMIMEMap(data.Metadata),
+		Transient: EnsureMIMEMap(data.Transient),
+	})
+}
+
 // PublishDisplayDataWithHTML is a shortcut to PublishDisplayData for HTML content.
 func PublishDisplayDataWithHTML(msg Message, html string) error {
 	msgData := Data{

@@ -27,6 +27,7 @@ type DisplayData struct {
 
 	// DisplayID is a "transient" (see doc) information about which id to display something. It's used to
 	// overwrite some previous content. So far tested only with HTML. A program should always generate
-	// unique IDs to start with, and then re-use them to update them.
+	// unique IDs to start with, and then re-use them to update them. If set, after the first time that it's
+	// used, it will trigger the use of the `update_display_data` as opposed to `display_data` message.
 	DisplayID string
 }

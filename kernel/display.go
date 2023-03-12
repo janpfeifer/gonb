@@ -16,6 +16,7 @@ import (
 // It expects pipeIn to be closed when the polling is to stop.
 func PollDisplayRequests(msg Message, pipeReader *os.File) {
 	decoder := gob.NewDecoder(pipeReader)
+	knownBlockIds := make(map[string]struct{})
 	for {
 		data := &protocol.DisplayData{}
 		err := decoder.Decode(data)
@@ -25,7 +26,7 @@ func PollDisplayRequests(msg Message, pipeReader *os.File) {
 			log.Printf("Failed to read from named pipe, stopped polling for new data content: %+v", err)
 			return
 		}
-		processDisplayData(msg, data)
+		processDisplayData(msg, data, knownBlockIds)
 	}
 }
 
@@ -47,7 +48,7 @@ func logDisplayData(data MIMEMap) {
 }
 
 // processDisplayData process an incoming `protocol.DisplayData` object.
-func processDisplayData(msg Message, data *protocol.DisplayData) {
+func processDisplayData(msg Message, data *protocol.DisplayData, knownBlockIds map[string]struct{}) {
 	// Log info about what is being displayed.
 	msgData := Data{
 		Data:      make(MIMEMap, len(data.Data)),
@@ -61,10 +62,20 @@ func processDisplayData(msg Message, data *protocol.DisplayData) {
 	for key, content := range data.Metadata {
 		msgData.Metadata[key] = content
 	}
+	isUpdate := false
 	if data.DisplayID != "" {
 		msgData.Transient["display_id"] = data.DisplayID
+		if _, found := knownBlockIds[data.DisplayID]; found {
+			isUpdate = true
+		}
+		knownBlockIds[data.DisplayID] = struct{}{}
 	}
-	err := PublishDisplayData(msg, msgData)
+	var err error
+	if isUpdate {
+		err = PublishUpdateDisplayData(msg, msgData)
+	} else {
+		err = PublishDisplayData(msg, msgData)
+	}
 	if err != nil {
 		log.Printf("Failed to display data (ignoring): %v", err)
 	}

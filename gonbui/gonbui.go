@@ -2,6 +2,7 @@ package gonbui
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/gob"
 	"fmt"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
@@ -123,4 +124,17 @@ func DisplaySVG(svg string) {
 	//	Data: map[protocol.MIMEType]any{protocol.MIMEImageSVG: svg},
 	//})
 	DisplayHTML(fmt.Sprintf("<div>%s</div>", svg))
+}
+
+// EmbedImageAsPNGSrc returns a string that can be used as in an HTML <img> tag, as its source (it's `src` field).
+// This simplifies embedding an image in HTML without requiring separate files. It embeds it as a PNG file
+// base64 encoded.
+func EmbedImageAsPNGSrc(img image.Image) (string, error) {
+	buf := &bytes.Buffer{}
+	err := png.Encode(buf, img)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to encode image as PNG")
+	}
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
 }

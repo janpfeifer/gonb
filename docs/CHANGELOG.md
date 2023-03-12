@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## v0.4.0
+
+* "%%" or "%main" now set the program arguments as well. This may reset previously configured parameters
+  given by "%args", which breaks compatibility is some cases, hence the version number bump.
+
 ## v0.3.9
 
 * Small Go Report Card fixes (https://goreportcard.com/report/github.com/janpfeifer/gonb)

@@ -45,11 +45,13 @@ after is wrapped inside a "func main() { ... }". So our revised "hello world" lo
 
 Special non-Go commands: 
 
-- "%main" or "%%": Marks the lines as follows to be wrapped in a "func main() {...}" during 
+- "%%" or "%main": Marks the lines as follows to be wrapped in a "func main() {...}" during 
   execution. A shortcut to quickly execute code. It also automatically includes "flag.Parse()"
-  as the very first statement.
+  as the very first statement. Anything "%%" or "%main" are taken as arguments
+  to be passed to the program -- it resets previous values given by "%args".
 - "%args": Sets arguments to be passed when executing the Go code. This allows one to
-  use flags as a normal program.
+  use flags as a normal program. Notice that if a value after "%%" or "%main" is given, it will
+  overwrite the values here.
 - "%autoget" and "%noautoget": Default is "%autoget", which automatically does "go get" for
   packages not yet available.
 - "%env VAR value": Sets the environment variable VAR to the given value. These variables
@@ -152,12 +154,11 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	content := msg.ComposedMsg().Content.(map[string]any)
 	parts := splitCmd(cmdStr)
 	switch parts[0] {
-	case "%":
-		// Handled by goexec, nothing to do here.
-	case "args":
+	case "%", "main", "args":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
 		log.Printf("args=%+q", parts)
+		// %% and %main are also handled specially by goexec, where it starts a main() clause.
 	case "env":
 		// Set environment variables.
 		if len(parts) != 3 {
@@ -170,8 +171,6 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		goExec.AutoGet = false
 	case "help":
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStdout, HelpMessage)
-	case "main":
-		// Handled by goexec, nothing to do here.
 	case "reset":
 		goExec.Reset()
 		err := kernel.PublishWriteStream(msg, kernel.StreamStdout, "* State reset: all memorized declarations discarded.\n")

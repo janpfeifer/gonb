@@ -2,8 +2,10 @@ package gonbui
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/gob"
 	"fmt"
+	"github.com/gofrs/uuid"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"image"
@@ -37,17 +39,11 @@ func Error() error {
 	return gonbPipeError
 }
 
-// Open a singleton connection to the GoNB kernel. Returns any potential error. Errors can also later be accessed
-// by the Error() function. The connection will be used by all Display* functions.
+// openLock a singleton connection to the GoNB kernel, assuming `mu` is already locked. Returns any potential error.
+// Errors can also later be accessed by the Error() function. The connection will be used by all Display* functions.
 //
 // Notice the display functions will call Open automatically, so it's not necessarily needed. Also, if the pipe is
 // already opened, this becomes a no-op.
-func Open() error {
-	mu.Lock()
-	defer mu.Unlock()
-	return openLocked()
-}
-
 func openLocked() error {
 	if gonbPipeError != nil {
 		return gonbPipeError // Errors are persistent, it won't recover.
@@ -65,6 +61,7 @@ func openLocked() error {
 	return nil
 }
 
+// sendData to be displayed in the connected Notebook.
 func sendData(data *protocol.DisplayData) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -86,6 +83,42 @@ func DisplayHTML(html string) {
 	sendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMETextHTML: html},
 	})
+}
+
+// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`: the block is created
+// automatically the first time this function is called, and simply updated thereafter.
+//
+// The contents of these cells are considered transient, and intended to live only during a kernel session.
+//
+// Usage example:
+//
+// ```go
+//
+//	counterDisplayId := gonbui.UniqueID()
+//	for ii := 0; ii < 10; ii++ {
+//	  gonbui.UpdateHTML(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
+//	}
+//	gonbui.UpdateHTML(counterDisplayId, "")  // Erase transient block.
+//	gonbui.DisplayHTML(fmt.Sprintf("Count: <b>%d</b>\n", ii))  // Show on final block.
+//
+// ```
+func UpdateHTML(id, html string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data:      map[protocol.MIMEType]any{protocol.MIMETextHTML: html},
+		DisplayID: id,
+	})
+}
+
+// UniqueID returns a unique id that can be used for UpdateHTML. Should be generated once per display block
+// the program wants to update.
+func UniqueID() string {
+	uuid, _ := uuid.NewV7()
+	uuidStr := uuid.String()
+	uid := uuidStr[len(uuidStr)-8:]
+	return fmt.Sprintf("gonb_id_%s", uid)
 }
 
 // DisplayPNG displays the given PNG, given as raw bytes.
@@ -123,4 +156,17 @@ func DisplaySVG(svg string) {
 	//	Data: map[protocol.MIMEType]any{protocol.MIMEImageSVG: svg},
 	//})
 	DisplayHTML(fmt.Sprintf("<div>%s</div>", svg))
+}
+
+// EmbedImageAsPNGSrc returns a string that can be used as in an HTML <img> tag, as its source (it's `src` field).
+// This simplifies embedding an image in HTML without requiring separate files. It embeds it as a PNG file
+// base64 encoded.
+func EmbedImageAsPNGSrc(img image.Image) (string, error) {
+	buf := &bytes.Buffer{}
+	err := png.Encode(buf, img)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to encode image as PNG")
+	}
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
 }

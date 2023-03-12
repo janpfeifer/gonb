@@ -77,7 +77,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 		var createdFuncMain bool
 		for ii, line := range lines {
 			line = strings.TrimRight(line, " ")
-			if line == "%main" || line == "%%" {
+			if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
 				addEmptyLine()
 				addLine("func main() {", NoCursorLine, 0)
 				addLine("\tflag.Parse()", NoCursorLine, 0)

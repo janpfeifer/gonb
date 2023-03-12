@@ -1,5 +1,7 @@
 # GoNB Changelog
 
+* Fixed crash when auto-complete returns a nil structure.
+
 ## v0.3.9
 
 * Small Go Report Card fixes (https://goreportcard.com/report/github.com/janpfeifer/gonb)

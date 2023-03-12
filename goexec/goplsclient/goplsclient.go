@@ -161,7 +161,10 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 	if err != nil {
 		return
 	}
-
+	if items == nil {
+		// No results.
+		return
+	}
 	replaceLength = -1
 	for _, item := range items.Items {
 		edit := item.TextEdit

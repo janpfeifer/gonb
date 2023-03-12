@@ -5,6 +5,7 @@
 * "%%" or "%main" now set the program arguments as well. This may reset previously configured parameters
   given by "%args", which breaks compatibility is some cases, hence the version number bump.
 * Added "UpdateHTML" and "UniqueID", to allow dynamically updated HTML content on the page.
+* Fixed crash when auto-complete returns a nil structure.
 
 ## v0.3.9
 

@@ -56,7 +56,7 @@ display any type of HTML content.
 
 For the most cases, one can simply import 
 [`github.com/janpfeifer/gonb/gonbui`](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui):
-the library offers and convenient API to everything available. Examples of use in the
+the library offers a convenient API to everything available. Examples of use in the
 [tutorial](examples/tutorial.ipynb). 
 
 If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol

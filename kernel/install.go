@@ -42,7 +42,7 @@ func Install(extraArgs []string, force bool) error {
 	case "linux":
 		configDir = path.Join(home, ".local/share/jupyter/kernels/gonb")
 	case "darwin":
-		configDir = path.Join(home, "Library/Jupyter/kernels/")
+		configDir = path.Join(home, "Library/Jupyter/kernels/gonb")
 	default:
 		return errors.Errorf("Unknown OS %q: not sure how to install GoNB.", runtime.GOOS)
 	}

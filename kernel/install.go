@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"strings"
 )
 
 // jupyterKernelConfig is the Jupyter configuration to be
 // converted to a `kernel.json` file under `~/.local/share/jupyter/kernels/gonb`
+// (or `${HOME}/Library/Jupyter/kernels/` in Macs)
 type jupyterKernelConfig struct {
 	Argv        []string          `json:"argv"`
 	DisplayName string            `json:"display_name"`
@@ -35,7 +37,15 @@ func Install(extraArgs []string, force bool) error {
 
 	// Jupyter configuration directory for gonb.
 	home := os.Getenv("HOME")
-	configDir := path.Join(home, ".local/share/jupyter/kernels/gonb")
+	var configDir string
+	switch runtime.GOOS {
+	case "linux":
+		configDir = path.Join(home, ".local/share/jupyter/kernels/gonb")
+	case "darwin":
+		configDir = path.Join(home, "Library/Jupyter/kernels/")
+	default:
+		return errors.Errorf("Unknown OS %q: not sure how to install GoNB.", runtime.GOOS)
+	}
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return errors.WithMessagef(err, "failed to create configuration directory %q", configDir)
 	}

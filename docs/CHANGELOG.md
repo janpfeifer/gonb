@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.4.1
+
+* Adding support for Mac installation.
+
 ## v0.4.0
 
 * "%%" or "%main" now set the program arguments as well. This may reset previously configured parameters

@@ -53,7 +53,7 @@ In Github's Codespace, if Jupyter is already started, restarting the docker is a
 
 ## On Mac
 
-See issue #9 for a small fix. In the works.
+See [issue #9](https://github.com/janpfeifer/gonb/issues/9) for a small fix. In the works.
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 

@@ -30,6 +30,8 @@ It also works in VSCode and Github's Codespaces. Just follow the installation be
 
 # Installation
 
+**Only for Linux (and WSL in Windows) out-of-the-box for now.**
+
 The [**tutorial**](examples/tutorial.ipynb) explains, but in short:
 
 ```
@@ -48,6 +50,10 @@ go install github.com/janpfeifer/gonb@latest && go install golang.org/x/tools/cm
 And then (re-)start Jupyter.
 
 In Github's Codespace, if Jupyter is already started, restarting the docker is an easy way to restart Jupyter.
+
+## On Mac
+
+See issue #9 for a small fix. In the works.
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 

@@ -75,7 +75,7 @@ details.
 
 Contributions are welcome! 
 
-* Mac and Windows: 
+* Windows version: 
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 * Tracking of lines on generated Go files back to cell, so reported errors are easy to
@@ -83,16 +83,14 @@ Contributions are welcome!
   surrounding them.
 * Controllable (per package or file) logging in GoNB code. 
 * Library to easily store/retrieve calculated content. When doing data analysis so 
-  one doesn't need to re-generate some result at a next cell execution. Something
-  like `func Save[T any](id string, fn func() (T, error)) T, error` that calls
-  fn, and if successful, saves the result before returning it. And the accompanying
-  `func Load[T any](id string) T, error` and 
-  `func LoadOrRun[T any](id string, fn func() (T, error)) T, error` which will 
-  load the result if available or run `fn` to regenerate it (and then save it).
+  one doesn't need to re-generate some result at a next cell execution.
+* Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
+  would be handy, but complicates tracking the position of the cursor on the changed
+  file.
 
 # Implementation
 
 The Jupyter kernel started from [gophernotes](https://github.com/gopherdata/gophernotes)
-implementation, but was heavily modified and very little is left. Also, the execution loop
-and mechanisms are completely different and new: GoNB compiles and executes on-the-fly,
-instead of using a REPL engine.
+implementation, but was heavily modified and very little from it is left. Also, the
+execution loop and mechanisms are completely different and new: GoNB compiles and 
+executes on-the-fly, instead of using a REPL engine.

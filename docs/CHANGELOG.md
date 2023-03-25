@@ -2,7 +2,7 @@
 
 ## v0.4.1
 
-* Adding support for Mac installation.
+* Added support for Mac installation.
 
 ## v0.4.0
 

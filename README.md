@@ -30,7 +30,7 @@ It also works in VSCode and Github's Codespaces. Just follow the installation be
 
 # Installation
 
-**Only for Linux (and WSL in Windows) out-of-the-box for now.**
+**Only for Linux (and WSL in Windows) and MacOS.**
 
 The [**tutorial**](examples/tutorial.ipynb) explains, but in short:
 
@@ -51,9 +51,12 @@ And then (re-)start Jupyter.
 
 In Github's Codespace, if Jupyter is already started, restarting the docker is an easy way to restart Jupyter.
 
-## On Mac
+## Windows
 
-See [issue #9](https://github.com/janpfeifer/gonb/issues/9) for a small fix. In the works.
+The recommendation is to use [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install)
+or WSL2, and run Jupyter and the GoNB kernel in Linux. Installation there as if in a linux machine.
+
+A pure Windows installation is not supported at this time -- but contribution to add support would be welcome :)
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 

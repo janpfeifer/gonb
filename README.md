@@ -87,6 +87,12 @@ Contributions are welcome!
 * Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
   would be handy, but complicates tracking the position of the cursor on the changed
   file.
+* Create a JupyterLab extension to allows the Go code to create and interact with widgets. Or 
+  alternatively open a WebSocket from the widget to the kernel. Some links:
+  * https://github.com/jupyterlab/extension-examples
+  * https://jupyter-notebook.readthedocs.io/en/4.x/comms.html
+  * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
+  * https://discourse.jupyter.org/c/jupyterlab/extensions/43
 
 # Implementation
 

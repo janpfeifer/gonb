@@ -14,6 +14,12 @@ import (
 	"regexp"
 )
 
+// State holds information about Go code execution for this kernel. It's a singleton (for now).
+// It hols the directory, ids, configuration, command line arguments to use and currently
+// defined Go code.
+//
+// That is, if the user runs a cell that defines, let's say `func f(x int) int { return x+1 }`,
+// the declaration of `f` will be stored in Decls field.
 type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
@@ -182,8 +188,9 @@ func (c *Cursor) CursorFrom(line, col int) Cursor {
 	return Cursor{Line: c.Line + line, Col: c.Col + col}
 }
 
+// ClearCursor resets the cursor to an invalid state.
 func (c *Cursor) ClearCursor() {
-	c.Line = -1
+	c.Line = NoCursorLine
 }
 
 // Function definition.
@@ -249,6 +256,10 @@ func NewImport(importPath, alias string) *Import {
 	return &Import{Key: key, Path: importPath, Alias: alias}
 }
 
+// Reset clears all the memorized Go declarations. It becomes as if no cells had
+// been executed so far -- except for configurations and arguments that remain unchanged.
+//
+// It is connected to the special command `%reset`.
 func (s *State) Reset() {
 	s.Decls = NewDeclarations()
 }

@@ -11,25 +11,16 @@ import (
 
 // The tests here uses the sample code and utility functions defined in `parser_test.go`.
 
-var sampleCellContentSuffix = `
-!echo nonono
-
-%%
-fmt.Printf("Hello! %s\n", c)
-fmt.Printf("1 + 3 = %d\n", sum(1, 3))
-fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
-`
-
 func TestCreateGoFileFromLines(t *testing.T) {
 	// Test cursor positioning in generated lines.
 	s := newEmptyState(t)
-	//defer func() {
-	//	err := s.Finalize()
-	//	require.NoError(t, err, "Failed to finalized state")
-	//}()
+	defer func() {
+		err := s.Finalize()
+		require.NoError(t, err, "Failed to finalized state")
+	}()
 	fmt.Println(s.MainPath())
 
-	content := sampleCellCode + sampleCellContentSuffix
+	content := sampleCellCode
 	lines := strings.Split(content, "\n")
 	skipLines := MakeSet[int]()
 	for ii, line := range lines {

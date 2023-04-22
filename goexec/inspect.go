@@ -26,7 +26,8 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 
 	// Generate `main.go` with contents of current cell.
 	cursorInCell := Cursor{cursorLine, cursorCol}
-	_, cursorInFile, err := s.parseLinesAndComposeMain(nil, lines, skipLines, cursorInCell)
+	cellId := -1 // Inspect doesn't actually execute it, so parsed contents of cell are not kept.
+	_, cursorInFile, err := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
 	if err != nil {
 		if errors.Is(err, ParseError) || errors.Is(err, CursorLost) {
 			return make(kernel.MIMEMap), nil
@@ -69,7 +70,8 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	// Generate `main.go` with contents of current cell.
 	cursorInCell := Cursor{cursorLine, cursorCol}
 	var cursorInFile Cursor
-	_, cursorInFile, err = s.parseLinesAndComposeMain(nil, cellLines, skipLines, cursorInCell)
+	cellId := -1 // AutoComplete doesn't actually execute it, so parsed contents of cell are not kept.
+	_, cursorInFile, err = s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
 	if err != nil {
 		if errors.Is(err, ParseError) || errors.Is(err, CursorLost) {
 			// Simply return no auto-complete.

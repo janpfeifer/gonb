@@ -15,7 +15,7 @@ import (
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
-	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, lines, skipLines, NoCursor)
+	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}

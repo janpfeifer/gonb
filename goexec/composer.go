@@ -301,7 +301,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 	var createdFuncMain bool
 	for ii, line := range lines {
 		if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
-			w.Write("func main() {\n\tflag.Parse\n")
+			w.Write("func main() {\n\tflag.Parse()\n")
 			createdFuncMain = true
 			continue
 		}

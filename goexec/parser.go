@@ -22,8 +22,14 @@ import (
 // parseInfo holds the information needed for parsing Go code and some key helper methods.
 type parseInfo struct {
 	cursor        Cursor
+	cellId        int
 	fileSet       *token.FileSet
 	filesContents map[string]string
+
+	// fileToCellLine holds for each line in the `main.go` file, the corresponding line number in the cell. This
+	// is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
+	// that have no correspondent value in the cell code.
+	fileToCellLine []int
 }
 
 // getCursor returns the cursor position within this declaration, if the original cursor falls in there.
@@ -33,26 +39,26 @@ func (pi *parseInfo) getCursor(node ast.Node) Cursor {
 		return NoCursor
 	}
 	fromPos, toPos := pi.fileSet.Position(from), pi.fileSet.Position(to)
-	for line := fromPos.Line; line <= toPos.Line; line++ {
+	for lineNum := fromPos.Line; lineNum <= toPos.Line; lineNum++ {
 		// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
-		if line-1 == pi.cursor.Line {
+		if lineNum-1 == pi.cursor.Line {
 			// Column is set either relative to the start of the definition, if in the
-			// same start line, or the definition column.
+			// same start lineNum, or the definition column.
 			col := pi.cursor.Col
-			if line == fromPos.Line && col < fromPos.Column-1 {
+			if lineNum == fromPos.Line && col < fromPos.Column-1 {
 				// Cursor before node.
 				//log.Printf("Cursor before node: %q", pi.extractContentOfNode(node))
 				return NoCursor
 			}
-			if line == toPos.Line && col >= toPos.Column-1 {
+			if lineNum == toPos.Line && col >= toPos.Column-1 {
 				// Cursor after node.
 				//log.Printf("Cursor after node: %q", pi.extractContentOfNode(node))
 				return NoCursor
 			}
-			if line == fromPos.Line {
+			if lineNum == fromPos.Line {
 				col = col - (fromPos.Column - 1) // fromPos column is 1-based.
 			}
-			c := Cursor{line - fromPos.Line, col}
+			c := Cursor{lineNum - fromPos.Line, col}
 			//log.Printf("Found cursor at %v in definition, (%d, %d):\n%s", c, fromPos.Line, fromPos.Column,
 			//	pi.extractContentOfNode(node))
 			return c
@@ -61,9 +67,22 @@ func (pi *parseInfo) getCursor(node ast.Node) Cursor {
 	return NoCursor
 }
 
+// calculateCellLines returns the
+func (pi *parseInfo) calculateCellLines(node ast.Node) (c CellLines) {
+	c.Id = pi.cellId
+	from, to := node.Pos(), node.End()
+	fromPos, toPos := pi.fileSet.Position(from), pi.fileSet.Position(to)
+	numLines := (toPos.Line - fromPos.Line) + 1
+	c.Lines = make([]int, 0, numLines)
+	for lineNum := fromPos.Line; lineNum <= toPos.Line; lineNum++ {
+		c.Lines = append(c.Lines, pi.fileToCellLine[lineNum-1])
+	}
+	return
+}
+
 // extractContentOfNode from files, given the golang parser's tokens.
 //
-// Currently, we generate all the content in file `main.go`, so fileContents will only have
+// Currently, we generate all the content into the file `main.go`, so fileContents will only have
 // one entry.
 //
 // This is used to get the exact definition (string) of an element (function, variable, const, import, type, etc.)
@@ -80,18 +99,31 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 // parseFromMainGo reads main.go and parses its declarations -- see object Declarations.
 //
 // This will be called by parseLinesAndComposeMain, after `main.go` is written.
-func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor) (decls *Declarations, err error) {
+//
+// Parameters:
+//   - msg: connection to notebook, to report errors. If nil, errors are not reported.
+//   - cellId: execution id of the cell being processed. Set to -1 if later this cell will be discarded (for
+//     instance when parsing for auto-complete).
+//   - cursor: where it is in the file. If set (that is, `cursor != NoCursor`), it will record the position
+//     of the cursor in the corresponding declaration.
+//   - fileToCellLine: for each line in the `main.go` file, the corresponding line number in the cell. This
+//     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
+//     that have no correspondent value in the cell code.
+func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellLine []int) (decls *Declarations, err error) {
 	decls = NewDeclarations()
 	pi := &parseInfo{
-		cursor:  cursor,
-		fileSet: token.NewFileSet(),
+		cursor:         cursor,
+		fileSet:        token.NewFileSet(),
+		fileToCellLine: fileToCellLine,
 	}
-	packages, err := parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
+	var packages map[string]*ast.Package
+	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
 	if err != nil {
 		if msg != nil {
 			s.DisplayErrorWithContext(msg, err.Error())
 		}
-		return nil, errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
+		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
+		return
 	}
 	pi.filesContents = make(map[string]string)
 
@@ -101,8 +133,9 @@ func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor) (decls *Decla
 
 	for name, pkgAst := range packages {
 		if name != "main" {
-			log.Printf("WARNING: found package %s while parsing imports, but we expected only package main.", name)
-			continue
+			err = errors.New("Invalid package %q declared: there should be no `package` declaration, " +
+				"GoNB will automatically create `package main` when combining cell code.")
+			return
 		}
 		for _, fileObj := range pkgAst.Files {
 			// Currently, there is only `main.go` file.
@@ -145,6 +178,24 @@ func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor) (decls *Decla
 	return
 }
 
+// NewImport from the importPath and it's alias. If alias is empty or "<nil>", it will default to the
+// last name part of the importPath.
+func NewImport(importPath, alias string) *Import {
+	key := alias
+	if key == "" {
+		parts := reDefaultImportPathAlias.FindStringSubmatch(importPath)
+		if len(parts) < 2 {
+			key = importPath
+		} else {
+			key = parts[1]
+		}
+	} else if key == "." {
+		// More than one import can be moved to the current namespace.
+		key = ".~" + importPath
+	}
+	return &Import{Key: key, Path: importPath, Alias: alias}
+}
+
 // ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.parseFromMainGo
 func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec) {
 	var alias string
@@ -154,6 +205,7 @@ func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec
 	value := entry.Path.Value
 	value = value[1 : len(value)-1] // Remove quotes.
 	importEntry := NewImport(value, alias)
+	importEntry.CellLines = pi.calculateCellLines(entry.Path)
 
 	// Find if and where the cursor may be.
 	if c := pi.getCursor(entry.Path); c.HasCursor() {
@@ -183,6 +235,7 @@ func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl)
 		key = fmt.Sprintf("%s~%s", typeName, key)
 	}
 	f := &Function{Key: key, Definition: pi.extractContentOfNode(funcDecl)}
+	f.CellLines = pi.calculateCellLines(funcDecl)
 	f.Cursor = pi.getCursor(funcDecl)
 	decls.Functions[f.Key] = f
 }
@@ -228,6 +281,7 @@ func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 			}
 
 			v.Key = v.Name
+			v.CellLines = pi.calculateCellLines(vSpec)
 			if v.Name == "_" {
 				// Each un-named reference has a unique key.
 				v.Key = "_~" + strconv.Itoa(rand.Int()%0xFFFF)
@@ -283,6 +337,7 @@ func (pi *parseInfo) ParseConstEntry(decls *Declarations, typedDecl *ast.GenDecl
 					}
 				}
 			}
+			c.CellLines = pi.calculateCellLines(vSpec)
 			decls.Constants[c.Key] = c
 		}
 	}
@@ -302,6 +357,7 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 			tDecl.Cursor = c
 			tDecl.CursorInType = true
 		}
+		tDecl.CellLines = pi.calculateCellLines(tSpec)
 		decls.Types[name] = tDecl
 	}
 }
@@ -317,17 +373,21 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines Set[int], cursorInCell Cursor) (
+func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	updatedDecls *Declarations, cursorInFile Cursor, err error) {
 	if cursorInCell.HasCursor() {
 		log.Printf("Cursor in cell (%+v)", cursorInCell)
 	}
-	var cursorInTmpFile Cursor
-	cursorInTmpFile, _, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	var (
+		cursorInTmpFile Cursor
+		fileToCellLine  []int
+	)
+
+	cursorInTmpFile, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	if err != nil {
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
 	}
-	newDecls, err := s.parseFromMainGo(msg, cursorInTmpFile)
+	newDecls, err := s.parseFromMainGo(msg, cellId, cursorInTmpFile, fileToCellLine)
 	if err != nil {
 		// If cell is in an un-parseable state, just returns empty context. User can try to
 		// run cell to get an error.

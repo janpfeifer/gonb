@@ -1,4 +1,4 @@
-// Package goexec executes cells with Go sampleCellCode for the gonb kernel.
+// Package goexec executes cells with Go code for the gonb kernel.
 //
 // It defines a State object, that carries all the globals defined so far. It provides
 // the ExecuteCell method, to run a new cell.
@@ -24,7 +24,7 @@ type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
 
-	// Building and executing go sampleCellCode configuration:
+	// Building and executing go code configuration:
 	Args    []string // Args to be passed to the program, after being executed.
 	AutoGet bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
 
@@ -86,7 +86,7 @@ func New(uniqueID string) (*State, error) {
 
 	} else {
 		msg := `
-Program gopls is not installed. It is used to inspect into sampleCellCode
+Program gopls is not installed. It is used to inspect into code
 and provide contextual information and autocompletion. It is a 
 standard Go toolkit package. You can install it from the notebook
 with:

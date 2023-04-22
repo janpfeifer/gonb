@@ -79,6 +79,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 </div>
 `))
 
+// Example type of error message:
 // /tmp/gonb_4e5ea2e7/main.go:3:1: expected declaration, found fmt
 
 // DisplayErrorWithContext in an HTML div, with a mouse-over pop-up window

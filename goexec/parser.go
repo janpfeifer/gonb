@@ -7,82 +7,18 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"io"
 	"log"
 	"math/rand"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 )
 
-// This file implements functions related to the parsing of the Go sampleCellCode.
-// It is used to properly merge sampleCellCode coming from the execution of different cells.
+// This file implements functions related to the parsing of the Go code.
+// It is used to properly merge code coming from the execution of different cells.
 
-// WriterWithCursor keep tabs of current line/col of the file (presumably)
-// being written.
-type WriterWithCursor struct {
-	w         io.Writer
-	err       error // If err != nil, nothing is written anymore.
-	Line, Col int
-}
-
-// NewWriterWithCursor that keeps tabs of current line/col of the file (presumably)
-// being written.
-func NewWriterWithCursor(w io.Writer) *WriterWithCursor {
-	return &WriterWithCursor{w: w}
-}
-
-// Error returns first error that happened during writing.
-func (w *WriterWithCursor) Error() error { return w.err }
-
-// Format write with formatted text. Errors can be retrieved with Error.
-func (w *WriterWithCursor) Format(format string, args ...any) {
-	if w.err != nil {
-		return
-	}
-	text := fmt.Sprintf(format, args...)
-	w.Str(text)
-}
-
-// Str writes the given content and keeps track of cursor. Errors can be retrieved with Error.
-func (w *WriterWithCursor) Str(content string) {
-	if w.err != nil {
-		return
-	}
-	var n int
-	n, w.err = w.w.Write([]byte(content))
-	if n != len(content) {
-		w.err = errors.Errorf("failed to write %q, %d bytes: wrote only %d", content, len(content), n)
-	}
-	if w.err != nil {
-		return
-	}
-
-	// Update cursor position.
-	parts := strings.Split(content, "\n")
-	if len(parts) == 1 {
-		w.Col += len(parts[0])
-	} else {
-		w.Line += len(parts) - 1
-		w.Col = len(parts[len(parts)-1])
-	}
-}
-
-// CursorInFile returns a cursor pointing in file, given the current position in the file
-// (stored in w) and the position of the relativeCursor in the definition to come.
-func (w *WriterWithCursor) CursorInFile(relativeCursor Cursor) (fileCursor Cursor) {
-	fileCursor.Line = w.Line + relativeCursor.Line
-	if relativeCursor.Line > 0 {
-		fileCursor.Col = relativeCursor.Col
-	} else {
-		fileCursor.Col = w.Col + relativeCursor.Col
-	}
-	return
-}
-
-// parseInfo holds the information needed for parsing and some key helper methods.
+// parseInfo holds the information needed for parsing Go code and some key helper methods.
 type parseInfo struct {
 	cursor        Cursor
 	fileSet       *token.FileSet
@@ -140,8 +76,8 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 	return contents[from:to]
 }
 
-// ParseFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
-func (s *State) ParseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declarations) error {
+// parseFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
+func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declarations) error {
 	pi := &parseInfo{
 		cursor:  cursor,
 		fileSet: token.NewFileSet(),
@@ -205,7 +141,7 @@ func (s *State) ParseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declar
 	return nil
 }
 
-// ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.ParseFromMainGo
+// ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.parseFromMainGo
 func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec) {
 	var alias string
 	if entry.Name != nil {
@@ -228,7 +164,7 @@ func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec
 	decls.Imports[importEntry.Key] = importEntry
 }
 
-// ParseFuncEntry registers a new `func` declaration based on the ast.FuncDecl. See State.ParseFromMainGo
+// ParseFuncEntry registers a new `func` declaration based on the ast.FuncDecl. See State.parseFromMainGo
 func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl) {
 	// Incorporate functions.
 	key := funcDecl.Name.Name
@@ -247,7 +183,7 @@ func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl)
 	decls.Functions[f.Key] = f
 }
 
-// ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.ParseFromMainGo
+// ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.parseFromMainGo
 func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 	// Multiple declarations in the same line may share the cursor (e.g: `var a, b int` if the cursor
 	// is in the `int` token). Only the first definition ('a' in the example) takes the cursor.
@@ -297,7 +233,7 @@ func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 	}
 }
 
-// ParseConstEntry registers a new `const` declaration based on the ast.GenDecl. See State.ParseFromMainGo
+// ParseConstEntry registers a new `const` declaration based on the ast.GenDecl. See State.parseFromMainGo
 func (pi *parseInfo) ParseConstEntry(decls *Declarations, typedDecl *ast.GenDecl) {
 	var prevConstDecl *Constant
 	// Multiple declarations in the same line may share the cursor (e.g: `var a, b int` if the cursor
@@ -366,186 +302,93 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 	}
 }
 
-// sortedKeys enumerate keys and sort them.
-func sortedKeys[T any](m map[string]T) (keys []string) {
-	keys = make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return
-}
-
-// RenderImports writes out `import ( ... )` for all imports in Declarations.
-func (d *Declarations) RenderImports(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
-	if len(d.Imports) == 0 {
-		return
-	}
-
-	w.Str("import (\n")
-	for _, key := range sortedKeys(d.Imports) {
-		importDecl := d.Imports[key]
-		w.Str("\t")
-		if importDecl.Alias != "" {
-			if importDecl.CursorInAlias {
-				cursor = w.CursorInFile(importDecl.Cursor)
-			}
-			w.Format("%s ", importDecl.Alias)
-		}
-		if importDecl.CursorInPath {
-			cursor = w.CursorInFile(importDecl.Cursor)
-		}
-		w.Format("%q\n", importDecl.Path)
-	}
-	w.Str(")\n\n")
-	return
-}
-
-// RenderVariables writes out `var ( ... )` for all variables in Declarations.
-func (d *Declarations) RenderVariables(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
-	if len(d.Variables) == 0 {
-		return
-	}
-
-	w.Str("var (\n")
-	for _, key := range sortedKeys(d.Variables) {
-		varDecl := d.Variables[key]
-		w.Str("\t")
-		if varDecl.CursorInName {
-			cursor = w.CursorInFile(varDecl.Cursor)
-		}
-		w.Str(varDecl.Name)
-		if varDecl.TypeDefinition != "" {
-			w.Str(" ")
-			if varDecl.CursorInType {
-				cursor = w.CursorInFile(varDecl.Cursor)
-			}
-			w.Str(varDecl.TypeDefinition)
-		}
-		if varDecl.ValueDefinition != "" {
-			w.Str(" = ")
-			if varDecl.CursorInValue {
-				cursor = w.CursorInFile(varDecl.Cursor)
-			}
-			w.Str(varDecl.ValueDefinition)
-		}
-		w.Str("\n")
-	}
-	w.Str(")\n\n")
-	return
-}
-
-// RenderFunctions without comments, for all functions in Declarations.
-func (d *Declarations) RenderFunctions(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
-	if len(d.Functions) == 0 {
-		return
-	}
-
-	for _, key := range sortedKeys(d.Functions) {
-		funcDecl := d.Functions[key]
-		def := funcDecl.Definition
-		if funcDecl.HasCursor() {
-			cursor = w.CursorInFile(funcDecl.Cursor)
-		}
-		if strings.HasPrefix(key, "init_") {
-			// TODO: this will not work if there is a comment before the function
-			//       which also has the string key. We need something more sophisticated.
-			def = strings.Replace(def, key, "init", 1)
-		}
-		w.Format("%s\n\n", def)
-	}
-	return
-}
-
-// RenderTypes without comments.
-func (d *Declarations) RenderTypes(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
-	if len(d.Types) == 0 {
-		return
-	}
-
-	for _, key := range sortedKeys(d.Types) {
-		typeDecl := d.Types[key]
-		w.Str("type ")
-		if typeDecl.CursorInKey {
-			cursor = w.CursorInFile(typeDecl.Cursor)
-		}
-		w.Format("%s ", key)
-		if typeDecl.CursorInType {
-			cursor = w.CursorInFile(typeDecl.Cursor)
-		}
-		w.Format("%s\n", typeDecl.TypeDefinition)
-	}
-	w.Str("\n")
-	return
-}
-
-// RenderConstants without comments for all constants in Declarations.
+// parseLinesAndComposeMain parses the cell (given in lines and skipLines), merges with
+// currently memorized declarations (from previous Cell runs) and compose a `main.go`.
 //
-// Constants are trickier to render because when they are defined in a block,
-// using `iota`, their ordering matters. So we re-render them in the same order
-// and blocks as they were originally parsed.
+// On return the `main.go` file (in `s.TempDir`) has been updated, and it returns the updated merged
+// declarations and optionally the cursor position adjusted into the newly generate `main.go` file.
 //
-// The ordering is given by the sort order of the first element of each `const` block.
-func (d *Declarations) RenderConstants(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
-	if len(d.Constants) == 0 {
-		return
+// If cursorInCell defines a cursor (it can be set to NoCursor), but the cursor position
+// is not rendered in the resulting `main.go`, a CursorLost error is returned.
+//
+// skipLines are lines that should not be considered as Go code. Typically, these are the special
+// commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
+func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]bool, cursorInCell Cursor) (
+	updatedDecls *Declarations, cursorInFile Cursor, err error) {
+	if cursorInCell.HasCursor() {
+		log.Printf("Cursor in cell (%+v)", cursorInCell)
+	}
+	var cursorInTmpFile Cursor
+	cursorInTmpFile, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	if err != nil {
+		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
+	}
+	newDecls := NewDeclarations()
+	if err = s.parseFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
+		// If cell is in an un-parseable state, just returns empty context. User can try to
+		// run cell to get an error.
+		return nil, NoCursor, errors.WithStack(ParseError)
 	}
 
-	// Enumerate heads of const blocks.
-	headKeys := make([]string, 0, len(d.Constants))
-	for key, constDecl := range d.Constants {
-		if constDecl.Prev == nil {
-			// Head of the const block.
-			headKeys = append(headKeys, key)
-		}
+	// Checks whether there is a "main" function defined in the code.
+	mainDecl, hasMain := newDecls.Functions["main"]
+	if hasMain {
+		// Remove "main" from newDecls: this should not be stored from one cell execution from
+		// another.
+		delete(newDecls.Functions, "main")
+	} else {
+		// Declare a stub main function, just so we can try to compile the final code.
+		mainDecl = &Function{Key: "main", Name: "main", Definition: "func main() { flag.Parse() }"}
 	}
-	sort.Strings(headKeys)
+	_ = mainDecl
 
-	for _, headKey := range headKeys {
-		constDecl := d.Constants[headKey]
-		if constDecl.Next == nil {
-			// Render individual const declaration.
-			w.Str("const ")
-			constDecl.Render(w, &cursor)
-			w.Str("\n\n")
-			continue
-		}
-		// Render block of constants.
-		w.Str("const (\n")
-		for constDecl != nil {
-			w.Str("\t")
-			constDecl.Render(w, &cursor)
-			w.Str("\n")
-			constDecl = constDecl.Next
-		}
-		w.Str(")\n\n")
+	// Merge cell declarations with a copy of the current state: we don't want to commit the new
+	// declarations until they compile successfully.
+	updatedDecls = s.Decls.Copy()
+	updatedDecls.ClearCursor()
+	updatedDecls.MergeFrom(newDecls)
+
+	// Render declarations to main.go.
+	cursorInFile, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
+	if err != nil {
+		return nil, NoCursor, errors.WithMessagef(err, "in goexec.InspectIdentifierInCell() while generating main.go with all declarations")
 	}
-	return
+	if cursorInCell.HasCursor() && !cursorInFile.HasCursor() {
+		// Returns empty data, which returns a "not found".
+		return nil, NoCursor, errors.WithStack(CursorLost)
+	}
+	if cursorInCell.HasCursor() {
+		s.logCursor(cursorInFile)
+	}
+	return updatedDecls, cursorInFile, nil
 }
 
-// Render Constant declaration (without the `const` keyword).
-func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
-	if c.CursorInKey {
-		*cursor = w.CursorInFile(c.Cursor)
+const cursorStr = "‸"
+
+// logCursor will log the line in `main.go` the cursor is pointing to, and puts a
+// "*" where the
+func (s *State) logCursor(cursor Cursor) {
+	content, err := s.readMainGo()
+	if err != nil {
+		log.Printf("Failed to read main.go, for debugging.")
+	} else {
+		log.Printf("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
 	}
-	w.Str(c.Key)
-	if c.TypeDefinition != "" {
-		w.Str(" ")
-		if c.CursorInType {
-			*cursor = w.CursorInFile(c.Cursor)
+}
+
+func lineWithCursor(content string, cursor Cursor) string {
+	if !cursor.HasCursor() {
+		return "cursor position non-existent"
+	}
+	var modLine string
+	lines := strings.Split(content, "\n")
+	if cursor.Line < len(lines) {
+		line := lines[cursor.Line]
+		if cursor.Col < len(line) {
+			modLine = line[:cursor.Col] + cursorStr + line[cursor.Col:]
+		} else {
+			modLine = line + cursorStr
 		}
-		w.Str(c.TypeDefinition)
 	}
-	if c.ValueDefinition != "" {
-		w.Str(" = ")
-		if c.CursorInValue {
-			*cursor = w.CursorInFile(c.Cursor)
-		}
-		w.Str(c.ValueDefinition)
-	}
+	return modLine
 }

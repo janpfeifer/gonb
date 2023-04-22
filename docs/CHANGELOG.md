@@ -1,5 +1,12 @@
 # GoNB Changelog
 
+## v0.5
+
+* TODO: Improved error reporting, including indication of line number in cell.
+* TODO: Parse error output of the execution of a cell, and if it contains a stack-trace, "enrich"
+  references to the cell code (add context, making it easy to point out where the stack-trace happened).
+* Generally improved code documentation for `goexec` package.
+
 ## v0.4.1
 
 * Added support for Mac installation.

@@ -104,6 +104,10 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 func init_c() {
 	c += ", blah"
 }
+
+%%
+fmt.Printf("Hello! %s\n", c)
+fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 `
 
 func TestState_ParseFromMainGo(t *testing.T) {
@@ -113,7 +117,7 @@ func TestState_ParseFromMainGo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create main.go: %+v", err)
 	}
-	err = s.ParseFromMainGo(nil, NoCursor, s.Decls)
+	err = s.parseFromMainGo(nil, NoCursor, s.Decls)
 	if err != nil {
 		t.Fatalf("Failed to parse imports from main.go: %+v", err)
 	}
@@ -304,7 +308,7 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		err = s.ParseFromMainGo(nil, testLine.cursor, s.Decls)
+		err = s.parseFromMainGo(nil, testLine.cursor, s.Decls)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}

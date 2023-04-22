@@ -2,6 +2,7 @@ package goexec
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
@@ -30,10 +31,10 @@ func TestCreateGoFileFromLines(t *testing.T) {
 
 	content := sampleCellCode + sampleCellContentSuffix
 	lines := strings.Split(content, "\n")
-	skipLines := make(map[int]struct{})
+	skipLines := MakeSet[int]()
 	for ii, line := range lines {
 		if line == "!echo nonono" {
-			skipLines[ii] = struct{}{}
+			skipLines.Insert(ii)
 		}
 	}
 

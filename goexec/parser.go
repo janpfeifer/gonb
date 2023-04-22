@@ -2,6 +2,7 @@ package goexec
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"go/ast"
@@ -316,7 +317,7 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]struct{}, cursorInCell Cursor) (
+func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	updatedDecls *Declarations, cursorInFile Cursor, err error) {
 	if cursorInCell.HasCursor() {
 		log.Printf("Cursor in cell (%+v)", cursorInCell)

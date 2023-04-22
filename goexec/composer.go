@@ -2,6 +2,7 @@ package goexec
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/pkg/errors"
 	"io"
 	"os"
@@ -304,7 +305,7 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
 // * cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
 //
 // It returns cursorInFile, the equivalent cursor position in the final file, considering the given cursorInCell.
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]struct{}, cursorInCell Cursor) (cursorInFile Cursor, err error) {
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (cursorInFile Cursor, err error) {
 	cursorInFile = NoCursor
 
 	var f *os.File

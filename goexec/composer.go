@@ -83,41 +83,6 @@ func (w *WriterWithCursor) Write(content string) {
 	}
 }
 
-func (s *State) writeLinesToFile(filePath string, lines <-chan string) (err error) {
-	var f *os.File
-	f, err = os.Create(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "creating %q", filePath)
-	}
-	defer func() {
-		newErr := f.Close()
-		if newErr != nil && err == nil {
-			err = errors.Wrapf(newErr, "closing %q", filePath)
-		}
-	}()
-	for line := range lines {
-		if err != nil {
-			// If there was an error keep on reading to the end of channel, discarding the input.
-			continue
-		}
-		_, err = fmt.Fprintf(f, "%s\n", line)
-		if err != nil {
-			err = errors.Wrapf(err, "writing to %q", filePath)
-		}
-	}
-	return err
-}
-
-// sortedKeys enumerate keys and sort them.
-func sortedKeys[T any](m map[string]T) (keys []string) {
-	keys = make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return
-}
-
 // RenderImports writes out `import ( ... )` for all imports in Declarations.
 func (d *Declarations) RenderImports(w *WriterWithCursor) (cursor Cursor) {
 	cursor = NoCursor
@@ -126,7 +91,7 @@ func (d *Declarations) RenderImports(w *WriterWithCursor) (cursor Cursor) {
 	}
 
 	w.Write("import (\n")
-	for _, key := range sortedKeys(d.Imports) {
+	for _, key := range SortedKeys(d.Imports) {
 		importDecl := d.Imports[key]
 		w.Write("\t")
 		if importDecl.Alias != "" {
@@ -152,7 +117,7 @@ func (d *Declarations) RenderVariables(w *WriterWithCursor) (cursor Cursor) {
 	}
 
 	w.Write("var (\n")
-	for _, key := range sortedKeys(d.Variables) {
+	for _, key := range SortedKeys(d.Variables) {
 		varDecl := d.Variables[key]
 		w.Write("\t")
 		if varDecl.CursorInName {
@@ -186,7 +151,7 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor) (cursor Cursor) {
 		return
 	}
 
-	for _, key := range sortedKeys(d.Functions) {
+	for _, key := range SortedKeys(d.Functions) {
 		funcDecl := d.Functions[key]
 		def := funcDecl.Definition
 		if funcDecl.HasCursor() {
@@ -209,7 +174,7 @@ func (d *Declarations) RenderTypes(w *WriterWithCursor) (cursor Cursor) {
 		return
 	}
 
-	for _, key := range sortedKeys(d.Types) {
+	for _, key := range SortedKeys(d.Types) {
 		typeDecl := d.Types[key]
 		w.Write("type ")
 		if typeDecl.CursorInKey {
@@ -299,19 +264,31 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
 // * Handle the special `%%` line, a shortcut to create a `func main()`.
 //
 // Parameters:
-// * filePath is the path where to write the Go code.
-// * lines are the lines in the cell.
-// * skipLines are lines in the cell that are not Go code: lines starting with "!" or "%" special characters.
-// * cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
+//   - filePath is the path where to write the Go code.
+//   - lines are the lines in the cell.
+//   - skipLines are lines in the cell that are not Go code: lines starting with "!" or "%" special characters.
+//   - cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
 //
-// It returns cursorInFile, the equivalent cursor position in the final file, considering the given cursorInCell.
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (cursorInFile Cursor, err error) {
+// Return:
+//   - cursorInFile: the equivalent cursor position in the final file, considering the given cursorInCell.
+//   - fileToCellLines: a map from the file lines to original cell lines. It is set to NoCursorLine (-1) for lines
+//     that don't have an equivalent in the cell (e.g: the `package main` line that inserted here).
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (
+	cursorInFile Cursor, fileToCellLines []int, err error) {
 	cursorInFile = NoCursor
+
+	// Maximum number of extra lines created is 5, so we create a map with that amount of line. Later we trim it
+	// to the correct number.
+	fileToCellLines = make([]int, len(lines)+5)
+	for ii := 0; ii < len(fileToCellLines); ii++ {
+		fileToCellLines[ii] = NoCursorLine
+	}
 
 	var f *os.File
 	f, err = os.Create(filePath)
 	if err != nil {
-		return cursorInFile, errors.Wrapf(err, "Failed to create %q", filePath)
+		err = errors.Wrapf(err, "Failed to create %q", filePath)
+		return
 	}
 	w := NewWriterWithCursor(f)
 	defer func() {
@@ -338,22 +315,24 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			// Use current line for cursor, but add column.
 			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})
 		}
+		fileToCellLines[w.Line] = ii // Registers line mapping.
 		w.Write(line)
 		w.Write("\n")
 	}
 	if createdFuncMain {
 		w.Write("\n}\n")
 	}
-
 	if w.Error() != nil {
 		err = w.Error()
 		return
 	}
+	fileToCellLines = fileToCellLines[:w.Line] // Truncate to lines actually used.
 
 	// Close file.
 	err = f.Close()
 	if err != nil {
-		return cursorInFile, errors.Wrapf(err, "Failed to close %q", filePath)
+		err = errors.Wrapf(err, "Failed to close %q", filePath)
+		return
 	}
 	f = nil
 	return

@@ -323,7 +323,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, ski
 		log.Printf("Cursor in cell (%+v)", cursorInCell)
 	}
 	var cursorInTmpFile Cursor
-	cursorInTmpFile, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	cursorInTmpFile, _, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	if err != nil {
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
 	}

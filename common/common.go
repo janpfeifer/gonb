@@ -1,6 +1,8 @@
 // Package common holds functionality that is common to multiple other packages.
 package common
 
+import "sort"
+
 // Set implements a Set for the key type T.
 type Set[T comparable] map[T]struct{}
 
@@ -22,4 +24,15 @@ func (s Set[T]) Has(key T) bool {
 // Insert key into set.
 func (s Set[T]) Insert(key T) {
 	s[key] = struct{}{}
+}
+
+// SortedKeys enumerate keys from a string map and sort them.
+// TODO: make it for any key type.
+func SortedKeys[T any](m map[string]T) (keys []string) {
+	keys = make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return
 }

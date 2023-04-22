@@ -40,7 +40,7 @@ func TestCreateGoFileFromLines(t *testing.T) {
 
 	cursorInCell := Cursor{38, 27} // "func (k *Kg) Gain(lasagna K_g) {"
 	cursorLine := lines[cursorInCell.Line]
-	cursorInFile, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	cursorInFile, fileToCellMap, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.MainPath())
 
 	// Read generated contents:
@@ -55,4 +55,16 @@ func TestCreateGoFileFromLines(t *testing.T) {
 	newNumLines := len(newLines)
 	require.Equal(t, originalNumLines+5, newNumLines, "Number of lines of generated main.go")
 	require.Equal(t, cursorLine, newLines[cursorInFile.Line], "Cursor line remains the same.")
+
+	for ii, newLine := range newLines {
+		if ii >= newNumLines-8 {
+			// Content of lines change (an indentation is added) so we skip these.
+			break
+		}
+		originalLineIdx := fileToCellMap[ii]
+		if originalLineIdx == NoCursorLine {
+			continue
+		}
+		require.Equalf(t, lines[originalLineIdx], newLine, "Line mapping look wrong: file line %d --> cell line %d", ii, originalLineIdx)
+	}
 }

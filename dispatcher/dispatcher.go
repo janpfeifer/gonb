@@ -171,7 +171,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	}
 	hasMoreToRun := len(usedLines) < len(lines)
 	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
-		executionErr = goExec.ExecuteCell(msg, lines, usedLines)
+		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
 	}
 
 	// Final execution result.

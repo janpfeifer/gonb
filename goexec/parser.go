@@ -76,8 +76,11 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 	return contents[from:to]
 }
 
-// parseFromMainGo reads main.go and parses its declarations into decls -- see object Declarations.
-func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declarations) error {
+// parseFromMainGo reads main.go and parses its declarations -- see object Declarations.
+//
+// This will be called by parseLinesAndComposeMain, after `main.go` is written.
+func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor) (decls *Declarations, err error) {
+	decls = NewDeclarations()
 	pi := &parseInfo{
 		cursor:  cursor,
 		fileSet: token.NewFileSet(),
@@ -87,7 +90,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declar
 		if msg != nil {
 			s.DisplayErrorWithContext(msg, err.Error())
 		}
-		return errors.Wrapf(err, "parsing go files in TempDir %s", s.TempDir)
+		return nil, errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 	}
 	pi.filesContents = make(map[string]string)
 
@@ -106,7 +109,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declar
 			filePath := path.Join(s.TempDir, fileObj.Name.Name) + ".go"
 			content, err := os.ReadFile(filePath)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to read %q", fileObj.Name)
+				return nil, errors.Wrapf(err, "Failed to read %q", fileObj.Name)
 			}
 			pi.filesContents[filePath] = string(content)
 			// Incorporate Imports
@@ -138,7 +141,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cursor Cursor, decls *Declar
 			}
 		}
 	}
-	return nil
+	return
 }
 
 // ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.parseFromMainGo
@@ -313,7 +316,7 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]bool, cursorInCell Cursor) (
+func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]struct{}, cursorInCell Cursor) (
 	updatedDecls *Declarations, cursorInFile Cursor, err error) {
 	if cursorInCell.HasCursor() {
 		log.Printf("Cursor in cell (%+v)", cursorInCell)
@@ -323,8 +326,8 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, ski
 	if err != nil {
 		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
 	}
-	newDecls := NewDeclarations()
-	if err = s.parseFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
+	newDecls, err := s.parseFromMainGo(msg, cursorInTmpFile)
+	if err != nil {
 		// If cell is in an un-parseable state, just returns empty context. User can try to
 		// run cell to get an error.
 		return nil, NoCursor, errors.WithStack(ParseError)

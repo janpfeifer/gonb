@@ -14,12 +14,12 @@ import (
 
 // InspectIdentifierInCell implements an `inspect_request` from Jupyter, using `gopls`.
 // It updates `main.go` with the cell contents (given as lines)
-func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]bool, cursorLine, cursorCol int) (kernel.MIMEMap, error) {
+func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct{}, cursorLine, cursorCol int) (kernel.MIMEMap, error) {
 	if s.gopls == nil {
 		// gopls not installed.
 		return make(kernel.MIMEMap), nil
 	}
-	if skipLines[cursorLine] {
+	if _, found := skipLines[cursorLine]; found {
 		// Only Go code can be inspected here.
 		return nil, errors.Errorf("goexec.InspectIdentifierInCell() can only inspect Go code, line %d is a secial command line: %q", cursorLine, lines[cursorLine])
 	}
@@ -54,13 +54,13 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]bool, 
 
 // AutoCompleteOptionsInCell implements an `complete_request` from Jupyter, using `gopls`.
 // It updates `main.go` with the cell contents (given as lines)
-func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]bool,
+func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]struct{},
 	cursorLine, cursorCol int, reply *kernel.CompleteReply) (err error) {
 	if s.gopls == nil {
 		// gopls not installed.
 		return
 	}
-	if skipLines[cursorLine] {
+	if _, found := skipLines[cursorLine]; found {
 		// Only Go code can be inspected here.
 		err = errors.Errorf("goexec.AutoCompleteOptionsInCell() can only auto-complete Go code, line %d is a secial command line: %q", cursorLine, cellLines[cursorLine])
 		return

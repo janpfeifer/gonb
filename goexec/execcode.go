@@ -13,7 +13,7 @@ import (
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]bool) error {
+func (s *State) ExecuteCell(msg kernel.Message, lines []string, skipLines map[int]struct{}) error {
 	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")

@@ -50,7 +50,7 @@ func main() {
 	}
 
 	if *flagKernel == "" {
-		fmt.Fprintf(os.Stderr, "Use either --install to install the kernel, or if started by Jupyter the flag --kernel must be provided.\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Use either --install to install the kernel, or if started by Jupyter the flag --kernel must be provided.\n")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -86,8 +86,8 @@ var (
 // SetUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
 // requested.
 func SetUpLogging() {
-	uuid, _ := uuid.NewV7()
-	uuidStr := uuid.String()
+	uuidTmp, _ := uuid.NewV7()
+	uuidStr := uuidTmp.String()
 	UniqueID = uuidStr[len(uuidStr)-8:]
 	log.SetPrefix(fmt.Sprintf("%s[%s]%s ", ColorBgYellow, UniqueID, ColorReset))
 	if *flagExtraLog != "" {
@@ -95,7 +95,7 @@ func SetUpLogging() {
 		if err != nil {
 			log.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
 		}
-		f.Write([]byte("\n\n"))
+		_, _ = f.Write([]byte("\n\n"))
 		w := io.MultiWriter(f, os.Stderr) // Write to STDERR and the newly open f.
 		log.SetOutput(w)
 	}

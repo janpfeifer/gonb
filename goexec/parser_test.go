@@ -3,44 +3,46 @@ package goexec
 import (
 	"bytes"
 	"fmt"
+	"github.com/gofrs/uuid"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
-	"path"
 	"testing"
 )
 
-func createTestGoMain(content string) (dirPath string, err error) {
-	dirPath, err = os.MkdirTemp("", "parser_test_")
+// newEmptyState returns an empty state with a temporary directory created.
+func newEmptyState(t *testing.T) *State {
+	uuidTmp, _ := uuid.NewV7()
+	uuidStr := uuidTmp.String()
+	uniqueID := uuidStr[len(uuidStr)-8:]
+	s, err := New(uniqueID)
 	if err != nil {
-		return
+		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}
-	var f *os.File
-	f, err = os.Create(path.Join(dirPath, "main.go"))
+	return s
+}
+
+// createTestGoMain prefixes the cell content with `package main` and writes it to `main.go`.
+func createTestGoMain(s *State, cellContent string) error {
+	f, err := os.Create(s.MainPath())
 	if err != nil {
-		return
+		return errors.Wrapf(err, "Failed to create file %q", s.MainPath())
 	}
-	_, err = f.WriteString(content)
+	_, err = f.WriteString("package main\n\n" + cellContent)
 	if err != nil {
-		return
+		return errors.Wrapf(err, "Failed to write to file %q", s.MainPath())
 	}
 	err = f.Close()
 	if err != nil {
-		return
+		return errors.Wrapf(err, "Failed to close file %q", s.MainPath())
 	}
-	fmt.Printf("Create test data in %q\n", dirPath)
-	return
+	fmt.Printf("Create test data in %q\n", f.Name())
+	return nil
 }
 
-func emptyState() *State {
-	return &State{
-		Decls: NewDeclarations(),
-	}
-}
-
-var sampleCellCode = `package main
-
-import "fmt"
+var (
+	sampleCellCode = `import "fmt"
 
 // Some comment
 
@@ -104,20 +106,24 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 func init_c() {
 	c += ", blah"
 }
-
-%%
-fmt.Printf("Hello! %s\n", c)
-fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 `
+)
 
-func TestState_ParseFromMainGo(t *testing.T) {
-	s := emptyState()
+func TestState_Parse(t *testing.T) {
+	s := newEmptyState(t)
+	defer func() {
+		err := s.Finalize()
+		if err != nil {
+			t.Fatalf("Failed to finalized state: %+v", err)
+		}
+	}()
 	var err error
-	s.TempDir, err = createTestGoMain(sampleCellCode)
-	if err != nil {
+	fmt.Printf("s.TempDir=%q\n", s.TempDir)
+	if err = createTestGoMain(s, sampleCellCode); err != nil {
 		t.Fatalf("Failed to create main.go: %+v", err)
 	}
-	err = s.parseFromMainGo(nil, NoCursor, s.Decls)
+	fmt.Printf("s.TempDir=%q\n", s.TempDir)
+	s.Decls, err = s.parseFromMainGo(nil, NoCursor)
 	if err != nil {
 		t.Fatalf("Failed to parse imports from main.go: %+v", err)
 	}
@@ -274,10 +280,16 @@ const (
 
 func TestCursorPositioning(t *testing.T) {
 	// Test cursor positioning in generated lines.
-	s := emptyState()
+	s := newEmptyState(t)
+	defer func() {
+		err := s.Finalize()
+		if err != nil {
+			t.Fatalf("Failed to finalized state: %+v", err)
+		}
+	}()
+
 	var err error
-	s.TempDir, err = createTestGoMain(sampleCellCode)
-	if err != nil {
+	if err = createTestGoMain(s, sampleCellCode); err != nil {
 		t.Fatalf("Failed to create main.go: %+v", err)
 	}
 
@@ -308,7 +320,7 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		err = s.parseFromMainGo(nil, testLine.cursor, s.Decls)
+		s.Decls, err = s.parseFromMainGo(nil, testLine.cursor)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}

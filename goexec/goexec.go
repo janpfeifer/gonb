@@ -101,6 +101,22 @@ with:
 	return s, nil
 }
 
+// Finalize stops gopls and removes temporary files and directories.
+func (s *State) Finalize() error {
+	if s.gopls != nil {
+		s.gopls.Shutdown()
+		s.gopls = nil
+	}
+	if s.TempDir != "" {
+		err := os.RemoveAll(s.TempDir)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to remove goexec.State temporary directory %s", s.TempDir)
+		}
+		s.TempDir = "/"
+	}
+	return nil
+}
+
 func NewDeclarations() *Declarations {
 	return &Declarations{
 		Imports:   make(map[string]*Import),

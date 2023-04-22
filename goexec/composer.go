@@ -304,74 +304,57 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
 // * cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
 //
 // It returns cursorInFile, the equivalent cursor position in the final file, considering the given cursorInCell.
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]bool, cursorInCell Cursor) (cursorInFile Cursor, err error) {
-	linesChan := make(chan string, 1)
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]struct{}, cursorInCell Cursor) (cursorInFile Cursor, err error) {
+	cursorInFile = NoCursor
 
-	cursorInFile = cursorInCell
-	lineInFile := 0
-	go func() {
-		defer close(linesChan)
-		// addLine checks for the new cursorInFile position.
-		addLine := func(line string, lineInCell int, deltaColumn int) {
-			linesChan <- line
-			lineInFile++
-
-			if !cursorInCell.HasCursor() || lineInCell == NoCursorLine {
-				return
-			}
-			if lineInCell == cursorInCell.Line {
-				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
-				cursorInFile.Col = cursorInCell.Col + deltaColumn
-				//var modLine string
-				//if cursorInFile.Col < int32(len(line)) {
-				//	modLine = line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
-				//} else {
-				//	modLine = line + "*"
-				//}
-				//log.Printf("Cursor in parse file %+v (cell line %d): %s", cursorInFile, lineInCell, modLine)
-			}
-		}
-		addEmptyLine := func() {
-			addLine("", NoCursorLine, 0)
-		}
-
-		// Insert package.
-		addLine("package main", NoCursorLine, 0)
-		addEmptyLine()
-
-		var createdFuncMain bool
-		for ii, line := range lines {
-			line = strings.TrimRight(line, " ")
-			if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
-				addEmptyLine()
-				addLine("func main() {", NoCursorLine, 0)
-				addLine("\tflag.Parse()", NoCursorLine, 0)
-				createdFuncMain = true
-				continue
-			}
-			if skipLines[ii] {
-				continue
-			}
-			if createdFuncMain {
-				// Indent following lines.
-				line = "\t" + line
-				addLine(line, ii, 1)
-			} else {
-				addLine(line, ii, 0)
-			}
-		}
-		if createdFuncMain {
-			addLine("}", NoCursorLine, 0)
+	var f *os.File
+	f, err = os.Create(filePath)
+	if err != nil {
+		return cursorInFile, errors.Wrapf(err, "Failed to create %q", filePath)
+	}
+	w := NewWriterWithCursor(f)
+	defer func() {
+		if f != nil {
+			_ = f.Close()
 		}
 	}()
 
-	// Pipe linesChan to main.go file.
-	err = s.writeLinesToFile(filePath, linesChan)
-
-	// Check for any error only at the end.
-	if err != nil {
-		return NoCursor, err
+	w.Write("package main\n\n")
+	var createdFuncMain bool
+	for ii, line := range lines {
+		if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
+			w.Write("func main() {\n\tflag.Parse\n")
+			createdFuncMain = true
+			continue
+		}
+		if _, found := skipLines[ii]; found {
+			continue
+		}
+		if createdFuncMain && line != "" {
+			w.Write("\t")
+		}
+		if ii == cursorInCell.Line {
+			// Use current line for cursor, but add column.
+			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})
+		}
+		w.Write(line)
+		w.Write("\n")
 	}
+	if createdFuncMain {
+		w.Write("\n}\n")
+	}
+
+	if w.Error() != nil {
+		err = w.Error()
+		return
+	}
+
+	// Close file.
+	err = f.Close()
+	if err != nil {
+		return cursorInFile, errors.Wrapf(err, "Failed to close %q", filePath)
+	}
+	f = nil
 	return
 }
 

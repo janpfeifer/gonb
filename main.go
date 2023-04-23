@@ -14,7 +14,7 @@ import (
 
 var (
 	flagInstall  = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
-	flagKernel   = flag.String("kernel", "", "Run kernel using given path for the `connection_file` provided by Jupyter client")
+	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
 	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
 )

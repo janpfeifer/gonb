@@ -1,11 +1,18 @@
 package goexec
 
 import (
+	"bytes"
+	"fmt"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"io"
+	"log"
 	"os/exec"
 	"path"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 // ExecuteCell takes the contents of a cell, parses it, merges new declarations with the ones
@@ -20,7 +27,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
-	// Run `goimports` (or the code that implements it)
+	// Exec `goimports` (or the code that implements it)
 	fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
@@ -47,7 +54,9 @@ func (s *State) MainPath() string {
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
-	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), s.Args...).Run()
+	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), s.Args...).
+		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.MainPath(), fileToCellIdAndLine)).
+		Exec()
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.
@@ -135,4 +144,61 @@ can install it from the notebook with:
 		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 	return fileToCellIdAndLine, nil
+}
+
+// jupyterStackTraceMapperWriter implements an io.Writer that maps stack traces to their corresponding
+// cell lines, to facilitate debugging.
+type jupyterStackTraceMapperWriter struct {
+	jupyterWriter       io.Writer
+	mainPath            string
+	fileToCellIdAndLine []CellIdAndLine
+	regexpMainPath      *regexp.Regexp
+}
+
+// newJupyterStackTraceMapperWriter creates an io.Writer that allows for mapping of references to the `main.go`
+// to its corresponding position in a cell.
+func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPath string, fileToCellIdAndLine []CellIdAndLine) io.Writer {
+	r, err := regexp.Compile(fmt.Sprintf("%s:(\\d+)", regexp.QuoteMeta(mainPath)))
+	if err != nil {
+		log.Printf("Failed to compile expression to match %q: won't map stack traces with cell lines", mainPath)
+	}
+
+	return &jupyterStackTraceMapperWriter{
+		jupyterWriter:       kernel.NewJupyterStreamWriter(msg, stream),
+		mainPath:            mainPath,
+		regexpMainPath:      r,
+		fileToCellIdAndLine: fileToCellIdAndLine,
+	}
+}
+
+// Write implements io.Writer, and maps references to the `main.go` file to their corresponding lines in cells.
+func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
+	if w.regexpMainPath == nil {
+		return w.jupyterWriter.Write(p)
+	}
+	p = w.regexpMainPath.ReplaceAllFunc(p, func(match []byte) []byte {
+		log.Printf("\tFiltering stderr: %s", match)
+		lineNumStr := strings.Split(string(match), ":")[1]
+		lineNum, err := strconv.Atoi(lineNumStr)
+		if err != nil {
+			log.Printf("Can't parse line number %q, skipping", lineNumStr)
+			return match
+		}
+		if lineNum < 0 || lineNum > len(w.fileToCellIdAndLine) {
+			log.Printf("Can't line number %d is invalid, skipping", lineNum)
+			return match
+		}
+		cellId, cellLineNum := w.fileToCellIdAndLine[lineNum].Id, w.fileToCellIdAndLine[lineNum].Line
+		var cellText []byte
+		const invertColor = "\033[7m"
+		const resetColor = "\033[0m"
+		if cellId == -1 {
+			cellText = []byte(fmt.Sprintf(" %s[[ Cell Line %d ]]%s ", invertColor, cellLineNum, resetColor))
+		} else {
+			cellText = []byte(fmt.Sprintf(" %s[[ Cell [%d] Line %d ]]%s ", invertColor, cellId, cellLineNum, resetColor))
+		}
+		res := bytes.Join([][]byte{cellText, match}, nil)
+		return res
+	})
+	return w.jupyterWriter.Write(p)
 }

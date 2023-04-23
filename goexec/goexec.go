@@ -60,7 +60,7 @@ func New(uniqueID string) (*State, error) {
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
 	}
 
-	// Run go mod init on given directory.
+	// Exec go mod init on given directory.
 	cmd := exec.Command("go", "mod", "init", s.Package)
 	cmd.Dir = s.TempDir
 	var output []byte

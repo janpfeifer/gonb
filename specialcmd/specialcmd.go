@@ -212,13 +212,13 @@ func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithInput(500).Run()
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithInput(500).Exec()
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithPassword(1).Run()
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithPassword(1).Exec()
 	} else {
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).Run()
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).Exec()
 	}
 }
 

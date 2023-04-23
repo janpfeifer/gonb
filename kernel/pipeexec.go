@@ -82,11 +82,11 @@ func (builder *PipeExecToJupyterBuilder) WithPassword(millisecondsWait int) *Pip
 	return builder
 }
 
-// Run executes the configured PipeExecToJupyter configuration.
+// Exec executes the configured PipeExecToJupyter configuration.
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
 // program returns an error for any reason.
-func (builder *PipeExecToJupyterBuilder) Run() error {
+func (builder *PipeExecToJupyterBuilder) Exec() error {
 	log.Printf("Executing: %s %v", builder.command, builder.args)
 
 	cmd := exec.Command(builder.command, builder.args...)

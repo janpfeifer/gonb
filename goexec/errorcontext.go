@@ -65,6 +65,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	border-style: dotted;
 	border-width: 1px;	
 	border-color: var(--jp-border-color2);
+	background-color: var(--jp-rendermime-error-background);
 	font-weight: bold;
 }
 .gonb-cell-line-info {
@@ -79,18 +80,14 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <div class="lm-Widget p-Widget lm-Panel p-Panel jp-OutputArea-child">
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
-{{if .HasContext}}
-{{if .HasCellInfo}}
-<span class="gonb-cell-line-info">{{.CellInfo}}</span>
-{{end}}
-<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
+{{if .HasContext}}{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span>
+{{end}}<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
 <div class="gonb-error-context">
 {{.Context}}
 </div>
 {{else}}
-<pre>{{.Location}} {{.Message}}</pre>
+<span style="white-space: pre;">{{.Location}} {{.Message}}</span><br/>
 {{end}}
-<br/>
 {{end}}
 </div>
 `))

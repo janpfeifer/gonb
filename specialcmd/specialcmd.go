@@ -8,6 +8,7 @@ package specialcmd
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
@@ -90,10 +91,10 @@ type cellStatus struct {
 // from the code will be returned in usedLines -- so they can be excluded from other executors (goexec).
 //
 // If any errors happen, it is returned in err.
-func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines map[int]bool) (err error) {
+func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines Set[int]) (err error) {
 	status := &cellStatus{}
 	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
-		if usedLines[lineNum] {
+		if _, found := usedLines[lineNum]; found {
 			continue
 		}
 		line := codeLines[lineNum]
@@ -133,10 +134,10 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 //
 // It returns the joined lines with the '\\\n' replaced by a space, and appends the used lines (including
 // fromLine) to usedLines.
-func joinLine(lines []string, fromLine int, usedLines map[int]bool) (cmdStr string) {
+func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) {
 	for ; fromLine < len(lines); fromLine++ {
 		cmdStr += lines[fromLine]
-		usedLines[fromLine] = true
+		usedLines[fromLine] = struct{}{}
 		if cmdStr[len(cmdStr)-1] != '\\' {
 			return
 		}
@@ -211,13 +212,13 @@ func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyterWithInput(msg, execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithInput(500).Exec()
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyterWithPassword(msg, execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithPassword(1).Exec()
 	} else {
-		return kernel.PipeExecToJupyter(msg, execDir, "/bin/bash", "-c", cmdStr)
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).Exec()
 	}
 }
 

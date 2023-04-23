@@ -1,4 +1,4 @@
-// Package goexec executes cells with Go sampleCellCode for the gonb kernel.
+// Package goexec executes cells with Go code for the gonb kernel.
 //
 // It defines a State object, that carries all the globals defined so far. It provides
 // the ExecuteCell method, to run a new cell.
@@ -24,7 +24,7 @@ type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
 
-	// Building and executing go sampleCellCode configuration:
+	// Building and executing go code configuration:
 	Args    []string // Args to be passed to the program, after being executed.
 	AutoGet bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
 
@@ -60,7 +60,7 @@ func New(uniqueID string) (*State, error) {
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
 	}
 
-	// Run go mod init on given directory.
+	// Exec go mod init on given directory.
 	cmd := exec.Command("go", "mod", "init", s.Package)
 	cmd.Dir = s.TempDir
 	var output []byte
@@ -86,7 +86,7 @@ func New(uniqueID string) (*State, error) {
 
 	} else {
 		msg := `
-Program gopls is not installed. It is used to inspect into sampleCellCode
+Program gopls is not installed. It is used to inspect into code
 and provide contextual information and autocompletion. It is a 
 standard Go toolkit package. You can install it from the notebook
 with:
@@ -99,6 +99,22 @@ with:
 
 	log.Printf("Initialized goexec.State in %s", s.TempDir)
 	return s, nil
+}
+
+// Finalize stops gopls and removes temporary files and directories.
+func (s *State) Finalize() error {
+	if s.gopls != nil {
+		s.gopls.Shutdown()
+		s.gopls = nil
+	}
+	if s.TempDir != "" {
+		err := os.RemoveAll(s.TempDir)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to remove goexec.State temporary directory %s", s.TempDir)
+		}
+		s.TempDir = "/"
+	}
+	return nil
 }
 
 func NewDeclarations() *Declarations {
@@ -193,9 +209,35 @@ func (c *Cursor) ClearCursor() {
 	c.Line = NoCursorLine
 }
 
+// CellLines identifies a cell (by its execution id) and the lines
+// corresponding to a declaration.
+type CellLines struct {
+	// Id of the cell where the definition comes from. It is set to -1 if the declaration was automatically
+	// created (for instance by goimports).
+	Id int
+
+	// Lines has one value per line used in the declaration. The point to the cell line where it was declared.
+	// Some of these numbers may be NoCursorLine (-1) indicating that they are inserted automatically and don't.
+	// have corresponding lines in any cell.
+	//
+	// If Id is -1, Lines will be nil, which indicates the content didn't come from any cell.
+	Lines []int
+}
+
+// Append id and line numbers to fileToCellIdAndLine, a slice of `CellIdAndLine`. This is used when
+// rendering a declaration to a file.
+func (c CellLines) Append(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	for _, lineNum := range c.Lines {
+		fileToCellIdAndLine = append(fileToCellIdAndLine, CellIdAndLine{Id: c.Id, Line: lineNum})
+	}
+	return fileToCellIdAndLine
+}
+
 // Function definition.
 type Function struct {
 	Cursor
+	CellLines
+
 	Key            string
 	Name, Receiver string
 	Definition     string // Multi-line definition, includes comments preceding definition.
@@ -204,6 +246,8 @@ type Function struct {
 
 type Variable struct {
 	Cursor
+	CellLines
+
 	CursorInName, CursorInType, CursorInValue bool
 	Key, Name                                 string
 	TypeDefinition, ValueDefinition           string // Type definition may be empty.
@@ -211,6 +255,8 @@ type Variable struct {
 
 type TypeDecl struct {
 	Cursor
+	CellLines
+
 	Key                       string // Same as the name here.
 	TypeDefinition            string // Type definition may be empty.
 	CursorInKey, CursorInType bool
@@ -221,6 +267,8 @@ type TypeDecl struct {
 // For this we use Next/Prev links.
 type Constant struct {
 	Cursor
+	CellLines
+
 	Key                                      string
 	TypeDefinition, ValueDefinition          string // Can be empty, if used as iota.
 	CursorInKey, CursorInType, CursorInValue bool
@@ -231,30 +279,14 @@ type Constant struct {
 // `goimports`.
 type Import struct {
 	Cursor
+	CellLines
+
 	Key                         string
 	Path, Alias                 string
 	CursorInPath, CursorInAlias bool
 }
 
 var reDefaultImportPathAlias = regexp.MustCompile(`^.*?(\w[\w0-9_]*)\s*$`)
-
-// NewImport from the importPath and it's alias. If alias is empty or "<nil>", it will default to the
-// last name part of the importPath.
-func NewImport(importPath, alias string) *Import {
-	key := alias
-	if key == "" {
-		parts := reDefaultImportPathAlias.FindStringSubmatch(importPath)
-		if len(parts) < 2 {
-			key = importPath
-		} else {
-			key = parts[1]
-		}
-	} else if key == "." {
-		// More than one import can be moved to the current namespace.
-		key = ".~" + importPath
-	}
-	return &Import{Key: key, Path: importPath, Alias: alias}
-}
 
 // Reset clears all the memorized Go declarations. It becomes as if no cells had
 // been executed so far -- except for configurations and arguments that remain unchanged.

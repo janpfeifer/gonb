@@ -2,121 +2,388 @@ package goexec
 
 import (
 	"fmt"
-	"github.com/janpfeifer/gonb/kernel"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/pkg/errors"
 	"io"
-	"log"
 	"os"
+	"sort"
 	"strings"
 )
 
-// This file holds the various functions used to compose the go sampleCellCode that
+// This file holds the various functions used to compose and render the go code that
 // will be compiled, from the parsed cells.
 
-func (s *State) writeLinesToFile(filePath string, lines <-chan string) (err error) {
-	var f *os.File
-	f, err = os.Create(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "creating %q", filePath)
-	}
-	defer func() {
-		newErr := f.Close()
-		if newErr != nil && err == nil {
-			err = errors.Wrapf(newErr, "closing %q", filePath)
-		}
-	}()
-	for line := range lines {
-		if err != nil {
-			// If there was an error keep on reading to the end of channel, discarding the input.
-			continue
-		}
-		_, err = fmt.Fprintf(f, "%s\n", line)
-		if err != nil {
-			err = errors.Wrapf(err, "writing to %q", filePath)
-		}
-	}
-	return err
+// CellIdAndLine points to a line within a cell. Id is the execution number of the cell,
+// as given to ExecuteCell.
+type CellIdAndLine struct {
+	Id, Line int
 }
 
-// createGoFileFromLines implements CreateMainGo with no extra functionality (like auto-import).
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines map[int]bool, cursorInCell Cursor) (cursorInFile Cursor, err error) {
-	linesChan := make(chan string, 1)
-
-	cursorInFile = cursorInCell
-	lineInFile := 0
-	go func() {
-		defer close(linesChan)
-		// addLine checks for the new cursorInFile position.
-		addLine := func(line string, lineInCell int, deltaColumn int) {
-			linesChan <- line
-			lineInFile++
-
-			if !cursorInCell.HasCursor() || lineInCell == NoCursorLine {
-				return
-			}
-			if lineInCell == cursorInCell.Line {
-				cursorInFile.Line = lineInFile - 1 // -1 because we already incremented lineInFile above.
-				cursorInFile.Col = cursorInCell.Col + deltaColumn
-				//var modLine string
-				//if cursorInFile.Col < int32(len(line)) {
-				//	modLine = line[:cursorInFile.Col] + "*" + line[cursorInFile.Col:]
-				//} else {
-				//	modLine = line + "*"
-				//}
-				//log.Printf("Cursor in parse file %+v (cell line %d): %s", cursorInFile, lineInCell, modLine)
-			}
-		}
-		addEmptyLine := func() {
-			addLine("", NoCursorLine, 0)
-		}
-
-		// Insert package.
-		addLine("package main", NoCursorLine, 0)
-		addEmptyLine()
-
-		var createdFuncMain bool
-		for ii, line := range lines {
-			line = strings.TrimRight(line, " ")
-			if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
-				addEmptyLine()
-				addLine("func main() {", NoCursorLine, 0)
-				addLine("\tflag.Parse()", NoCursorLine, 0)
-				createdFuncMain = true
-				continue
-			}
-			if skipLines[ii] {
-				continue
-			}
-			if createdFuncMain {
-				// Indent following lines.
-				line = "\t" + line
-				addLine(line, ii, 1)
-			} else {
-				addLine(line, ii, 0)
-			}
-		}
-		if createdFuncMain {
-			addLine("}", NoCursorLine, 0)
-		}
-	}()
-
-	// Pipe linesChan to main.go file.
-	err = s.writeLinesToFile(filePath, linesChan)
-
-	// Check for any error only at the end.
-	if err != nil {
-		return NoCursor, err
+// MakeFileToCellIdAndLine converts a cellId slice of cell line numbers for a file to a slice of CellIdAndLine.
+func MakeFileToCellIdAndLine(cellId int, fileToCellLine []int) (fileToCellIdAndLine []CellIdAndLine) {
+	fileToCellIdAndLine = make([]CellIdAndLine, len(fileToCellLine))
+	for ii, line := range fileToCellLine {
+		fileToCellIdAndLine[ii] = CellIdAndLine{cellId, line}
 	}
 	return
 }
 
-func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+// WriterWithCursor keep tabs of the current line/col of the file (presumably)
+// being written.
+type WriterWithCursor struct {
+	w         io.Writer
+	err       error // If err != nil, nothing is written anymore.
+	Line, Col int
+}
+
+// NewWriterWithCursor that keeps tabs of current line/col of the file (presumably)
+// being written.
+func NewWriterWithCursor(w io.Writer) *WriterWithCursor {
+	return &WriterWithCursor{w: w}
+}
+
+// Cursor returns the current position in the file, at the end of what has been written so far.
+func (w *WriterWithCursor) Cursor() Cursor {
+	return Cursor{Line: w.Line, Col: w.Col}
+}
+
+// CursorPlusDelta returns the expected cursor position in the current file, assuming the original cursor
+// is cursorDelta away from the current position in the file (stored in w).
+//
+// Semantically it's equivalent to `w.Cursor() + cursorDelta`.
+func (w *WriterWithCursor) CursorPlusDelta(delta Cursor) (fileCursor Cursor) {
+	fileCursor = w.Cursor()
+	fileCursor.Line += delta.Line
+	if delta.Line > 0 {
+		fileCursor.Col = delta.Col
+	} else {
+		fileCursor.Col += delta.Col
+	}
+	return fileCursor
+}
+
+// FillLinesGap append NoCursorLine (-1) line indices to fileToCellIdAndLine slice, up to
+// the current line.
+func (w *WriterWithCursor) FillLinesGap(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	for len(fileToCellIdAndLine) < w.Line {
+		fileToCellIdAndLine = append(fileToCellIdAndLine, CellIdAndLine{NoCursorLine, NoCursorLine})
+	}
+	return fileToCellIdAndLine
+}
+
+// Error returns first error that happened during writing.
+func (w *WriterWithCursor) Error() error { return w.err }
+
+// Writef write with formatted text. Errors can be retrieved with Error.
+func (w *WriterWithCursor) Writef(format string, args ...any) {
+	if w.err != nil {
+		return
+	}
+	text := fmt.Sprintf(format, args...)
+	w.Write(text)
+}
+
+// Write writes the given content and keeps track of cursor. Errors can be retrieved with Error.
+func (w *WriterWithCursor) Write(content string) {
+	if w.err != nil {
+		return
+	}
+	var n int
+	n, w.err = w.w.Write([]byte(content))
+	if n != len(content) {
+		w.err = errors.Errorf("failed to write %q, %d bytes: wrote only %d", content, len(content), n)
+	}
+	if w.err != nil {
+		return
+	}
+
+	// Update cursor position.
+	parts := strings.Split(content, "\n")
+	if len(parts) == 1 {
+		w.Col += len(parts[0])
+	} else {
+		w.Line += len(parts) - 1
+		w.Col = len(parts[len(parts)-1])
+	}
+}
+
+// RenderImports writes out `import ( ... )` for all imports in Declarations.
+func (d *Declarations) RenderImports(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if len(d.Imports) == 0 {
+		return cursor, fileToCellIdAndLine
+	}
+
+	w.Write("import (\n")
+	for _, key := range SortedKeys(d.Imports) {
+		importDecl := d.Imports[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = importDecl.CellLines.Append(fileToCellIdAndLine)
+		w.Write("\t")
+		if importDecl.Alias != "" {
+			if importDecl.CursorInAlias {
+				cursor = w.CursorPlusDelta(importDecl.Cursor)
+			}
+			w.Writef("%s ", importDecl.Alias)
+		}
+		if importDecl.CursorInPath {
+			cursor = w.CursorPlusDelta(importDecl.Cursor)
+		}
+		w.Writef("%q\n", importDecl.Path)
+	}
+	w.Write(")\n\n")
+	return cursor, fileToCellIdAndLine
+}
+
+// RenderVariables writes out `var ( ... )` for all variables in Declarations.
+func (d *Declarations) RenderVariables(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if len(d.Variables) == 0 {
+		return cursor, fileToCellIdAndLine
+	}
+
+	w.Write("var (\n")
+	for _, key := range SortedKeys(d.Variables) {
+		varDecl := d.Variables[key]
+		w.Write("\t")
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = varDecl.CellLines.Append(fileToCellIdAndLine)
+		if varDecl.CursorInName {
+			cursor = w.CursorPlusDelta(varDecl.Cursor)
+		}
+		w.Write(varDecl.Name)
+		if varDecl.TypeDefinition != "" {
+			w.Write(" ")
+			if varDecl.CursorInType {
+				cursor = w.CursorPlusDelta(varDecl.Cursor)
+			}
+			w.Write(varDecl.TypeDefinition)
+		}
+		if varDecl.ValueDefinition != "" {
+			w.Write(" = ")
+			if varDecl.CursorInValue {
+				cursor = w.CursorPlusDelta(varDecl.Cursor)
+			}
+			w.Write(varDecl.ValueDefinition)
+		}
+		w.Write("\n")
+	}
+	w.Write(")\n\n")
+	return cursor, fileToCellIdAndLine
+}
+
+// RenderFunctions without comments, for all functions in Declarations.
+func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if len(d.Functions) == 0 {
+		return cursor, fileToCellIdAndLine
+	}
+
+	for _, key := range SortedKeys(d.Functions) {
+		funcDecl := d.Functions[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = funcDecl.CellLines.Append(fileToCellIdAndLine)
+		def := funcDecl.Definition
+		if funcDecl.HasCursor() {
+			cursor = w.CursorPlusDelta(funcDecl.Cursor)
+		}
+		if strings.HasPrefix(key, "init_") {
+			// TODO: this will not work if there is a comment before the function
+			//       which also has the string key. We need something more sophisticated.
+			def = strings.Replace(def, key, "init", 1)
+		}
+		w.Writef("%s\n\n", def)
+	}
+	return cursor, fileToCellIdAndLine
+}
+
+// RenderTypes without comments.
+func (d *Declarations) RenderTypes(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if len(d.Types) == 0 {
+		return cursor, fileToCellIdAndLine
+	}
+
+	for _, key := range SortedKeys(d.Types) {
+		typeDecl := d.Types[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = typeDecl.CellLines.Append(fileToCellIdAndLine)
+		w.Write("type ")
+		if typeDecl.CursorInKey {
+			cursor = w.CursorPlusDelta(typeDecl.Cursor)
+		}
+		w.Writef("%s ", key)
+		if typeDecl.CursorInType {
+			cursor = w.CursorPlusDelta(typeDecl.Cursor)
+		}
+		w.Writef("%s\n", typeDecl.TypeDefinition)
+	}
+	w.Write("\n")
+	return cursor, fileToCellIdAndLine
+}
+
+// RenderConstants without comments for all constants in Declarations.
+//
+// Constants are trickier to render because when they are defined in a block,
+// using `iota`, their ordering matters. So we re-render them in the same order
+// and blocks as they were originally parsed.
+//
+// The ordering is given by the sort order of the first element of each `const` block.
+func (d *Declarations) RenderConstants(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if len(d.Constants) == 0 {
+		return cursor, fileToCellIdAndLine
+	}
+
+	// Enumerate heads of const blocks.
+	headKeys := make([]string, 0, len(d.Constants))
+	for key, constDecl := range d.Constants {
+		if constDecl.Prev == nil {
+			// Head of the const block.
+			headKeys = append(headKeys, key)
+		}
+	}
+	sort.Strings(headKeys)
+
+	for _, headKey := range headKeys {
+		constDecl := d.Constants[headKey]
+		if constDecl.Next == nil {
+			// Render individual const declaration.
+			w.Write("const ")
+			fileToCellIdAndLine = constDecl.Render(w, &cursor, fileToCellIdAndLine)
+			w.Write("\n\n")
+			continue
+		}
+		// Render block of constants.
+		w.Write("const (\n")
+		for constDecl != nil {
+			w.Write("\t")
+			fileToCellIdAndLine = constDecl.Render(w, &cursor, fileToCellIdAndLine)
+			w.Write("\n")
+			constDecl = constDecl.Next
+		}
+		w.Write(")\n\n")
+	}
+	return cursor, fileToCellIdAndLine
+}
+
+// Render Constant declaration (without the `const` keyword).
+func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+	fileToCellIdAndLine = c.CellLines.Append(fileToCellIdAndLine)
+	if c.CursorInKey {
+		*cursor = w.CursorPlusDelta(c.Cursor)
+	}
+	w.Write(c.Key)
+	if c.TypeDefinition != "" {
+		w.Write(" ")
+		if c.CursorInType {
+			*cursor = w.CursorPlusDelta(c.Cursor)
+		}
+		w.Write(c.TypeDefinition)
+	}
+	if c.ValueDefinition != "" {
+		w.Write(" = ")
+		if c.CursorInValue {
+			*cursor = w.CursorPlusDelta(c.Cursor)
+		}
+		w.Write(c.ValueDefinition)
+	}
+	return fileToCellIdAndLine
+}
+
+// createGoFileFromLines creates a main.go file from the cell contents. It doesn't yet include previous declarations.
+//
+// Among the things it handles:
+// * Adding an initial `package main` line.
+// * Handle the special `%%` line, a shortcut to create a `func main()`.
+//
+// Parameters:
+//   - filePath is the path where to write the Go code.
+//   - lines are the lines in the cell.
+//   - skipLines are lines in the cell that are not Go code: lines starting with "!" or "%" special characters.
+//   - cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
+//
+// Return:
+//   - cursorInFile: the equivalent cursor position in the final file, considering the given cursorInCell.
+//   - fileToCellLines: a map from the file lines to original cell lines. It is set to NoCursorLine (-1) for lines
+//     that don't have an equivalent in the cell (e.g: the `package main` line that inserted here).
+func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (
+	cursorInFile Cursor, fileToCellLines []int, err error) {
+	cursorInFile = NoCursor
+
+	// Maximum number of extra lines created is 5, so we create a map with that amount of line. Later we trim it
+	// to the correct number.
+	fileToCellLines = make([]int, len(lines)+5)
+	for ii := 0; ii < len(fileToCellLines); ii++ {
+		fileToCellLines[ii] = NoCursorLine
+	}
+
+	var f *os.File
+	f, err = os.Create(filePath)
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to create %q", filePath)
+		return
+	}
+	w := NewWriterWithCursor(f)
+	defer func() {
+		if f != nil {
+			_ = f.Close()
+		}
+	}()
+
+	w.Write("package main\n\n")
+	var createdFuncMain bool
+	for ii, line := range lines {
+		if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
+			w.Write("func main() {\n\tflag.Parse()\n")
+			createdFuncMain = true
+			continue
+		}
+		if _, found := skipLines[ii]; found {
+			continue
+		}
+		if createdFuncMain && line != "" {
+			w.Write("\t")
+		}
+		if ii == cursorInCell.Line {
+			// Use current line for cursor, but add column.
+			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})
+		}
+		fileToCellLines[w.Line] = ii // Registers line mapping.
+		w.Write(line)
+		w.Write("\n")
+	}
+	if createdFuncMain {
+		w.Write("\n}\n")
+	}
+	if w.Error() != nil {
+		err = w.Error()
+		return
+	}
+	fileToCellLines = fileToCellLines[:w.Line] // Truncate to lines actually used.
+
+	// Close file.
+	err = f.Close()
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to close %q", filePath)
+		return
+	}
+	f = nil
+	return
+}
+
+// createMainFileFromDecls creates `main.go` and writes all declarations.
+//
+// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
+func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	var f *os.File
 	f, err = os.Create(s.MainPath())
 	if err != nil {
+		err = errors.Wrapf(err, "Failed to create %q", s.MainPath())
 		return
 	}
-	cursor, err = s.createMainContentsFromDecls(f, decls, mainDecl)
+	cursor, fileToCellIdAndLine, err = s.createMainContentsFromDecls(f, decls, mainDecl)
 	err2 := f.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "creating main.go")
@@ -130,15 +397,20 @@ func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function)
 	return
 }
 
-func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+// createMainContentsFromDecls writes to the given file all the declarations.
+//
+// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
+func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursor = NoCursor
 	w := NewWriterWithCursor(writer)
-	w.Format("package main\n\n")
+	w.Writef("package main\n\n")
 	if err != nil {
 		return
 	}
 
-	mergeCursorAndReportError := func(w *WriterWithCursor, cursorInFile Cursor, name string) bool {
+	mergeCursorAndReportError := func(w *WriterWithCursor, renderer func(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine), name string) bool {
+		var cursorInFile Cursor
+		cursorInFile, fileToCellIdAndLine = renderer(w, fileToCellIdAndLine)
 		if w.Error() != nil {
 			err = errors.WithMessagef(err, "in block %q", name)
 			return true
@@ -148,30 +420,31 @@ func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declaration
 		}
 		return false
 	}
-	if mergeCursorAndReportError(w, decls.RenderImports(w), "imports") {
+
+	if mergeCursorAndReportError(w, decls.RenderImports, "imports") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderTypes(w), "types") {
+	if mergeCursorAndReportError(w, decls.RenderTypes, "types") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderConstants(w), "constants") {
+	if mergeCursorAndReportError(w, decls.RenderConstants, "constants") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderVariables(w), "variables") {
+	if mergeCursorAndReportError(w, decls.RenderVariables, "variables") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderFunctions(w), "functions") {
+	if mergeCursorAndReportError(w, decls.RenderFunctions, "functions") {
 		return
 	}
 
 	if mainDecl != nil {
-		w.Format("\n")
+		w.Writef("\n")
 		if mainDecl.HasCursor() {
-			cursor = mainDecl.Cursor
-			cursor.Line += w.Line
-			//log.Printf("Cursor in \"main\": %v", cursor)
+			cursor = w.CursorPlusDelta(mainDecl.Cursor)
 		}
-		w.Format("%s\n", mainDecl.Definition)
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = mainDecl.CellLines.Append(fileToCellIdAndLine)
+		w.Writef("%s\n", mainDecl.Definition)
 	}
 	return
 }
@@ -180,91 +453,3 @@ var (
 	ParseError = fmt.Errorf("failed to parse cell contents")
 	CursorLost = fmt.Errorf("cursor position not rendered in main.go")
 )
-
-// parseLinesAndComposeMain parses the cell (given in lines and skipLines), merges with
-// currently memorized declarations (from previous Cell runs) and compose a `main.go`.
-//
-// On return the `main.go` file has been updated, and it returns the updated merged
-// declarations, the cursor position adjusted into the newly generate `main.go` file.
-//
-// If cursorInCell defines a cursor (it can be set to NoCursor), but the cursor position
-// is not rendered in the resulting `main.go`, a CursorLost error is returned.
-func (s *State) parseLinesAndComposeMain(msg kernel.Message, lines []string, skipLines map[int]bool, cursorInCell Cursor) (
-	updatedDecls *Declarations, cursorInFile Cursor, err error) {
-	if cursorInCell.HasCursor() {
-		log.Printf("Cursor in cell (%+v)", cursorInCell)
-	}
-	var cursorInTmpFile Cursor
-	cursorInTmpFile, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
-	if err != nil {
-		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
-	}
-	newDecls := NewDeclarations()
-	if err = s.ParseFromMainGo(msg, cursorInTmpFile, newDecls); err != nil {
-		// If cell is in an un-parseable state, just returns empty context. User can try to
-		// run cell to get an error.
-		return nil, NoCursor, errors.WithStack(ParseError)
-	}
-
-	// Checks whether there is a "main" function defined in the sampleCellCode.
-	mainDecl, hasMain := newDecls.Functions["main"]
-	if hasMain {
-		// Remove "main" from newDecls: this should not be stored from one cell execution from
-		// another.
-		delete(newDecls.Functions, "main")
-	} else {
-		// Declare a stub main function, just so we can try to compile the final sampleCellCode.
-		mainDecl = &Function{Key: "main", Name: "main", Definition: "func main() { flag.Parse() }"}
-	}
-	_ = mainDecl
-
-	// Merge cell declarations with a copy of the current state: we don't want to commit the new
-	// declarations until they compile successfully.
-	updatedDecls = s.Decls.Copy()
-	updatedDecls.ClearCursor()
-	updatedDecls.MergeFrom(newDecls)
-
-	// Render declarations to main.go.
-	cursorInFile, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
-	if err != nil {
-		return nil, NoCursor, errors.WithMessagef(err, "in goexec.InspectIdentifierInCell() while generating main.go with all declarations")
-	}
-	if cursorInCell.HasCursor() && !cursorInFile.HasCursor() {
-		// Returns empty data, which returns a "not found".
-		return nil, NoCursor, errors.WithStack(CursorLost)
-	}
-	if cursorInCell.HasCursor() {
-		s.logCursor(cursorInFile)
-	}
-	return updatedDecls, cursorInFile, nil
-}
-
-const cursorStr = "‸"
-
-// logCursor will log the line in `main.go` the cursor is pointing to, and puts a
-// "*" where the
-func (s *State) logCursor(cursor Cursor) {
-	content, err := s.readMainGo()
-	if err != nil {
-		log.Printf("Failed to read main.go, for debugging.")
-	} else {
-		log.Printf("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
-	}
-}
-
-func lineWithCursor(content string, cursor Cursor) string {
-	if !cursor.HasCursor() {
-		return "cursor position non-existent"
-	}
-	var modLine string
-	lines := strings.Split(content, "\n")
-	if cursor.Line < len(lines) {
-		line := lines[cursor.Line]
-		if cursor.Col < len(line) {
-			modLine = line[:cursor.Col] + cursorStr + line[cursor.Col:]
-		} else {
-			modLine = line + cursorStr
-		}
-	}
-	return modLine
-}

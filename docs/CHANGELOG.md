@@ -1,5 +1,12 @@
 # GoNB Changelog
 
+## v0.5
+
+* Improved error reporting, including indication of line number in cell.
+* Parse error output of the execution of a cell, and if it contains a stack-trace, add a reference to the cell
+  code (cell id and line number).
+* Cleaned up, improved code documentation and testing for `goexec` package.
+
 ## v0.4.1
 
 * Added support for Mac installation.

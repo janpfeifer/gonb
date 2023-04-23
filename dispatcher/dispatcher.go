@@ -4,6 +4,7 @@ package dispatcher
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
@@ -163,14 +164,14 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Dispatch to various executors.
 	msg.Kernel().Interrupted.Store(false)
 	lines := strings.Split(code, "\n")
-	usedLines := make(map[int]bool)
+	usedLines := MakeSet[int]()
 	var executionErr error
 	if err := specialcmd.Parse(msg, goExec, true, lines, usedLines); err != nil {
 		executionErr = errors.WithMessagef(err, "executing special commands in cell")
 	}
 	hasMoreToRun := len(usedLines) < len(lines)
 	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
-		executionErr = goExec.ExecuteCell(msg, lines, usedLines)
+		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
 	}
 
 	// Final execution result.
@@ -210,14 +211,14 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
 	// Separate special commands from Go commands.
-	usedLines := make(map[int]bool)
+	usedLines := MakeSet[int]()
 	if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
 		return errors.WithMessagef(err, "parsing special commands in cell")
 	}
 
 	// Get data contents for reply.
 	var data kernel.MIMEMap
-	if usedLines[cursorLine] {
+	if usedLines.Has(cursorLine) {
 		// If special command, use our help message as inspect content.
 		data = kernel.MIMEMap{protocol.MIMETextPlain: any(specialcmd.HelpMessage)}
 	} else {
@@ -281,12 +282,12 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
 	// Separate special commands from Go commands.
-	usedLines := make(map[int]bool)
+	usedLines := MakeSet[int]()
 	if err = specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
 		err = errors.WithMessagef(err, "parsing special commands in cell")
 		return
 	}
-	if usedLines[cursorLine] {
+	if usedLines.Has(cursorLine) {
 		// No auto-complete for special commands.
 		return
 	}

@@ -3,44 +3,45 @@ package goexec
 import (
 	"bytes"
 	"fmt"
+	"github.com/gofrs/uuid"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"path"
+	"strings"
 	"testing"
 )
 
-func createTestGoMain(content string) (dirPath string, err error) {
-	dirPath, err = os.MkdirTemp("", "parser_test_")
+// newEmptyState returns an empty state with a temporary directory created.
+func newEmptyState(t *testing.T) *State {
+	uuidTmp, _ := uuid.NewV7()
+	uuidStr := uuidTmp.String()
+	uniqueID := uuidStr[len(uuidStr)-8:]
+	s, err := New(uniqueID)
 	if err != nil {
-		return
+		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}
-	var f *os.File
-	f, err = os.Create(path.Join(dirPath, "main.go"))
-	if err != nil {
-		return
+	return s
+}
+
+// createTestGoMain prefixes the cell content with `package main` and writes it to `main.go`.
+func createTestGoMain(t *testing.T, s *State, cellContent string) (fileToCellLine []int) {
+	content := sampleCellCode
+	lines := strings.Split(content, "\n")
+	skipLines := MakeSet[int]()
+	for ii, line := range lines {
+		if line == "!echo nonono" {
+			skipLines.Insert(ii)
+		}
 	}
-	_, err = f.WriteString(content)
-	if err != nil {
-		return
-	}
-	err = f.Close()
-	if err != nil {
-		return
-	}
-	fmt.Printf("Create test data in %q\n", dirPath)
+
+	var err error
+	_, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, NoCursor)
+	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.MainPath())
 	return
 }
 
-func emptyState() *State {
-	return &State{
-		Decls: NewDeclarations(),
-	}
-}
-
-var sampleCellCode = `package main
-
-import "fmt"
+var (
+	sampleCellCode = `import "fmt"
 
 // Some comment
 
@@ -104,19 +105,33 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 func init_c() {
 	c += ", blah"
 }
-`
 
-func TestState_ParseFromMainGo(t *testing.T) {
-	s := emptyState()
+!echo nonono
+
+%%
+fmt.Printf("Hello! %s\n", c)
+fmt.Printf("1 + 3 = %d\n", sum(1, 3))
+fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
+`
+)
+
+func TestState_Parse(t *testing.T) {
+	s := newEmptyState(t)
+	//defer func() {
+	//	err := s.Finalize()
+	//	if err != nil {
+	//		t.Fatalf("Failed to finalized state: %+v", err)
+	//	}
+	//}()
+	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
+	fmt.Printf("Code:\t%s\n", s.MainPath())
+	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
+
 	var err error
-	s.TempDir, err = createTestGoMain(sampleCellCode)
-	if err != nil {
-		t.Fatalf("Failed to create main.go: %+v", err)
-	}
-	err = s.ParseFromMainGo(nil, NoCursor, s.Decls)
-	if err != nil {
-		t.Fatalf("Failed to parse imports from main.go: %+v", err)
-	}
+	cellId := NoCursorLine // Transient cellId.
+	s.Decls, err = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
+	require.NoErrorf(t, err, "Failed to parse %q", s.MainPath())
+
 	fmt.Printf("\ttest imports: %+v\n", s.Decls.Imports)
 	assert.Lenf(t, s.Decls.Imports, 5, "Expected 5 imports, got %+v", s.Decls.Imports)
 	assert.Contains(t, s.Decls.Imports, "fmt")
@@ -124,15 +139,21 @@ func TestState_ParseFromMainGo(t *testing.T) {
 	assert.Contains(t, s.Decls.Imports, "fmtOther")
 	assert.Contains(t, s.Decls.Imports, "errors")
 	assert.Contains(t, s.Decls.Imports, ".~gomlx/computation")
+	assert.ElementsMatch(t, []int{7}, s.Decls.Imports["errors"].CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest functions: %+v\n", s.Decls.Functions)
-	assert.Lenf(t, s.Decls.Functions, 6, "Expected 2 functions, got %+v", s.Decls.Functions)
+	// Notice `func main` will be automatically included.
+	assert.Lenf(t, s.Decls.Functions, 7, "Expected 6 functions, got %d", len(s.Decls.Functions))
 	assert.Contains(t, s.Decls.Functions, "f")
 	assert.Contains(t, s.Decls.Functions, "sum")
 	assert.Contains(t, s.Decls.Functions, "init_c")
 	assert.Contains(t, s.Decls.Functions, "Kg~Weight")
 	assert.Contains(t, s.Decls.Functions, "Kg~Gain")
 	assert.Contains(t, s.Decls.Functions, "N~Weight")
+	assert.Contains(t, s.Decls.Functions, "main")
+	assert.ElementsMatch(t, []int{-1, -1, 68, 69, 70, 71, -1, -1}, s.Decls.Functions["main"].CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)
 	assert.Lenf(t, s.Decls.Variables, 6, "Expected 4 variables, got %+v", s.Decls.Variables)
@@ -142,6 +163,8 @@ func TestState_ParseFromMainGo(t *testing.T) {
 	assert.Contains(t, s.Decls.Variables, "b")
 	assert.Contains(t, s.Decls.Variables, "c")
 	// The 5th var is "_", which gets a random key.
+	assert.ElementsMatch(t, []int{21, 22}, s.Decls.Variables["b"].CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest types: %+v\n", s.Decls.Types)
 	assert.Lenf(t, s.Decls.Types, 3, "Expected 3 types, got %+v", s.Decls.Types)
@@ -149,6 +172,8 @@ func TestState_ParseFromMainGo(t *testing.T) {
 	assert.Contains(t, s.Decls.Types, "Kg")
 	assert.Contains(t, s.Decls.Types, "N")
 	assert.Equal(t, "struct { x, y float64 }", s.Decls.Types["XY"].TypeDefinition)
+	assert.ElementsMatch(t, []int{27}, s.Decls.Types["XY"].CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest constants: %+v\n", s.Decls.Constants)
 	assert.Lenf(t, s.Decls.Constants, 7, "Expected 7 Constants, got %+v", s.Decls.Constants)
@@ -162,6 +187,8 @@ func TestState_ParseFromMainGo(t *testing.T) {
 	assert.Contains(t, s.Decls.Constants, "K2")
 	assert.Equal(t, "K0", s.Decls.Constants["K1"].Prev.Key)
 	assert.Equal(t, "K2", s.Decls.Constants["K1"].Next.Key)
+	assert.ElementsMatch(t, []int{45}, s.Decls.Constants["K0"].CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
 
 	// Check imports rendering.
 	wantImportsRendering := `import (
@@ -175,10 +202,18 @@ func TestState_ParseFromMainGo(t *testing.T) {
 `
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	w := &WriterWithCursor{w: buf}
-	cursor := s.Decls.RenderImports(w)
+	cursor, fileToCellIdAndLine := s.Decls.RenderImports(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderImports()")
 	assert.Equal(t, wantImportsRendering, buf.String())
+	require.ElementsMatch(t, []CellIdAndLine{
+		{cellId, NoCursorLine},
+		{cellId, 8},
+		{cellId, 7},
+		{cellId, 0},
+		{cellId, 6},
+		{cellId, 5},
+	}, fileToCellIdAndLine, "Line numbers in cell code don't match")
 
 	// Checks variables rendering.
 	wantVariablesRendering := `var (
@@ -194,10 +229,20 @@ func TestState_ParseFromMainGo(t *testing.T) {
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor = s.Decls.RenderVariables(w)
+	cursor, fileToCellIdAndLine = s.Decls.RenderVariables(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderVariables()")
 	assert.Equal(t, wantVariablesRendering, buf.String())
+	require.ElementsMatch(t, []CellIdAndLine{
+		{cellId, NoCursorLine},
+		{cellId, 29},
+		{cellId, 21},
+		{cellId, 22},
+		{cellId, 55},
+		{cellId, 20},
+		{cellId, 20},
+		{cellId, 25},
+	}, fileToCellIdAndLine, "Line numbers in cell code don't match")
 
 	// Checks functions rendering.
 	wantFunctionsRendering := `func (k *Kg) Gain(lasagna Kg) {
@@ -218,6 +263,15 @@ func init() {
 	c += ", blah"
 }
 
+func main() {
+	flag.Parse()
+	fmt.Printf("Hello! %s\n", c)
+	fmt.Printf("1 + 3 = %d\n", sum(1, 3))
+	fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
+
+
+}
+
 func sum[T interface{int | float32 | float64}](a, b T) T {
 	return a + b
 }
@@ -225,7 +279,7 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor = s.Decls.RenderFunctions(w)
+	cursor, _ = s.Decls.RenderFunctions(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderFunctions()")
 	assert.Equal(t, wantFunctionsRendering, buf.String())
@@ -238,7 +292,7 @@ type XY struct { x, y float64 }
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor = s.Decls.RenderTypes(w)
+	cursor, _ = s.Decls.RenderTypes(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderTypes()")
 	assert.Equal(t, wantTypesRendering, buf.String())
@@ -261,7 +315,7 @@ const (
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor = s.Decls.RenderConstants(w)
+	cursor, _ = s.Decls.RenderConstants(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, err, "Declarations.RenderConstants()")
 	assert.Equal(t, wantConstantsRendering, buf.String())
@@ -270,13 +324,16 @@ const (
 
 func TestCursorPositioning(t *testing.T) {
 	// Test cursor positioning in generated lines.
-	s := emptyState()
+	s := newEmptyState(t)
+	defer func() {
+		err := s.Finalize()
+		if err != nil {
+			t.Fatalf("Failed to finalized state: %+v", err)
+		}
+	}()
+	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
+	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
 	var err error
-	s.TempDir, err = createTestGoMain(sampleCellCode)
-	if err != nil {
-		t.Fatalf("Failed to create main.go: %+v", err)
-	}
-
 	testLines := []struct {
 		cursor Cursor
 		Line   string
@@ -304,12 +361,13 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		err = s.ParseFromMainGo(nil, testLine.cursor, s.Decls)
+		s.Decls, err = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}
 
-		cursorInFile, err := s.createMainContentsFromDecls(buf, s.Decls, nil)
+		cursorInFile, fileToCellIdAndLine, err := s.createMainContentsFromDecls(buf, s.Decls, nil)
+		_ = fileToCellIdAndLine
 		require.NoError(t, err)
 		content := buf.String()
 		l := lineWithCursor(content, cursorInFile)

@@ -26,6 +26,9 @@ type errorLine struct {
 	Message    string // Error message, what comes after the `file:line_number:col_number`
 	Location   string // `file:line_number:col_number` prefix, only if HasContext == true.
 	Context    string // Context to display on a mouse-over window, only if HasContext == true.
+
+	HasCellInfo bool
+	CellInfo    string
 }
 
 // To check the standard Jupyter colors to choose from, see:
@@ -62,23 +65,35 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	border-style: dotted;
 	border-width: 1px;	
 	border-color: var(--jp-border-color2);
+	background-color: var(--jp-rendermime-error-background);
 	font-weight: bold;
+}
+.gonb-cell-line-info {
+	background: var(--jp-layout-color2);
+	color: #999;
+	margin: 0.1em;
+	border: 1px solid var(--jp-border-color1);
+	padding-left: 0.2em;
+	padding-right: 0.2em;
 }
 </style>
 <div class="lm-Widget p-Widget lm-Panel p-Panel jp-OutputArea-child">
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
-{{if .HasContext}}
-<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
-<div class="gonb-error-context">{{.Context}}</div>
+{{if .HasContext}}{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span>
+{{end}}<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
+<div class="gonb-error-context">
+{{.Context}}
+</div>
 {{else}}
-<pre>{{.Message}}</pre>
+<span style="white-space: pre;">{{.Location}} {{.Message}}</span>
 {{end}}
 <br/>
 {{end}}
 </div>
 `))
 
+// Example type of error message:
 // /tmp/gonb_4e5ea2e7/main.go:3:1: expected declaration, found fmt
 
 // DisplayErrorWithContext in an HTML div, with a mouse-over pop-up window
@@ -86,7 +101,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 //
 // Any errors within here are logged and simply ignored, since this is already
 // used to report errors
-func (s *State) DisplayErrorWithContext(msg kernel.Message, errorMsg string) {
+func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) {
 	// Default report, and makes sure display is called at the end.
 	reportHTML := "<pre>" + errorMsg + "</pre>" // If anything goes wrong, simply display the error message.
 	defer func() {
@@ -109,7 +124,7 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, errorMsg string) {
 	lines := strings.Split(errorMsg, "\n")
 	report := &errorReport{Lines: make([]errorLine, len(lines))}
 	for ii, line := range lines {
-		report.Lines[ii] = s.parseErrorLine(line, codeLines)
+		report.Lines[ii] = s.parseErrorLine(line, codeLines, fileToCellIdAndLine)
 	}
 
 	// Render error block.
@@ -144,7 +159,7 @@ func inBetween[T constraints.Ordered](x, from, to T) T {
 	return min(max(x, from), to)
 }
 
-func (s *State) parseErrorLine(lineStr string, codeLines []string) (l errorLine) {
+func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdAndLine []CellIdAndLine) (l errorLine) {
 	l.HasContext = false
 	matches := reFileLinePrefix.FindStringSubmatch(lineStr)
 	if len(codeLines) == 0 || len(matches) != 5 {
@@ -174,6 +189,18 @@ func (s *State) parseErrorLine(lineStr string, codeLines []string) (l errorLine)
 		parts = append(parts, part)
 	}
 	l.Context = strings.Join(parts, "")
+
+	// Gather CellInfo
+	if lineNum > 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {
+		cell := fileToCellIdAndLine[lineNum]
+		l.HasCellInfo = true
+		// Notice GoNB store lines starting at 0, but Jupyter display lines starting at 1, so we add 1 here.
+		if cell.Id != -1 {
+			l.CellInfo = fmt.Sprintf("Cell[%d]: Line %d", cell.Id, cell.Line+1)
+		} else {
+			l.CellInfo = fmt.Sprintf("Cell Line %d", cell.Line+1)
+		}
+	}
 	return
 }
 

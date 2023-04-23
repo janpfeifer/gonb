@@ -2,6 +2,7 @@ package specialcmd
 
 import (
 	"fmt"
+	. "github.com/janpfeifer/gonb/common"
 	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
@@ -11,10 +12,11 @@ import (
 
 func TestJoinLine(t *testing.T) {
 	lines := strings.Split("a\nb c\\\nd\\\ne\nf", "\n")
-	updatedLines := make(map[int]bool)
+	updatedLines := MakeSet[int]()
 	got := joinLine(lines, 1, updatedLines)
 	assert.Equal(t, "b c d e", got, "Joining consecutive lines ended in '\\'")
-	assert.EqualValues(t, map[int]bool{1: true, 2: true, 3: true}, updatedLines, "Joining consecutive lines ended in '\\'")
+	var empty = struct{}{}
+	assert.EqualValues(t, map[int]struct{}{1: empty, 2: empty, 3: empty}, updatedLines, "Joining consecutive lines ended in '\\'")
 }
 
 func TestSplitCmd(t *testing.T) {

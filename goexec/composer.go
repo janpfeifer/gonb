@@ -13,6 +13,21 @@ import (
 // This file holds the various functions used to compose and render the go code that
 // will be compiled, from the parsed cells.
 
+// CellIdAndLine points to a line within a cell. Id is the execution number of the cell,
+// as given to ExecuteCell.
+type CellIdAndLine struct {
+	Id, Line int
+}
+
+// MakeFileToCellIdAndLine converts a cellId slice of cell line numbers for a file to a slice of CellIdAndLine.
+func MakeFileToCellIdAndLine(cellId int, fileToCellLine []int) (fileToCellIdAndLine []CellIdAndLine) {
+	fileToCellIdAndLine = make([]CellIdAndLine, len(fileToCellLine))
+	for ii, line := range fileToCellLine {
+		fileToCellIdAndLine[ii] = CellIdAndLine{cellId, line}
+	}
+	return
+}
+
 // WriterWithCursor keep tabs of the current line/col of the file (presumably)
 // being written.
 type WriterWithCursor struct {
@@ -45,6 +60,15 @@ func (w *WriterWithCursor) CursorPlusDelta(delta Cursor) (fileCursor Cursor) {
 		fileCursor.Col += delta.Col
 	}
 	return fileCursor
+}
+
+// FillLinesGap append NoCursorLine (-1) line indices to fileToCellIdAndLine slice, up to
+// the current line.
+func (w *WriterWithCursor) FillLinesGap(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	for len(fileToCellIdAndLine) < w.Line {
+		fileToCellIdAndLine = append(fileToCellIdAndLine, CellIdAndLine{NoCursorLine, NoCursorLine})
+	}
+	return fileToCellIdAndLine
 }
 
 // Error returns first error that happened during writing.
@@ -84,15 +108,17 @@ func (w *WriterWithCursor) Write(content string) {
 }
 
 // RenderImports writes out `import ( ... )` for all imports in Declarations.
-func (d *Declarations) RenderImports(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
+func (d *Declarations) RenderImports(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
 	if len(d.Imports) == 0 {
-		return
+		return cursor, fileToCellIdAndLine
 	}
 
 	w.Write("import (\n")
 	for _, key := range SortedKeys(d.Imports) {
 		importDecl := d.Imports[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = importDecl.CellLines.Append(fileToCellIdAndLine)
 		w.Write("\t")
 		if importDecl.Alias != "" {
 			if importDecl.CursorInAlias {
@@ -106,20 +132,22 @@ func (d *Declarations) RenderImports(w *WriterWithCursor) (cursor Cursor) {
 		w.Writef("%q\n", importDecl.Path)
 	}
 	w.Write(")\n\n")
-	return
+	return cursor, fileToCellIdAndLine
 }
 
 // RenderVariables writes out `var ( ... )` for all variables in Declarations.
-func (d *Declarations) RenderVariables(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
+func (d *Declarations) RenderVariables(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
 	if len(d.Variables) == 0 {
-		return
+		return cursor, fileToCellIdAndLine
 	}
 
 	w.Write("var (\n")
 	for _, key := range SortedKeys(d.Variables) {
 		varDecl := d.Variables[key]
 		w.Write("\t")
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = varDecl.CellLines.Append(fileToCellIdAndLine)
 		if varDecl.CursorInName {
 			cursor = w.CursorPlusDelta(varDecl.Cursor)
 		}
@@ -141,18 +169,20 @@ func (d *Declarations) RenderVariables(w *WriterWithCursor) (cursor Cursor) {
 		w.Write("\n")
 	}
 	w.Write(")\n\n")
-	return
+	return cursor, fileToCellIdAndLine
 }
 
 // RenderFunctions without comments, for all functions in Declarations.
-func (d *Declarations) RenderFunctions(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
+func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
 	if len(d.Functions) == 0 {
-		return
+		return cursor, fileToCellIdAndLine
 	}
 
 	for _, key := range SortedKeys(d.Functions) {
 		funcDecl := d.Functions[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = funcDecl.CellLines.Append(fileToCellIdAndLine)
 		def := funcDecl.Definition
 		if funcDecl.HasCursor() {
 			cursor = w.CursorPlusDelta(funcDecl.Cursor)
@@ -164,18 +194,20 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor) (cursor Cursor) {
 		}
 		w.Writef("%s\n\n", def)
 	}
-	return
+	return cursor, fileToCellIdAndLine
 }
 
 // RenderTypes without comments.
-func (d *Declarations) RenderTypes(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
+func (d *Declarations) RenderTypes(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
 	if len(d.Types) == 0 {
-		return
+		return cursor, fileToCellIdAndLine
 	}
 
 	for _, key := range SortedKeys(d.Types) {
 		typeDecl := d.Types[key]
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = typeDecl.CellLines.Append(fileToCellIdAndLine)
 		w.Write("type ")
 		if typeDecl.CursorInKey {
 			cursor = w.CursorPlusDelta(typeDecl.Cursor)
@@ -187,7 +219,7 @@ func (d *Declarations) RenderTypes(w *WriterWithCursor) (cursor Cursor) {
 		w.Writef("%s\n", typeDecl.TypeDefinition)
 	}
 	w.Write("\n")
-	return
+	return cursor, fileToCellIdAndLine
 }
 
 // RenderConstants without comments for all constants in Declarations.
@@ -197,10 +229,10 @@ func (d *Declarations) RenderTypes(w *WriterWithCursor) (cursor Cursor) {
 // and blocks as they were originally parsed.
 //
 // The ordering is given by the sort order of the first element of each `const` block.
-func (d *Declarations) RenderConstants(w *WriterWithCursor) (cursor Cursor) {
-	cursor = NoCursor
+func (d *Declarations) RenderConstants(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
 	if len(d.Constants) == 0 {
-		return
+		return cursor, fileToCellIdAndLine
 	}
 
 	// Enumerate heads of const blocks.
@@ -218,7 +250,7 @@ func (d *Declarations) RenderConstants(w *WriterWithCursor) (cursor Cursor) {
 		if constDecl.Next == nil {
 			// Render individual const declaration.
 			w.Write("const ")
-			constDecl.Render(w, &cursor)
+			fileToCellIdAndLine = constDecl.Render(w, &cursor, fileToCellIdAndLine)
 			w.Write("\n\n")
 			continue
 		}
@@ -226,17 +258,19 @@ func (d *Declarations) RenderConstants(w *WriterWithCursor) (cursor Cursor) {
 		w.Write("const (\n")
 		for constDecl != nil {
 			w.Write("\t")
-			constDecl.Render(w, &cursor)
+			fileToCellIdAndLine = constDecl.Render(w, &cursor, fileToCellIdAndLine)
 			w.Write("\n")
 			constDecl = constDecl.Next
 		}
 		w.Write(")\n\n")
 	}
-	return
+	return cursor, fileToCellIdAndLine
 }
 
 // Render Constant declaration (without the `const` keyword).
-func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
+func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+	fileToCellIdAndLine = c.CellLines.Append(fileToCellIdAndLine)
 	if c.CursorInKey {
 		*cursor = w.CursorPlusDelta(c.Cursor)
 	}
@@ -255,6 +289,7 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor) {
 		}
 		w.Write(c.ValueDefinition)
 	}
+	return fileToCellIdAndLine
 }
 
 // createGoFileFromLines creates a main.go file from the cell contents. It doesn't yet include previous declarations.
@@ -338,13 +373,17 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 	return
 }
 
-func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+// createMainFileFromDecls creates `main.go` and writes all declarations.
+//
+// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
+func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	var f *os.File
 	f, err = os.Create(s.MainPath())
 	if err != nil {
+		err = errors.Wrapf(err, "Failed to create %q", s.MainPath())
 		return
 	}
-	cursor, err = s.createMainContentsFromDecls(f, decls, mainDecl)
+	cursor, fileToCellIdAndLine, err = s.createMainContentsFromDecls(f, decls, mainDecl)
 	err2 := f.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "creating main.go")
@@ -358,7 +397,10 @@ func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function)
 	return
 }
 
-func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, err error) {
+// createMainContentsFromDecls writes to the given file all the declarations.
+//
+// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
+func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursor = NoCursor
 	w := NewWriterWithCursor(writer)
 	w.Writef("package main\n\n")
@@ -366,7 +408,9 @@ func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declaration
 		return
 	}
 
-	mergeCursorAndReportError := func(w *WriterWithCursor, cursorInFile Cursor, name string) bool {
+	mergeCursorAndReportError := func(w *WriterWithCursor, renderer func(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine), name string) bool {
+		var cursorInFile Cursor
+		cursorInFile, fileToCellIdAndLine = renderer(w, fileToCellIdAndLine)
 		if w.Error() != nil {
 			err = errors.WithMessagef(err, "in block %q", name)
 			return true
@@ -376,29 +420,30 @@ func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declaration
 		}
 		return false
 	}
-	if mergeCursorAndReportError(w, decls.RenderImports(w), "imports") {
+
+	if mergeCursorAndReportError(w, decls.RenderImports, "imports") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderTypes(w), "types") {
+	if mergeCursorAndReportError(w, decls.RenderTypes, "types") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderConstants(w), "constants") {
+	if mergeCursorAndReportError(w, decls.RenderConstants, "constants") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderVariables(w), "variables") {
+	if mergeCursorAndReportError(w, decls.RenderVariables, "variables") {
 		return
 	}
-	if mergeCursorAndReportError(w, decls.RenderFunctions(w), "functions") {
+	if mergeCursorAndReportError(w, decls.RenderFunctions, "functions") {
 		return
 	}
 
 	if mainDecl != nil {
 		w.Writef("\n")
 		if mainDecl.HasCursor() {
-			cursor = mainDecl.Cursor
-			cursor.Line += w.Line
-			//log.Printf("Cursor in \"main\": %v", cursor)
+			cursor = w.CursorPlusDelta(mainDecl.Cursor)
 		}
+		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+		fileToCellIdAndLine = mainDecl.CellLines.Append(fileToCellIdAndLine)
 		w.Writef("%s\n", mainDecl.Definition)
 	}
 	return

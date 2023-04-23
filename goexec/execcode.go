@@ -15,18 +15,19 @@ import (
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
-	updatedDecls, _, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
+	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
 	// Run `goimports` (or the code that implements it)
-	if err = s.GoImports(msg); err != nil {
+	fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
 	}
 
 	// And then compile it.
-	if err := s.Compile(msg); err != nil {
+	if err := s.Compile(msg, fileToCellIdAndLine); err != nil {
 		return err
 	}
 
@@ -53,13 +54,13 @@ func (s *State) Execute(msg kernel.Message) error {
 //
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
-func (s *State) Compile(msg kernel.Message) error {
+func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) error {
 	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
 	cmd.Dir = s.TempDir
 	var output []byte
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, string(output))
+		s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
 		return errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 	return nil
@@ -67,7 +68,9 @@ func (s *State) Compile(msg kernel.Message) error {
 
 // GoImports execute `goimports` which adds imports to non-declared imports automatically.
 // It also runs "go get" to download any missing dependencies.
-func (s *State) GoImports(msg kernel.Message) error {
+//
+// It returns an updated fileToCellIdAndLines that reflect any changes in `main.go`.
+func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) ([]CellIdAndLine, error) {
 	goimportsPath, err := exec.LookPath("goimports")
 	if err != nil {
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, `
@@ -78,27 +81,42 @@ can install it from the notebook with:
 !go install golang.org/x/tools/cmd/goimports@latest
 
 `)
-		return errors.WithMessagef(err, "while trying to run goimports\n")
+		return nil, errors.WithMessagef(err, "while trying to run goimports\n")
 	}
 	cmd := exec.Command(goimportsPath, "-w", s.MainPath())
 	cmd.Dir = s.TempDir
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, string(output)+"\n"+err.Error())
-		return errors.Wrapf(err, "failed to run %q", cmd.String())
+		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+
+	// Parse declarations in created `main.go` file.
+	var newDecls *Declarations
+	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
+	if err != nil {
+		return nil, err
+	}
+	// TODO remove unused imports!
+	newDecls.MergeFrom(decls)
+	delete(newDecls.Functions, "main")
+	_, fileToCellIdAndLine, err = s.createMainFileFromDecls(newDecls, mainDecl)
+	if err != nil {
+		err = errors.WithMessagef(err, "while composing main.go with all declarations")
+		return nil, err
 	}
 
 	// Download missing dependencies.
-	if !s.AutoGet {
-		return nil
+	if s.AutoGet {
+		return fileToCellIdAndLine, nil
 	}
 	cmd = exec.Command("go", "get")
 	cmd.Dir = s.TempDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, string(output)+"\n"+err.Error())
-		return errors.Wrapf(err, "failed to run %q", cmd.String())
+		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
-	return nil
+	return fileToCellIdAndLine, nil
 }

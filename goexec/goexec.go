@@ -224,6 +224,15 @@ type CellLines struct {
 	Lines []int
 }
 
+// Append id and line numbers to fileToCellIdAndLine, a slice of `CellIdAndLine`. This is used when
+// rendering a declaration to a file.
+func (c CellLines) Append(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
+	for _, lineNum := range c.Lines {
+		fileToCellIdAndLine = append(fileToCellIdAndLine, CellIdAndLine{Id: c.Id, Line: lineNum})
+	}
+	return fileToCellIdAndLine
+}
+
 // Function definition.
 type Function struct {
 	Cursor

@@ -26,10 +26,10 @@ type parseInfo struct {
 	fileSet       *token.FileSet
 	filesContents map[string]string
 
-	// fileToCellLine holds for each line in the `main.go` file, the corresponding line number in the cell. This
-	// is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
+	// fileToCellIdAndLine holds for each line in the `main.go` file, the corresponding cell id and line number in the
+	// cell. This is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
 	// that have no correspondent value in the cell code.
-	fileToCellLine []int
+	fileToCellIdAndLine []CellIdAndLine
 }
 
 // getCursor returns the cursor position within this declaration, if the original cursor falls in there.
@@ -67,7 +67,7 @@ func (pi *parseInfo) getCursor(node ast.Node) Cursor {
 	return NoCursor
 }
 
-// calculateCellLines returns the
+// calculateCellLines returns the CellLines information for the corresponding ast.Node.
 func (pi *parseInfo) calculateCellLines(node ast.Node) (c CellLines) {
 	c.Id = pi.cellId
 	from, to := node.Pos(), node.End()
@@ -75,7 +75,11 @@ func (pi *parseInfo) calculateCellLines(node ast.Node) (c CellLines) {
 	numLines := (toPos.Line - fromPos.Line) + 1
 	c.Lines = make([]int, 0, numLines)
 	for lineNum := fromPos.Line; lineNum <= toPos.Line; lineNum++ {
-		c.Lines = append(c.Lines, pi.fileToCellLine[lineNum-1])
+		if pi.fileToCellIdAndLine != nil {
+			c.Lines = append(c.Lines, pi.fileToCellIdAndLine[lineNum-1].Line)
+		} else {
+			c.Lines = append(c.Lines, NoCursorLine)
+		}
 	}
 	return
 }
@@ -108,19 +112,22 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 //     of the cursor in the corresponding declaration.
 //   - fileToCellLine: for each line in the `main.go` file, the corresponding line number in the cell. This
 //     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
-//     that have no correspondent value in the cell code.
-func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellLine []int) (decls *Declarations, err error) {
+//     that have no correspondent value in the cell code. It can be nil if there is no information mapping
+//     file lines to cell lines.
+func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
 	decls = NewDeclarations()
 	pi := &parseInfo{
-		cursor:         cursor,
-		fileSet:        token.NewFileSet(),
-		fileToCellLine: fileToCellLine,
+		cursor:  cursor,
+		fileSet: token.NewFileSet(),
+
+		cellId:              cellId,
+		fileToCellIdAndLine: fileToCellIdAndLine,
 	}
 	var packages map[string]*ast.Package
 	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
 	if err != nil {
 		if msg != nil {
-			s.DisplayErrorWithContext(msg, err.Error())
+			s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
 		}
 		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 		return
@@ -374,10 +381,9 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
 func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
-	updatedDecls *Declarations, cursorInFile Cursor, err error) {
-	if cursorInCell.HasCursor() {
-		log.Printf("Cursor in cell (%+v)", cursorInCell)
-	}
+	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
+	cursorInFile = NoCursor
+
 	var (
 		cursorInTmpFile Cursor
 		fileToCellLine  []int
@@ -385,13 +391,15 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 
 	cursorInTmpFile, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	if err != nil {
-		return nil, NoCursor, errors.WithMessagef(err, "in goexec.parseLinesAndComposeMain()")
+		return
 	}
-	newDecls, err := s.parseFromMainGo(msg, cellId, cursorInTmpFile, fileToCellLine)
+	fileToCellIdAndLine = MakeFileToCellIdAndLine(cellId, fileToCellLine)
+
+	// Parse declarations in created `main.go` file.
+	var newDecls *Declarations
+	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInTmpFile, fileToCellIdAndLine)
 	if err != nil {
-		// If cell is in an un-parseable state, just returns empty context. User can try to
-		// run cell to get an error.
-		return nil, NoCursor, errors.WithStack(ParseError)
+		return
 	}
 
 	// Checks whether there is a "main" function defined in the code.
@@ -404,7 +412,6 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 		// Declare a stub main function, just so we can try to compile the final code.
 		mainDecl = &Function{Key: "main", Name: "main", Definition: "func main() { flag.Parse() }"}
 	}
-	_ = mainDecl
 
 	// Merge cell declarations with a copy of the current state: we don't want to commit the new
 	// declarations until they compile successfully.
@@ -413,18 +420,20 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 	updatedDecls.MergeFrom(newDecls)
 
 	// Render declarations to main.go.
-	cursorInFile, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
+	cursorInFile, fileToCellIdAndLine, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
 	if err != nil {
-		return nil, NoCursor, errors.WithMessagef(err, "in goexec.InspectIdentifierInCell() while generating main.go with all declarations")
+		err = errors.WithMessagef(err, "while composing main.go with all declarations")
+		return
 	}
 	if cursorInCell.HasCursor() && !cursorInFile.HasCursor() {
 		// Returns empty data, which returns a "not found".
-		return nil, NoCursor, errors.WithStack(CursorLost)
+		err = errors.WithStack(CursorLost)
+		return
 	}
 	if cursorInCell.HasCursor() {
 		s.logCursor(cursorInFile)
 	}
-	return updatedDecls, cursorInFile, nil
+	return
 }
 
 const cursorStr = "‸"

@@ -2,10 +2,10 @@
 
 ## v0.5
 
-* TODO: Improved error reporting, including indication of line number in cell.
-* TODO: Parse error output of the execution of a cell, and if it contains a stack-trace, "enrich"
-  references to the cell code (add context, making it easy to point out where the stack-trace happened).
-* Generally improved code documentation for `goexec` package.
+* Improved error reporting, including indication of line number in cell.
+* Parse error output of the execution of a cell, and if it contains a stack-trace, add a reference to the cell
+  code (cell id and line number).
+* Cleaned up, improved code documentation and testing for `goexec` package.
 
 ## v0.4.1
 

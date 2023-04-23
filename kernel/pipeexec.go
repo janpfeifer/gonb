@@ -13,44 +13,84 @@ import (
 	"github.com/pkg/errors"
 )
 
-// PipeExecToJupyter executes the given command (command plus arguments) and pipe the output
-// to Jupyter stdout and stderr streams connected to msg.
+// PipeExecToJupyterBuilder holds the configuration to executing a command that is piped to Jupyter.
+// Use PipeExecToJupyter to create it.
+type PipeExecToJupyterBuilder struct {
+	msg     Message
+	command string
+	args    []string
+	dir     string
+
+	stdoutWriter, stderrWriter io.Writer
+
+	millisecondsToInput int
+	inputPassword       bool
+}
+
+// PipeExecToJupyter creates a builder that will execute the given command (command plus arguments)
+// and pipe the output to Jupyter stdout and stderr streams connected to msg.
 //
-// If dir is not empty, before running the command the current directory is changed to dir.
+// It returns a builder object that can be further configured. Call Exec when the configuration is
+// done to actually execute the command.
+func PipeExecToJupyter(msg Message, command string, args ...string) *PipeExecToJupyterBuilder {
+	return &PipeExecToJupyterBuilder{
+		msg:                 msg,
+		command:             command,
+		args:                args,
+		millisecondsToInput: -1,
+	}
+}
+
+// InDir configures the PipeExecToJupyterBuilder to execute within the given directory. Returns
+// the modified builder.
+func (builder *PipeExecToJupyterBuilder) InDir(dir string) *PipeExecToJupyterBuilder {
+	builder.dir = dir
+	return builder
+}
+
+// WithStderr configures piping of stderr to the given `io.Writer`.
+func (builder *PipeExecToJupyterBuilder) WithStderr(stderrWriter io.Writer) *PipeExecToJupyterBuilder {
+	builder.stderrWriter = stderrWriter
+	return builder
+}
+
+// WithStdout configures piping of stderr to the given `io.Writer`.
+func (builder *PipeExecToJupyterBuilder) WithStdout(stdoutWriter io.Writer) *PipeExecToJupyterBuilder {
+	builder.stdoutWriter = stdoutWriter
+	return builder
+}
+
+// WithInput configures the PipeExecToJupyterBuilder to also plumb
+// the input from Jupyter input prompt.
+//
+// The prompt is displayed after millisecondsWait: so if the program exits quickly, nothing
+// is displayed.
+func (builder *PipeExecToJupyterBuilder) WithInput(millisecondsWait int) *PipeExecToJupyterBuilder {
+	builder.millisecondsToInput = millisecondsWait
+	builder.inputPassword = false
+	return builder
+}
+
+// WithPassword configures the PipeExecToJupyterBuilder to also plumb
+// the input from Jupyter password input (hidden).
+//
+// The prompt is displayed after millisecondsWait: so if the program exits quickly, nothing
+// is displayed.
+func (builder *PipeExecToJupyterBuilder) WithPassword(millisecondsWait int) *PipeExecToJupyterBuilder {
+	builder.millisecondsToInput = millisecondsWait
+	builder.inputPassword = true
+	return builder
+}
+
+// Run executes the configured PipeExecToJupyter configuration.
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
 // program returns an error for any reason.
-func PipeExecToJupyter(msg Message, dir, name string, args ...string) error {
-	return pipeExecToJupyter(msg, dir, name, args, -1, false)
-}
+func (builder *PipeExecToJupyterBuilder) Run() error {
+	log.Printf("Executing: %s %v", builder.command, builder.args)
 
-// PipeExecToJupyterWithInput executes the given command (command plus arguments) and
-// pipes the output and error to Jupyter stdout and stderr streams. It also plumbs
-// the input from Jupyter input, after 500ms the program started (so if programs
-// don't execute quick, and optional input will be made available).
-//
-// If dir is not empty, before running the command the current directory is changed to dir.
-//
-// It returns an error if it failed to execute or created the pipes -- but not if the executed
-// program returns an error for any reason.
-func PipeExecToJupyterWithInput(msg Message, dir, name string, args ...string) error {
-	return pipeExecToJupyter(msg, dir, name, args, 500, false)
-}
-
-// PipeExecToJupyterWithPassword executes the given command (command plus arguments) and
-// pipes the output and error to Jupyter stdout and stderr streams. It also plumbs
-// one input from Jupyter input set as a password (input hidden).
-//
-// If dir is not empty, before running the command the current directory is changed to dir.
-func PipeExecToJupyterWithPassword(msg Message, dir, name string, args ...string) error {
-	return pipeExecToJupyter(msg, dir, name, args, 1, true)
-}
-
-func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecondsToInput int, inputPassword bool) error {
-	log.Printf("Executing: %s %v", name, args)
-
-	cmd := exec.Command(name, args...)
-	cmd.Dir = dir
+	cmd := exec.Command(builder.command, builder.args...)
+	cmd.Dir = builder.dir
 
 	cmdStdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -62,17 +102,21 @@ func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecond
 	}
 
 	// Pipe all stdout and stderr to Jupyter.
-	jupyterStdout := NewJupyterStreamWriter(msg, StreamStdout)
-	jupyterStderr := NewJupyterStreamWriter(msg, StreamStderr)
+	if builder.stdoutWriter == nil {
+		builder.stdoutWriter = NewJupyterStreamWriter(builder.msg, StreamStdout)
+	}
+	if builder.stderrWriter == nil {
+		builder.stderrWriter = NewJupyterStreamWriter(builder.msg, StreamStderr)
+	}
 	var streamersWG sync.WaitGroup
 	streamersWG.Add(2)
 	go func() {
 		defer streamersWG.Done()
-		io.Copy(jupyterStdout, cmdStdout)
+		_, _ = io.Copy(builder.stdoutWriter, cmdStdout)
 	}()
 	go func() {
 		defer streamersWG.Done()
-		io.Copy(jupyterStderr, cmdStderr)
+		_, _ = io.Copy(builder.stderrWriter, cmdStderr)
 	}()
 
 	// Optionally prepare stdin to start after millisecondsToInput.
@@ -86,7 +130,7 @@ func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecond
 	if err != nil {
 		return errors.WithMessagef(err, "failed to create pipe for stdin")
 	}
-	if millisecondsToInput > 0 {
+	if builder.millisecondsToInput > 0 {
 		// Set function to handle incoming content.
 		var writeStdinFn OnInputFn
 		writeStdinFn = func(original, input *MessageImpl) error {
@@ -105,29 +149,29 @@ func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecond
 				if err != nil {
 					// Could happen if something was not fully written, and channel was closed, in
 					// which case it's ok.
-					log.Printf("failed to write to stdin of %q %v: %+v", name, args, err)
+					log.Printf("failed to write to stdin of %q %v: %+v", builder.command, builder.args, err)
 				}
 			}()
 			// Reschedule itself for the next message.
-			if !inputPassword {
-				msg.PromptInput(" ", inputPassword, writeStdinFn)
+			if !builder.inputPassword {
+				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
 			}
 			return err
 		}
 		go func() {
 			// Wait for the given time, and if command still running, ask
 			// Jupyter for stdin input.
-			time.Sleep(time.Duration(millisecondsToInput) * time.Millisecond)
+			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
 			muDone.Lock()
 			if !done {
-				msg.PromptInput(" ", inputPassword, writeStdinFn)
+				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
 			}
 			muDone.Unlock()
 		}()
 	}
 
 	// Prepare named-pipe to use for rich-data display.
-	if err = StartNamedPipe(msg, dir, doneChan); err != nil {
+	if err = StartNamedPipe(builder.msg, builder.dir, doneChan); err != nil {
 		return errors.WithMessagef(err, "failed to create named pipe for display content")
 	}
 
@@ -135,30 +179,30 @@ func pipeExecToJupyter(msg Message, dir, name string, args []string, millisecond
 	doneFn := func() {
 		muDone.Lock()
 		done = true
-		if millisecondsToInput > 0 {
-			msg.CancelInput()
+		if builder.millisecondsToInput > 0 {
+			_ = builder.msg.CancelInput()
 		}
-		cmdStdin.Close()
+		_ = cmdStdin.Close()
 		close(doneChan)
 		muDone.Unlock()
 	}
 
 	// Start command.
 	if err := cmd.Start(); err != nil {
-		cmdStderr.Close()
-		cmdStdout.Close()
+		_ = cmdStderr.Close()
+		_ = cmdStdout.Close()
 		doneFn()
-		return errors.WithMessagef(err, "failed to start to execute command %q", name)
+		return errors.WithMessagef(err, "failed to start to execute command %q", builder.command)
 	}
 
 	// Wait for output pipes to finish.
 	streamersWG.Wait()
 	if err := cmd.Wait(); err != nil {
 		errMsg := err.Error() + "\n"
-		if msg.Kernel().Interrupted.Load() {
+		if builder.msg.Kernel().Interrupted.Load() {
 			errMsg = "^C\n" + errMsg
 		}
-		PublishWriteStream(msg, StreamStderr, errMsg)
+		_ = PublishWriteStream(builder.msg, StreamStderr, errMsg)
 	}
 	doneFn()
 
@@ -211,14 +255,14 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 		if !fifoOpenedForReading {
 			w, err := os.OpenFile(pipePath, os.O_WRONLY, 0600)
 			if err == nil {
-				w.Close()
+				_ = w.Close()
 			}
 		}
 		muFifo.Unlock()
-		os.Remove(pipePath)
+		_ = os.Remove(pipePath)
 	}()
 
-	os.Setenv(protocol.GONB_PIPE_ENV, pipePath)
+	_ = os.Setenv(protocol.GONB_PIPE_ENV, pipePath)
 	go func() {
 		// Notice that opening pipeReader below blocks, until the other end
 		// (the go program being executed) opens it as well.
@@ -235,7 +279,7 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 
 		// Wait till channel is closed and then close reader.
 		<-doneChan
-		pipeReader.Close()
+		_ = pipeReader.Close()
 	}()
 	return nil
 }

@@ -35,7 +35,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	s.Decls = updatedDecls
 
 	// Execute compiled code.
-	return s.Execute(msg)
+	return s.Execute(msg, fileToCellIdAndLine)
 }
 
 func (s *State) BinaryPath() string {
@@ -46,8 +46,8 @@ func (s *State) MainPath() string {
 	return path.Join(s.TempDir, "main.go")
 }
 
-func (s *State) Execute(msg kernel.Message) error {
-	return kernel.PipeExecToJupyter(msg, "", s.BinaryPath(), s.Args...)
+func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
+	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), s.Args...).Run()
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.
@@ -108,7 +108,7 @@ can install it from the notebook with:
 	}
 
 	// Download missing dependencies.
-	if s.AutoGet {
+	if !s.AutoGet {
 		return fileToCellIdAndLine, nil
 	}
 	cmd = exec.Command("go", "get")

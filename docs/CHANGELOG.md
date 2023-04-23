@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.5.1
+
+* Fixed specialcmd_test.
+
 ## v0.5
 
 * Improved error reporting, including indication of line number in cell.

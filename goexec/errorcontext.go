@@ -86,8 +86,9 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 {{.Context}}
 </div>
 {{else}}
-<span style="white-space: pre;">{{.Location}} {{.Message}}</span><br/>
+<span style="white-space: pre;">{{.Location}} {{.Message}}</span>
 {{end}}
+<br/>
 {{end}}
 </div>
 `))

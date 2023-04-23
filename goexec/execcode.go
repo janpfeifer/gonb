@@ -98,8 +98,24 @@ can install it from the notebook with:
 	if err != nil {
 		return nil, err
 	}
-	// TODO remove unused imports!
+
+	// Find only imports that `goimports` found were used.
+	usedImports := MakeSet[string]()
+	for key, _ := range newDecls.Imports {
+		usedImports.Insert(key)
+	}
+
+	// Import original declarations -- they have the correct cell line numbers.
 	newDecls.MergeFrom(decls)
+
+	// Remove unused imports, to avoid the "imported and not used" error.
+	keys := SortedKeys(newDecls.Imports)
+	for _, key := range keys {
+		if !usedImports.Has(key) {
+			delete(newDecls.Imports, key)
+		}
+	}
+
 	delete(newDecls.Functions, "main")
 	_, fileToCellIdAndLine, err = s.createMainFileFromDecls(newDecls, mainDecl)
 	if err != nil {

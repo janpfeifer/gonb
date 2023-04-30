@@ -336,6 +336,8 @@ func Reset() error {
 	return Default.Reset()
 }
 
+// Default caching storage, created in a temporary directory with NewInTmp -- so it gets
+// cleaned up whenever the system is rebooted.
 var Default = MustNewInTmp()
 
 // CacheWith first checks if a value for `key` has already been saved at previous time,

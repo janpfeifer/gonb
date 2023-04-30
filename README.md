@@ -105,8 +105,6 @@ Contributions are welcome!
   follow. In the meantime the errors can be moused over and will display the lines
   surrounding them.
 * Controllable (per package or file) logging in GoNB code. 
-* Library to easily store/retrieve calculated content. When doing data analysis so 
-  one doesn't need to re-generate some result at a next cell execution.
 * Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
   would be handy, but complicates tracking the position of the cursor on the changed
   file.

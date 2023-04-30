@@ -24,3 +24,6 @@ experimental.ipynb
 
 # Dependency directories (remove the comment below to include it)
 vendor/
+
+# gonb/cache package cache directories, generated during testing.
+.gonb_cache

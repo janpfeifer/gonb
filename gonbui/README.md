@@ -3,7 +3,7 @@
 [**GoNB**](https://github.com/janpfeifer/gonb) is a [Jupyter notebook](https://jupyter.org/) kernel able to run Go
 code.
 
-**GoNBUI** is a library that allows any go code ran in **GoNB** to easily display various type of rich content in
+`gonbui` package allows any go code ran in **GoNB** to easily display various type of rich content in
 the notebook. Currently supported:
 
 * HTML: An arbitrary HTML block, and it also allows updates to a block (e.g.: updates to some ongoing processing).

@@ -2,6 +2,8 @@
 
 ## Next version
 
+* Issue #16: Added package `cache`: implements a convenient cache of values for things that
+  are expensive or slow to regenerate at each execution.
 * Issue #13 and #16: Dockerfile and updated documentation.
 
 ## v0.5.1

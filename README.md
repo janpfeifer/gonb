@@ -28,9 +28,29 @@ is odd), [download it from github](examples/google_colab_demo.ipynb) and upload 
 
 It also works in VSCode and Github's Codespaces. Just follow the installation below.
 
+
 # Installation
 
-**Only for Linux (and WSL in Windows) and MacOS.**
+**Only for Linux and MacOS. In Windows it works in WSL or inside a Docker**
+
+
+## Docker
+
+GoNB offers a pre-built docker, that includes Jupyter and GoNB. To use it, go to a directory that 
+you want to make available to the Jupyter notebook (your home directory, or a directory where
+to store the notebook files). It will be mounted on the `work/` sub-directory in JupyterLab.
+
+To start it:
+
+```shell
+docker pull janpfeifer/gonb_jupyter:latest
+docker run -it --rm -p 8888:8888 -v "${PWD}":/home/jovyan/work janpfeifer/gonb_jupyterlab:latest
+```
+
+Then copy&paste the URL it outputs in your browser.
+
+
+## Linux and Mac installation
 
 The [**tutorial**](examples/tutorial.ipynb) explains, but in short:
 
@@ -51,12 +71,14 @@ And then (re-)start Jupyter.
 
 In Github's Codespace, if Jupyter is already started, restarting the docker is an easy way to restart Jupyter.
 
+
 ## Windows
 
 The recommendation is to use [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install)
 or WSL2, and run Jupyter and the GoNB kernel in Linux. Installation there as if in a linux machine.
 
 A pure Windows installation is not supported at this time -- but contribution to add support would be welcome :)
+
 
 # Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
 
@@ -70,6 +92,7 @@ the library offers a convenient API to everything available. Examples of use in 
 
 If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol
 details.
+
 
 # TODOs
 
@@ -93,6 +116,7 @@ Contributions are welcome!
   * https://jupyter-notebook.readthedocs.io/en/4.x/comms.html
   * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
   * https://discourse.jupyter.org/c/jupyterlab/extensions/43
+
 
 # Implementation
 

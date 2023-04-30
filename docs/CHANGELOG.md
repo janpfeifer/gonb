@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next version
+
+* Issue #13 and #16: Dockerfile and updated documentation.
+
 ## v0.5.1
 
 * Fixed specialcmd_test.

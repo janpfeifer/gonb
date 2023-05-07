@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next version
+## v0.6.0
 
 * Issue #16: Added package `cache`: implements a convenient cache of values for things that
   are expensive or slow to regenerate at each execution.

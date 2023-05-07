@@ -11,9 +11,10 @@ it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in th
 of the loop -- so it's a Read-Compile-Run-Print-Loop -- while still feeling very interactive. 
 
 **GoNB** leverages that compilation speed to implement a full-featured (at least it's getting there)
-[Jupyter notebook](https://jupyter.org/) kernel.
+[Jupyter notebook](https://jupyter.org/) kernel. As a side benefit it works with packages that use CGO -- although it
+won't parse C code in the cells, so it can't be used as a C kernel.
 
-It already includes many goodies: contextual help and auto-complete (with 
+It already includes many goodies: cache between cell of results, contextual help and auto-complete (with 
 [`gopls`](https://github.com/golang/tools/tree/master/gopls)), compilation error context (by
 mousing over), bash command execution, images, html, etc. See the [tutorial](examples/tutorial.ipynb).
 
@@ -101,9 +102,6 @@ Contributions are welcome!
 * Windows version: 
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
-* Tracking of lines on generated Go files back to cell, so reported errors are easy to
-  follow. In the meantime the errors can be moused over and will display the lines
-  surrounding them.
 * Controllable (per package or file) logging in GoNB code. 
 * Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
   would be handy, but complicates tracking the position of the cursor on the changed

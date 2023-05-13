@@ -2,10 +2,10 @@ package kernel
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"io"
-	"log"
 	"runtime"
 	"time"
 
@@ -225,7 +225,7 @@ type OnInputFn func(original, input *MessageImpl) error
 // onInputFn is the callback function. It receives the original shell execute
 // message (m) and the message with the incoming input value.
 func (m *MessageImpl) PromptInput(prompt string, password bool, onInput OnInputFn) error {
-	log.Printf("MessageImpl.PromptInput(%q, %v)", prompt, password)
+	glog.V(1).Infof("MessageImpl.PromptInput(%q, %v)", prompt, password)
 	inputRequest, err := NewComposed("input_request", m.Composed)
 	if err != nil {
 		return errors.WithMessagef(err, "MessageImpl.PromptInput(): creating an input_request message")
@@ -234,7 +234,7 @@ func (m *MessageImpl) PromptInput(prompt string, password bool, onInput OnInputF
 		"prompt":   prompt,
 		"password": password,
 	}
-	log.Printf("Stdin(%v) input request", inputRequest.Content)
+	glog.V(1).Infof("Stdin(%v) input request", inputRequest.Content)
 	err = m.kernel.sockets.StdinSocket.RunLocked(
 		func(socket zmq4.Socket) error {
 			return m.sendMessage(socket, inputRequest)
@@ -252,7 +252,7 @@ func (m *MessageImpl) PromptInput(prompt string, password bool, onInput OnInputF
 
 // CancelInput will cancel any `input_request` message sent by PromptInput.
 func (m *MessageImpl) CancelInput() error {
-	log.Printf("MessageImpl.CancelInput()")
+	glog.V(1).Infof("MessageImpl.CancelInput()")
 	// TODO: Check for any answers in the cross-posted question:
 	// https://discourse.jupyter.org/t/cancelling-input-request-at-end-of-execution/17637
 	// https://stackoverflow.com/questions/75206276/kernel-cancelling-a-input-request-at-the-end-of-the-execution-of-a-cell
@@ -263,7 +263,7 @@ func (m *MessageImpl) CancelInput() error {
 // check if there is any running process listening to it, in which case it is delivered.
 // Still the user has to handle its delivery.
 func (m *MessageImpl) DeliverInput() error {
-	log.Printf("MessageImpl.DeliverInput()")
+	glog.V(1).Infof("MessageImpl.DeliverInput()")
 	if m.kernel.stdinMsg == nil {
 		return nil
 	}
@@ -279,7 +279,7 @@ func (m *MessageImpl) Reply(msgType string, content interface{}) error {
 	}
 
 	msg.Content = content
-	log.Printf("Reply(%s):", msgType)
+	glog.V(1).Infof("Reply(%s):", msgType)
 	return m.kernel.sockets.ShellSocket.RunLocked(func(shell zmq4.Socket) error {
 		return m.sendMessage(shell, msg)
 	})
@@ -335,6 +335,10 @@ func PublishExecutionError(msg Message, err string, trace []string) error {
 
 // PublishDisplayData publishes a single image.
 func PublishDisplayData(msg Message, data Data) error {
+	if msg == nil {
+		// Ignore if there is no message to reply to.
+		return nil
+	}
 	// copy Data in a struct with appropriate json tags
 	return msg.Publish("display_data", struct {
 		Data      MIMEMap `json:"data"`

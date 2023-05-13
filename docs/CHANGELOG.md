@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## v0.6.1
+
+* Issue #21: Added call to `goimports` and `go get` before trying to get contextual information or auto-complete, 
+  fixing many of the issues with those.
+
 ## v0.6.0
 
 * Issue #16: Added package `cache`: implements a convenient cache of values for things that

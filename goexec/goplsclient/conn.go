@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -20,7 +19,7 @@ var _ = lsp.MethodInitialize
 
 var (
 	ConnectTimeout       = 2000 * time.Millisecond
-	CommunicationTimeout = 500 * time.Millisecond
+	CommunicationTimeout = 2000 * time.Millisecond
 )
 
 // jsonrpc2Handler implements jsonrpc2.Handler, listening to incoming events.
@@ -88,7 +87,7 @@ func (c *Client) Connect(ctx context.Context) error {
 		// Exec should use a non-expiring context.
 		ctx := context.Background()
 		_ = c.jsonConn.Run(ctx)
-		log.Printf("- gopls connection stopped")
+		glog.Infof("- gopls connection stopped")
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if c.conn == currentConn {
@@ -229,8 +228,10 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed call to `gopls` \"definition_request\"")
 	}
-	for ii, r := range results {
-		log.Printf(" Result[%d].URI=%s\n", ii, r.URI)
+	if glog.V(2) {
+		for ii, r := range results {
+			glog.Infof(" Result[%d].URI=%s\n", ii, r.URI)
+		}
 	}
 	return
 }
@@ -351,34 +352,34 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 		var params lsp.ShowMessageParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			log.Printf("Failed to parse ShowMessageParams: %v", err)
+			glog.Errorf("Failed to parse ShowMessageParams: %v", err)
 			return true
 		}
 		h.client.messages = append(h.client.messages, params.Message)
-		log.Printf("gopls message: %s", trimString(params.Message, 100))
+		glog.V(1).Infof("gopls message: %s", trimString(params.Message, 100))
 		return true
 	case lsp.MethodWindowLogMessage:
 		var params lsp.LogMessageParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			log.Printf("Failed to parse LogMessageParams: %v", err)
+			glog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
 		h.client.messages = append(h.client.messages, params.Message)
-		log.Printf("gopls message: %s", trimString(params.Message, 100))
+		glog.V(1).Infof("gopls message: %s", trimString(params.Message, 100))
 		return true
 	case lsp.MethodTextDocumentPublishDiagnostics:
 		var params lsp.PublishDiagnosticsParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			log.Printf("Failed to parse LogMessageParams: %v", err)
+			glog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
 		h.client.messages = append(h.client.messages, fmt.Sprintf("Diagnostics:\n%+v", params))
-		log.Printf("gopls diagnostics: %s", trimString(fmt.Sprintf("%+v", params), 100))
+		glog.V(1).Infof("gopls diagnostics: %s", trimString(fmt.Sprintf("%+v", params), 100))
 		return true
 	default:
-		log.Printf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
+		glog.Errorf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
 	}
 	return false
 }
@@ -388,7 +389,7 @@ func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id js
 	_ = ctx
 	_ = conn
 	_ = canceled
-	log.Printf("- jsonrpc2 cancelled request id=%+v", id)
+	glog.Warningf("- jsonrpc2 cancelled request id=%+v", id)
 	return false
 }
 
@@ -396,7 +397,7 @@ func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id js
 func (h *jsonrpc2Handler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
 	_ = conn
 	_ = direction
-	//log.Printf("- jsonrpc2 Request(direction=%s) %q", direction, r.Method)
+	glog.V(2).Infof("- jsonrpc2 Request(direction=%s) %q", direction, r.Method)
 	return ctx
 }
 
@@ -407,7 +408,7 @@ func (h *jsonrpc2Handler) Response(ctx context.Context, conn *jsonrpc2.Conn, dir
 	if r.Result != nil && len(*r.Result) > 0 {
 		content = trimString(string(*r.Result), 100)
 	}
-	log.Printf("- jsonrpc2 Response(direction=%s) id=%+v, content=%s", direction, r.ID, content)
+	glog.V(2).Infof("- jsonrpc2 Response(direction=%s) id=%+v, content=%s", direction, r.ID, content)
 	return ctx
 }
 
@@ -422,5 +423,5 @@ func (h *jsonrpc2Handler) Write(ctx context.Context, _ int64) context.Context { 
 
 // Error implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Error(ctx context.Context, err error) {
-	log.Printf("- jsonrpc2 Error: %+v", err)
+	glog.Errorf("- jsonrpc2 Error: %+v", err)
 }

@@ -3,12 +3,12 @@ package goexec
 import (
 	"bytes"
 	"fmt"
+	"github.com/golang/glog"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"html"
 	"io"
-	"log"
 	"os"
 	"regexp"
 	"strconv"
@@ -102,20 +102,24 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 // Any errors within here are logged and simply ignored, since this is already
 // used to report errors
 func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) {
+	if msg == nil {
+		// Ignore, if there is no kernel.Message to reply to.
+		return
+	}
 	// Default report, and makes sure display is called at the end.
 	reportHTML := "<pre>" + errorMsg + "</pre>" // If anything goes wrong, simply display the error message.
 	defer func() {
 		// Display HTML report on exit.
 		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
 		if err != nil {
-			log.Printf("Failed to publish data in DisplayErrorWithContext: %+v", err)
+			glog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
 		}
 	}()
 
 	// Read main.go into lines.
 	mainGo, err := s.readMainGo()
 	if err != nil {
-		log.Printf("DisplayErrorWithContext: %+v", err)
+		glog.Errorf("DisplayErrorWithContext: %+v", err)
 		return
 	}
 	codeLines := strings.Split(mainGo, "\n")
@@ -130,7 +134,7 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine 
 	// Render error block.
 	buf := bytes.NewBuffer(make([]byte, 0, 512*len(lines)))
 	if err := templateErrorReport.Execute(buf, report); err != nil {
-		log.Printf("Failed to execute template in DisplayErrorWithContext: %+v", err)
+		glog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
 		return
 	}
 	reportHTML = buf.String()

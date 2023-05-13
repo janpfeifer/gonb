@@ -34,13 +34,13 @@ func main() {
 			extraArgs = []string{"--extra_log", *flagExtraLog}
 		}
 		if glogFlag := flag.Lookup("vmodule"); glogFlag != nil && glogFlag.Value.String() != "" {
-			extraArgs = append(extraArgs, "--vmodule", glogFlag.Value.String())
+			extraArgs = append(extraArgs, fmt.Sprintf("--vmodule=%s", glogFlag.Value.String()))
 		}
 		if glogFlag := flag.Lookup("logtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--logtostderr", glogFlag.Value.String())
+			extraArgs = append(extraArgs, "--logtostderr")
 		}
 		if glogFlag := flag.Lookup("alsologtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--alsologtostderr", glogFlag.Value.String())
+			extraArgs = append(extraArgs, "--alsologtostderr")
 		}
 		err := kernel.Install(extraArgs, *flagForce)
 		if err != nil {

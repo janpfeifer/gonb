@@ -28,7 +28,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	}
 
 	// Exec `goimports` (or the code that implements it)
-	fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
 	}
@@ -78,8 +78,9 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 // GoImports execute `goimports` which adds imports to non-declared imports automatically.
 // It also runs "go get" to download any missing dependencies.
 //
-// It returns an updated fileToCellIdAndLines that reflect any changes in `main.go`.
-func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) ([]CellIdAndLine, error) {
+// It returns the updated cursorInFile and fileToCellIdAndLines that reflect any changes in `main.go`.
+func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error) {
+	cursorInFile = NoCursor
 	goimportsPath, err := exec.LookPath("goimports")
 	if err != nil {
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, `
@@ -90,7 +91,8 @@ can install it from the notebook with:
 !go install golang.org/x/tools/cmd/goimports@latest
 
 `)
-		return nil, errors.WithMessagef(err, "while trying to run goimports\n")
+		err = errors.WithMessagef(err, "while trying to run goimports\n")
+		return
 	}
 	cmd := exec.Command(goimportsPath, "-w", s.MainPath())
 	cmd.Dir = s.TempDir
@@ -98,19 +100,20 @@ can install it from the notebook with:
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
-		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+		err = errors.Wrapf(err, "failed to run %q", cmd.String())
+		return
 	}
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
 	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	// Find only imports that `goimports` found were used.
 	usedImports := MakeSet[string]()
-	for key, _ := range newDecls.Imports {
+	for key := range newDecls.Imports {
 		usedImports.Insert(key)
 	}
 
@@ -126,24 +129,25 @@ can install it from the notebook with:
 	}
 
 	delete(newDecls.Functions, "main")
-	_, fileToCellIdAndLine, err = s.createMainFileFromDecls(newDecls, mainDecl)
+	cursorInFile, updatedFileToCellIdAndLine, err = s.createMainFileFromDecls(newDecls, mainDecl)
 	if err != nil {
 		err = errors.WithMessagef(err, "while composing main.go with all declarations")
-		return nil, err
+		return
 	}
 
 	// Download missing dependencies.
 	if !s.AutoGet {
-		return fileToCellIdAndLine, nil
+		return
 	}
 	cmd = exec.Command("go", "get")
 	cmd.Dir = s.TempDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
-		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+		err = errors.Wrapf(err, "failed to run %q", cmd.String())
+		return
 	}
-	return fileToCellIdAndLine, nil
+	return
 }
 
 // jupyterStackTraceMapperWriter implements an io.Writer that maps stack traces to their corresponding

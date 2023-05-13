@@ -20,7 +20,6 @@ package goplsclient
 import (
 	"context"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -110,8 +109,12 @@ func isGoInternalOrCache(filePath string) bool {
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
 	glog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
-	// Send "go.mod", in case it changes.
+	// Send "go.mod" and "go.sum" in case it changes.
 	err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, "go.mod"))
+	if err != nil {
+		return "", err
+	}
+	err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, "go.sum"))
 	if err != nil {
 		return "", err
 	}
@@ -124,7 +127,7 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	var results []lsp.Location
 	results, err = c.CallDefinition(ctx, filePath, line, col)
 	if err != nil {
-		log.Printf("c.CallDefinition failed: %+v", err)
+		glog.Errorf("c.CallDefinition failed: %+v", err)
 		return "", err
 	}
 	_ = results
@@ -138,11 +141,11 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	}
 	hover, err := c.CallHover(ctx, filePath, line, col)
 	if err != nil {
-		log.Printf("c.CallHover failed: %+v", err)
+		glog.Errorf("c.CallHover failed: %+v", err)
 		return "", err
 	}
 	if hover.Contents.Kind != lsp.Markdown {
-		log.Printf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
+		glog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
 	}
 	return hover.Contents.Value, nil
 }
@@ -188,7 +191,7 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 		matches = append(matches, edit.NewText)
 	}
 	if len(items.Items) != len(matches) {
-		log.Printf("Complete found %d items, used only %d", len(items.Items), len(matches))
+		glog.Infof("Complete found %d items, used only %d", len(items.Items), len(matches))
 	}
 	return
 }

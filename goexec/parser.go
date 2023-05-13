@@ -370,10 +370,11 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 }
 
 // parseLinesAndComposeMain parses the cell (given in lines and skipLines), merges with
-// currently memorized declarations (from previous Cell runs) and compose a `main.go`.
+// memorized declarations in the State (presumably from previous Cell runs) and compose a `main.go`.
 //
 // On return the `main.go` file (in `s.TempDir`) has been updated, and it returns the updated merged
-// declarations and optionally the cursor position adjusted into the newly generate `main.go` file.
+// declarations (`decls` is not changed) and optionally the cursor position adjusted into the newly generate
+// `main.go` file.
 //
 // If cursorInCell defines a cursor (it can be set to NoCursor), but the cursor position
 // is not rendered in the resulting `main.go`, a CursorLost error is returned.

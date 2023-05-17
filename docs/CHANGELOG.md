@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## v0.6.2 - 2023/05/17
+
+* Issue #23: Fixed support for generic types.
+
 ## v0.6.1
 
 * Issue #21: Added call to `goimports` and `go get` before trying to get contextual information or auto-complete, 

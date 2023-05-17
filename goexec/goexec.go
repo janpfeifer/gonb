@@ -257,9 +257,9 @@ type TypeDecl struct {
 	Cursor
 	CellLines
 
-	Key                       string // Same as the name here.
-	TypeDefinition            string // Type definition may be empty.
-	CursorInKey, CursorInType bool
+	Key            string // Same as the name here.
+	TypeDefinition string // Type definition which includes the name.
+	CursorInType   bool
 }
 
 // Constant represents the declaration of a constant. Because when appearing in block

@@ -106,6 +106,10 @@ func init_c() {
 	c += ", blah"
 }
 
+type Model[T any] struct {
+	Data T
+}
+
 !echo nonono
 
 %%
@@ -117,12 +121,6 @@ fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 
 func TestState_Parse(t *testing.T) {
 	s := newEmptyState(t)
-	//defer func() {
-	//	err := s.Finalize()
-	//	if err != nil {
-	//		t.Fatalf("Failed to finalized state: %+v", err)
-	//	}
-	//}()
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fmt.Printf("Code:\t%s\n", s.MainPath())
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
@@ -152,7 +150,7 @@ func TestState_Parse(t *testing.T) {
 	assert.Contains(t, s.Decls.Functions, "Kg~Gain")
 	assert.Contains(t, s.Decls.Functions, "N~Weight")
 	assert.Contains(t, s.Decls.Functions, "main")
-	assert.ElementsMatch(t, []int{-1, -1, 68, 69, 70, 71, -1, -1}, s.Decls.Functions["main"].CellLines.Lines,
+	assert.ElementsMatch(t, []int{-1, -1, 72, 73, 74, 75, -1, -1}, s.Decls.Functions["main"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)
@@ -167,11 +165,13 @@ func TestState_Parse(t *testing.T) {
 		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest types: %+v\n", s.Decls.Types)
-	assert.Lenf(t, s.Decls.Types, 3, "Expected 3 types, got %+v", s.Decls.Types)
+	assert.Lenf(t, s.Decls.Types, 4, "Expected 4 types, got %+v", s.Decls.Types)
 	assert.Contains(t, s.Decls.Types, "XY")
 	assert.Contains(t, s.Decls.Types, "Kg")
 	assert.Contains(t, s.Decls.Types, "N")
-	assert.Equal(t, "struct { x, y float64 }", s.Decls.Types["XY"].TypeDefinition)
+	assert.Contains(t, s.Decls.Types, "Model")
+	assert.Equal(t, "XY struct { x, y float64 }", s.Decls.Types["XY"].TypeDefinition)
+	assert.Equal(t, "Model[T any] struct {\n\tData T\n}", s.Decls.Types["Model"].TypeDefinition)
 	assert.ElementsMatch(t, []int{27}, s.Decls.Types["XY"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
@@ -286,6 +286,9 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 
 	// Checks types rendering.
 	wantTypesRendering := `type Kg int
+type Model[T any] struct {
+	Data T
+}
 type N float64
 type XY struct { x, y float64 }
 

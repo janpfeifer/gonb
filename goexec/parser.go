@@ -355,12 +355,9 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 	for _, spec := range typedDecl.Specs {
 		tSpec := spec.(*ast.TypeSpec)
 		name := tSpec.Name.Name
-		tDef := pi.extractContentOfNode(tSpec.Type)
+		tDef := pi.extractContentOfNode(tSpec)
 		tDecl := &TypeDecl{Key: name, TypeDefinition: tDef}
-		if c := pi.getCursor(tSpec.Name); c.HasCursor() {
-			tDecl.Cursor = c
-			tDecl.CursorInKey = true
-		} else if c := pi.getCursor(tSpec.Type); c.HasCursor() {
+		if c := pi.getCursor(tSpec); c.HasCursor() {
 			tDecl.Cursor = c
 			tDecl.CursorInType = true
 		}

@@ -209,10 +209,6 @@ func (d *Declarations) RenderTypes(w *WriterWithCursor, fileToCellIdAndLine []Ce
 		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
 		fileToCellIdAndLine = typeDecl.CellLines.Append(fileToCellIdAndLine)
 		w.Write("type ")
-		if typeDecl.CursorInKey {
-			cursor = w.CursorPlusDelta(typeDecl.Cursor)
-		}
-		w.Writef("%s ", key)
 		if typeDecl.CursorInType {
 			cursor = w.CursorPlusDelta(typeDecl.Cursor)
 		}

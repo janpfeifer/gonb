@@ -5,6 +5,7 @@
 package goexec
 
 import (
+	"fmt"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
 	"github.com/pkg/errors"
 	"log"
@@ -19,7 +20,7 @@ import (
 // defined Go code.
 //
 // That is, if the user runs a cell that defines, let's say `func f(x int) int { return x+1 }`,
-// the declaration of `f` will be stored in Decls field.
+// the definition of `f` will be stored in Decls field.
 type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
@@ -192,21 +193,30 @@ const NoCursorLine = int(-1)
 
 var NoCursor = Cursor{Line: NoCursorLine, Col: 0}
 
-func (c *Cursor) HasCursor() bool {
+func (c Cursor) HasCursor() bool {
 	return c.Line != NoCursorLine
 }
 
 // CursorFrom returns a new Cursor adjusted
-func (c *Cursor) CursorFrom(line, col int) Cursor {
+func (c Cursor) CursorFrom(line, col int) Cursor {
 	if !c.HasCursor() {
-		return *c
+		return c
 	}
 	return Cursor{Line: c.Line + line, Col: c.Col + col}
 }
 
-// ClearCursor resets the cursor to an invalid state.
+// ClearCursor resets the cursor to an invalid state. This method is needed
+// for the structs that embed Cursor.
 func (c *Cursor) ClearCursor() {
 	c.Line = NoCursorLine
+}
+
+// String implements the fmt.Stringer interface.
+func (c Cursor) String() string {
+	if c.HasCursor() {
+		return fmt.Sprintf("[L:%d, Col:%d]", c.Line, c.Col)
+	}
+	return "[NoCursor]"
 }
 
 // CellLines identifies a cell (by its execution id) and the lines
@@ -233,7 +243,7 @@ func (c CellLines) Append(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
 	return fileToCellIdAndLine
 }
 
-// Function definition.
+// Function definition, parsed from a notebook cell.
 type Function struct {
 	Cursor
 	CellLines
@@ -244,6 +254,7 @@ type Function struct {
 
 }
 
+// Variable definition, parsed from a notebook cell.
 type Variable struct {
 	Cursor
 	CellLines
@@ -253,6 +264,7 @@ type Variable struct {
 	TypeDefinition, ValueDefinition           string // Type definition may be empty.
 }
 
+// TypeDecl definition, parsed from a notebook cell.
 type TypeDecl struct {
 	Cursor
 	CellLines

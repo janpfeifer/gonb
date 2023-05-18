@@ -6,6 +6,7 @@ import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"os"
 	"strings"
 	"unicode/utf16"
 )
@@ -79,22 +80,39 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 		return
 	}
 
-	// Generate `main.go` with contents of current cell.
+	// Generate `main.go` (and maybe `other.go`) with contents of current cell.
 	cellId := -1 // AutoComplete doesn't actually execute it, so parsed contents of cell are not kept.
 	cursorInCell := Cursor{cursorLine, cursorCol}
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
 	if err != nil {
-		if errors.Is(err, ParseError) || errors.Is(err, CursorLost) {
-			err = nil
+		glog.V(1).Infof("Non-ParseError during parsing: %+v", err)
+		err = nil
+		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
+		// auto-complete.
+		err = s.createAlternativeFileFromDecls(s.Decls)
+		glog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
+		if err != nil {
+			return
 		}
-		return
+		defer func() {
+			// Remove alternative file after
+			err2 := os.Remove(s.AlternativeDefinitionsPath())
+			if err2 != nil && !os.IsNotExist(err2) {
+				glog.Errorf("Failed to remove alternative definitions: %+v", err2)
+			}
+			glog.V(2).Infof(". Alternative file %q with memorized definitions removed", s.AlternativeDefinitionsPath())
+		}()
+	} else {
+		// If parsing succeeded, execute `goimports`: we just want to make sure that "go get" is executed for the
+		// needed packages.
+		cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
+		if err != nil {
+			err = errors.WithMessagef(err, "goimports failed")
+			return
+		}
 	}
-
-	// Exec `goimports`: we just want to make sure that "go get" is executed for the needed packages.
-	cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
-	if err != nil {
-		err = errors.WithMessagef(err, "goimports failed")
-		return
+	if glog.V(1) {
+		s.logCursor(cursorInFile)
 	}
 
 	// Query `gopls`.

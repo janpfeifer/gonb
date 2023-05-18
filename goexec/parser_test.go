@@ -369,7 +369,7 @@ func TestCursorPositioning(t *testing.T) {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}
 
-		cursorInFile, fileToCellIdAndLine, err := s.createMainContentsFromDecls(buf, s.Decls, nil)
+		cursorInFile, fileToCellIdAndLine, err := s.createGoContentsFromDecls(buf, s.Decls, nil)
 		_ = fileToCellIdAndLine
 		require.NoError(t, err)
 		content := buf.String()

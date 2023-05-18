@@ -45,12 +45,20 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	return s.Execute(msg, fileToCellIdAndLine)
 }
 
+// BinaryPath is the path to the generated binary file.
 func (s *State) BinaryPath() string {
 	return path.Join(s.TempDir, s.Package)
 }
 
+// MainPath is the path to the main.go file.
 func (s *State) MainPath() string {
 	return path.Join(s.TempDir, "main.go")
+}
+
+// AlternativeDefinitionsPath is the path to a temporary file that holds the memorize definitions,
+// when we are not able to include them in the `main.go`, because the current cell is not parseable.
+func (s *State) AlternativeDefinitionsPath() string {
+	return path.Join(s.TempDir, "other.go")
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {

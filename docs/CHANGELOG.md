@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## v0.6.3 - 2023/05/18
+
+* Handle auto-complete case where cell is not parseable: now `gopls` is also called, and memorized
+  definitions are instead saved on a second `other.go` file, for `gopls` to pick content from.
+  (Issues #21 and #23).
+
 ## v0.6.2 - 2023/05/17
 
 * Issue #23: Fixed support for generic types.

@@ -105,19 +105,22 @@ func isGoInternalOrCache(filePath string) bool {
 	return false
 }
 
+// NotifyAboutStandardFiles will notify `gopls` of open or change of the files that may be used by GoNB.
+func (c *Client) NotifyAboutStandardFiles(ctx context.Context) (err error) {
+	// Send "go.mod" and "go.sum" in case it changes.
+	for _, fileName := range []string{"go.mod", "go.sum", "go.work", "other.go"} {
+		err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, fileName))
+		if err != nil {
+			return
+		}
+	}
+	return
+}
+
 // Definition return the definition for the identifier at the given position, rendered
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
 	glog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
-	// Send "go.mod" and "go.sum" in case it changes.
-	err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, "go.mod"))
-	if err != nil {
-		return "", err
-	}
-	err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, "go.sum"))
-	if err != nil {
-		return "", err
-	}
 	// Send filePath.
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {

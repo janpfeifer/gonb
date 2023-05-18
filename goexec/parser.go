@@ -2,13 +2,13 @@ package goexec
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"log"
 	"math/rand"
 	"os"
 	"path"
@@ -124,7 +124,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 		fileToCellIdAndLine: fileToCellIdAndLine,
 	}
 	var packages map[string]*ast.Package
-	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution|parser.AllErrors)
+	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
 			s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
@@ -382,12 +382,8 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursorInFile = NoCursor
 
-	var (
-		cursorInTmpFile Cursor
-		fileToCellLine  []int
-	)
-
-	cursorInTmpFile, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	var fileToCellLine []int
+	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
 	if err != nil {
 		return
 	}
@@ -395,7 +391,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInTmpFile, fileToCellIdAndLine)
+	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInFile, fileToCellIdAndLine)
 	if err != nil {
 		return
 	}
@@ -439,12 +435,16 @@ const cursorStr = "‸"
 // logCursor will log the line in `main.go` the cursor is pointing to, and puts a
 // "*" where the
 func (s *State) logCursor(cursor Cursor) {
+	if !cursor.HasCursor() {
+		glog.Infof("Cursor not defined.")
+		return
+	}
 	content, err := s.readMainGo()
 	if err != nil {
-		log.Printf("Failed to read main.go, for debugging.")
-	} else {
-		log.Printf("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
+		glog.Errorf("Failed to read main.go, for debugging.")
+		return
 	}
+	glog.Infof("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
 }
 
 func lineWithCursor(content string, cursor Cursor) string {

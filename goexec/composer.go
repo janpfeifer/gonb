@@ -379,7 +379,7 @@ func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function)
 		err = errors.Wrapf(err, "Failed to create %q", s.MainPath())
 		return
 	}
-	cursor, fileToCellIdAndLine, err = s.createMainContentsFromDecls(f, decls, mainDecl)
+	cursor, fileToCellIdAndLine, err = s.createGoContentsFromDecls(f, decls, mainDecl)
 	err2 := f.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "creating main.go")
@@ -393,10 +393,35 @@ func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function)
 	return
 }
 
-// createMainContentsFromDecls writes to the given file all the declarations.
+// createAlternativeFileFromDecls creates `other.go` and writes all memorized definitions.
+func (s *State) createAlternativeFileFromDecls(decls *Declarations) (err error) {
+	var f *os.File
+	fPath := s.AlternativeDefinitionsPath()
+	f, err = os.Create(fPath)
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to create %q", fPath)
+		return
+	}
+	_, _, err = s.createGoContentsFromDecls(f, decls, nil)
+	err2 := f.Close()
+	if err != nil {
+		err = errors.Wrapf(err, "creating %q", fPath)
+		return
+	}
+	err = err2
+	if err != nil {
+		err = errors.Wrapf(err, "closing %q", fPath)
+		return
+	}
+	return
+}
+
+// createGoContentsFromDecls writes to the given file all the declarations.
 //
-// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
-func (s *State) createMainContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
+// mainDecl is optional, and if not given no `main` function is created.
+//
+// It returns the cursor position in the file as well as a mapping from the file lines to the original cell ids and lines.
+func (s *State) createGoContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursor = NoCursor
 	w := NewWriterWithCursor(writer)
 	w.Writef("package main\n\n")

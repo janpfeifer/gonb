@@ -22,12 +22,14 @@ FROM ${BASE_IMAGE}:${BASE_TAG}
 
 # Update apt and install basic utils
 USER root
-RUN apt-get update --yes && apt-get install --yes --no-install-recommends wget
+RUN apt-get update --yes
+RUN apt-get install --yes --no-install-recommends wget
+RUN apt-get install --yes --no-install-recommends git
 
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ENV GO_VERSION=1.20.3
+ENV GO_VERSION=1.20.4
 ENV GOROOT=/usr/local/go
 ENV GOPATH=${HOME}/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -36,11 +38,6 @@ USER root
 WORKDIR /usr/local
 RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz \
     && go version
-
-# Other tools that may be useful for Go users -- including gcc for CGO libraries support.
-RUN apt-get install -y \
-    git libtool pkg-config build-essential autoconf automake uuid-dev libzmq3-dev \
-    gcc g++
 
 # Install GoNB (https://github.com/janpfeifer/gonb) in the jovyan's user account (default user)
 USER $NB_USER

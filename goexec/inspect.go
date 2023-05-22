@@ -2,20 +2,24 @@ package goexec
 
 import (
 	"context"
-	"github.com/golang/glog"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 	"os"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
-// This file implements inspecting an identifier in a Cell and auto-complete functionalities.
+// This file implements inspecting an identifier (`InspectRequest`) in a Cell and auto-complete
+// functionalities.
 
 // InspectIdentifierInCell implements an `inspect_request` from Jupyter, using `gopls`.
 // It updates `main.go` with the cell contents (given as lines)
 func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct{}, cursorLine, cursorCol int) (mimeMap kernel.MIMEMap, err error) {
+	klog.V(2).Infof("InspectIdentifierInCell: ")
 	if s.gopls == nil {
 		// gopls not installed.
 		return make(kernel.MIMEMap), nil
@@ -26,9 +30,11 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 		return
 	}
 
-	glog.V(2).Infof("InspectIdentifierInCell: ")
-	// Generate `main.go` with contents of current cell.
+	// Adjust cursor to identifier.
 	cursorInCell := Cursor{cursorLine, cursorCol}
+	cursorInCell = adjustCursorForFunctionIdentifier(lines, skipLines, cursorInCell)
+
+	// Generate `main.go` with contents of current cell.
 	cellId := -1 // Inspect doesn't actually execute it, so parsed contents of cell are not kept.
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
 	if err != nil {
@@ -49,7 +55,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	// Query `gopls`.
 	ctx := context.Background()
 	var desc string
-	glog.V(2).Infof("InspectIdentifierInCell: gopls.Definition(ctx, %s, %d, %d)",
+	klog.V(2).Infof("InspectIdentifierInCell: gopls.Definition(ctx, %s, %d, %d)",
 		s.MainPath(), cursorInFile.Line, cursorInFile.Col)
 	desc, err = s.gopls.Definition(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
 	messages := s.gopls.ConsumeMessages()
@@ -85,12 +91,12 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	cursorInCell := Cursor{cursorLine, cursorCol}
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
 	if err != nil {
-		glog.V(1).Infof("Non-ParseError during parsing: %+v", err)
+		klog.V(1).Infof("Non-ParseError during parsing: %+v", err)
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
 		// auto-complete.
 		err = s.createAlternativeFileFromDecls(s.Decls)
-		glog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
+		klog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
 		if err != nil {
 			return
 		}
@@ -98,9 +104,9 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 			// Remove alternative file after
 			err2 := os.Remove(s.AlternativeDefinitionsPath())
 			if err2 != nil && !os.IsNotExist(err2) {
-				glog.Errorf("Failed to remove alternative definitions: %+v", err2)
+				klog.Errorf("Failed to remove alternative definitions: %+v", err2)
 			}
-			glog.V(2).Infof(". Alternative file %q with memorized definitions removed", s.AlternativeDefinitionsPath())
+			klog.V(2).Infof(". Alternative file %q with memorized definitions removed", s.AlternativeDefinitionsPath())
 		}()
 	} else {
 		// If parsing succeeded, execute `goimports`: we just want to make sure that "go get" is executed for the
@@ -111,7 +117,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 			return
 		}
 	}
-	if glog.V(1) {
+	if klog.V(1).Enabled() {
 		s.logCursor(cursorInFile)
 	}
 
@@ -134,4 +140,96 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 		reply.Matches = matches
 	}
 	return
+}
+
+// runeIndicesForLine returns the start of each rune in the line (encoded as UTF-8).
+func runeIndicesForLine(line string, col int) (runeIndices []int, colIdx int) {
+	runeIndices = make([]int, 0, len(line))
+	for ii := range line {
+		runeIndices = append(runeIndices, ii)
+		if ii <= col {
+			colIdx = len(runeIndices) - 1
+		}
+	}
+	return
+}
+
+// adjustCursorForFunctionIdentifier adjusts the cursor to go to the function (or method) name
+// just before the cursor position, if it is over a comma or "(".
+//
+// This is a very simple implementation, and not a generic parser of Go code. So it won't deal
+// with nested function calls.
+//
+// Examples (where `‸` represents the cursor position):
+//
+//   - `f(‸)` -> will get mapped to `f‸()`
+//   - `f(x, ‸)` -> will bet mapped to `f‸(x, )`
+//
+// But these examples won't work:
+//
+//   - `f(g(), ‸)`, won't be changed because of the nested call to `g()`
+func adjustCursorForFunctionIdentifier(lines []string, skipLines common.Set[int], cursor Cursor) Cursor {
+	originalCursor := cursor
+	line := lines[cursor.Line]
+	lineIndices, colIdx := runeIndicesForLine(line, cursor.Col)
+	atCursor := func() rune {
+		if cursor == NoCursor || colIdx >= len(lineIndices) {
+			return rune(0)
+		}
+		r, _ := utf8.DecodeRuneInString(line[lineIndices[colIdx]:])
+		return r
+	}
+	previousCursorPos := func() {
+		colIdx--
+		if colIdx >= 0 {
+			cursor.Col = lineIndices[colIdx]
+			return
+		}
+
+		// Move to previous line, skipping "skipLines"
+		for cursor.Line > 0 {
+			cursor.Line--
+			if !skipLines.Has(cursor.Line) {
+				break
+			}
+		}
+		if cursor.Line < 0 {
+			// Start of file reached.
+			cursor = NoCursor
+			return
+		}
+
+		// Move cursor to end of the previous line.
+		line = lines[cursor.Line]
+		lineIndices, colIdx = runeIndicesForLine(line, len(line)-1)
+		if colIdx < len(lineIndices) {
+			cursor.Col = lineIndices[colIdx]
+		} else {
+			cursor.Col = 0
+		}
+	}
+
+	// Loop while we don't find the target identifier.
+	for cursor != NoCursor {
+		r := atCursor()
+		//fmt.Printf("\trune@cursor(%+v): (%d)'%c'\n", cursor, int(r), r)
+		if r == 0 || r == ' ' || r == '\t' || r == '(' || r == '{' || r == '}' || r == '[' || r == ']' {
+			previousCursorPos()
+		} else if r == ',' || r == ')' {
+			// Move backwards until we find function/method name, or type name of a list.
+			// TODO: it won't work well with generics, when the type parameter is passed.
+			for cursor != NoCursor && r != '(' && r != '{' {
+				previousCursorPos()
+				r = atCursor()
+			}
+			previousCursorPos()
+		} else {
+			// Otherwise, any non-space rune is considered part of an identifier, return that.
+			return cursor
+		}
+	}
+	if cursor == NoCursor {
+		return originalCursor
+	}
+	return cursor
 }

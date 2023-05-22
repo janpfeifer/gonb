@@ -378,3 +378,17 @@ func TestCursorPositioning(t *testing.T) {
 			testLine.cursor, cursorInFile, l, testLine.Line)
 	}
 }
+
+func TestAdjustCursorForFunctionIdentifier(t *testing.T) {
+	cursor := adjustCursorForFunctionIdentifier([]string{"f(x,)"}, nil, Cursor{0, 3})
+	assert.True(t, cursor.HasCursor())
+	assert.Equal(t, 0, cursor.Col) // "‸f(x,)"
+	cursor = adjustCursorForFunctionIdentifier([]string{"f(x,)"}, nil, Cursor{0, 4})
+	assert.True(t, cursor.HasCursor())
+	assert.Equal(t, 0, cursor.Col) // "‸f(x,)"
+
+	cursor = adjustCursorForFunctionIdentifier([]string{"f(x)", "", "", ""}, nil, Cursor{2, 0})
+	assert.True(t, cursor.HasCursor())
+	assert.Equal(t, 0, cursor.Line) // "‸f(x,)"
+	assert.Equal(t, 0, cursor.Col)  // "‸f(x,)"
+}

@@ -1,5 +1,13 @@
 # GoNB Changelog
 
+## v0.6.4 - 2023/05/22
+
+* More InspectRequest improvements:
+  * Search for identifier preceding the cursor if cursor is under a non-identifier.
+  * If cursor under a ",", search for preceding function name identifier.
+  * Handle case where cell is not parseable: like with auto-complete before.
+* Fixed a bug where updates to `go.mod` and `go.sum` were not being notified to `gopls`.
+
 ## v0.6.3 - 2023/05/18
 
 * Handle auto-complete case where cell is not parseable: now `gopls` is also called, and memorized

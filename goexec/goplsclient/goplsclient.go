@@ -20,6 +20,7 @@ package goplsclient
 import (
 	"context"
 	"io"
+	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"os/exec"
@@ -30,7 +31,6 @@ import (
 	"github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -105,32 +105,21 @@ func isGoInternalOrCache(filePath string) bool {
 	return false
 }
 
-// NotifyAboutStandardFiles will notify `gopls` of open or change of the files that may be used by GoNB.
-func (c *Client) NotifyAboutStandardFiles(ctx context.Context) (err error) {
-	// Send "go.mod" and "go.sum" in case it changes.
-	for _, fileName := range []string{"go.mod", "go.sum", "go.work", "other.go"} {
-		err = c.NotifyDidOpenOrChange(ctx, path.Join(c.dir, fileName))
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
 // Definition return the definition for the identifier at the given position, rendered
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
-	glog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
+	klog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
+
 	// Send filePath.
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	var results []lsp.Location
 	results, err = c.CallDefinition(ctx, filePath, line, col)
 	if err != nil {
-		glog.Errorf("c.CallDefinition failed: %+v", err)
+		klog.V(1).Infof("c.CallDefinition failed: %+v", err)
 		return "", err
 	}
 	_ = results
@@ -144,11 +133,11 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	}
 	hover, err := c.CallHover(ctx, filePath, line, col)
 	if err != nil {
-		glog.Errorf("c.CallHover failed: %+v", err)
+		klog.Errorf("c.CallHover failed: %+v", err)
 		return "", err
 	}
 	if hover.Contents.Kind != lsp.Markdown {
-		glog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
+		klog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
 	}
 	return hover.Contents.Value, nil
 }
@@ -157,7 +146,7 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 // of the matches and the number of characters before the cursor position that should
 // be replaced by the matches (the same value for every entry).
 func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (matches []string, replaceLength int, err error) {
-	glog.V(2).Infof("goplsclient.Complete(ctx, %s, %d, %d)", filePath, line, col)
+	klog.V(2).Infof("goplsclient.Complete(ctx, %s, %d, %d)", filePath, line, col)
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
 		return
@@ -194,7 +183,7 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 		matches = append(matches, edit.NewText)
 	}
 	if len(items.Items) != len(matches) {
-		glog.Infof("Complete found %d items, used only %d", len(items.Items), len(matches))
+		klog.Infof("Complete found %d items, used only %d", len(items.Items), len(matches))
 	}
 	return
 }
@@ -229,28 +218,51 @@ type FileData struct {
 // FileData retrieves the file data, including its contents.
 // It uses a cache system, so files don't need to be reloaded.
 func (c *Client) FileData(filePath string) (content *FileData, updated bool, err error) {
-	content, updated = c.fileCache[filePath]
-	if updated {
-		// Check file hasn't changed.
-		var fileInfo os.FileInfo
-		fileInfo, err = os.Stat(filePath)
-		if err == nil && fileInfo.ModTime() == content.ContentTime {
-			// Fine not changed.
+	klog.V(2).Infof("goplsclient.FileData(%q):", filePath)
+	var foundInCache bool
+	content, foundInCache = c.fileCache[filePath]
+
+	var fileInfo os.FileInfo
+	fileInfo, err = os.Stat(filePath)
+	foundInFile := err == nil
+	if err != nil {
+		if !os.IsNotExist(err) {
+			err = errors.Wrapf(err, "failed to stat file %q", filePath)
 			return
 		}
-		glog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
+		err = nil
+	}
+
+	if !foundInCache && !foundInFile {
+		// No file in cache or file system.
+		return
+	}
+
+	// Deal with missing and deleted file.
+	if foundInCache && foundInFile && fileInfo.ModTime() == content.ContentTime {
+		// Fine not changed.
+		return
+	}
+
+	updated = true
+	if !foundInFile && foundInCache {
+		// Remove notify removal.
+
+		delete(c.fileCache, filePath)
+		return
+	}
+
+	if foundInFile && foundInCache {
+		klog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
 			filePath, content.ContentTime, fileInfo.ModTime())
 	}
 
 	content = &FileData{
-		URI:  uri.File(filePath),
-		Path: filePath,
+		URI:         uri.File(filePath),
+		Path:        filePath,
+		ContentTime: fileInfo.ModTime(),
 	}
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "failed to stat %q for Client.FileData", filePath)
-	}
-	content.ContentTime = fileInfo.ModTime()
+
 	var f *os.File
 	f, err = os.Open(filePath)
 	if err != nil {
@@ -281,7 +293,7 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 			numLines++
 		}
 	}
-	glog.V(2).Infof("goplsclient.FileData() loaded file %q", filePath)
+	klog.V(2).Infof("goplsclient.FileData() loaded file %q", filePath)
 	c.fileCache[filePath] = content
 	return
 }

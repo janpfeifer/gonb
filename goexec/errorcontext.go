@@ -3,12 +3,12 @@ package goexec
 import (
 	"bytes"
 	"fmt"
-	"github.com/golang/glog"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"html"
 	"io"
+	"k8s.io/klog/v2"
 	"os"
 	"regexp"
 	"strconv"
@@ -112,14 +112,14 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine 
 		// Display HTML report on exit.
 		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
 		if err != nil {
-			glog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
+			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
 		}
 	}()
 
 	// Read main.go into lines.
 	mainGo, err := s.readMainGo()
 	if err != nil {
-		glog.Errorf("DisplayErrorWithContext: %+v", err)
+		klog.Errorf("DisplayErrorWithContext: %+v", err)
 		return
 	}
 	codeLines := strings.Split(mainGo, "\n")
@@ -134,7 +134,7 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine 
 	// Render error block.
 	buf := bytes.NewBuffer(make([]byte, 0, 512*len(lines)))
 	if err := templateErrorReport.Execute(buf, report); err != nil {
-		glog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
+		klog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
 		return
 	}
 	reportHTML = buf.String()

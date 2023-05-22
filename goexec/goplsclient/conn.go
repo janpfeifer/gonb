@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 	"time"
 
-	jsonrpc2 "github.com/go-language-server/jsonrpc2"
+	"github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -87,7 +87,7 @@ func (c *Client) Connect(ctx context.Context) error {
 		// Exec should use a non-expiring context.
 		ctx := context.Background()
 		_ = c.jsonConn.Run(ctx)
-		glog.Infof("- gopls connection stopped")
+		klog.Infof("- gopls connection stopped")
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		if c.conn == currentConn {
@@ -102,7 +102,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	}, &c.lspCapabilities)
 	if err != nil {
 		if closeErr := c.conn.Close(); closeErr != nil {
-			glog.Errorf("Failed to close connection: %+v", closeErr)
+			klog.Errorf("Failed to close connection: %+v", closeErr)
 		}
 		c.conn = nil
 		return errors.Wrapf(err, "failed \"initialize\" call to gopls in %q", addr)
@@ -111,7 +111,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	err = c.jsonConn.Notify(ctx, lsp.MethodInitialized, &lsp.InitializedParams{})
 	if err != nil {
 		if closeErr := c.conn.Close(); closeErr != nil {
-			glog.Errorf("Failed to close connection: %+v", closeErr)
+			klog.Errorf("Failed to close connection: %+v", closeErr)
 		}
 		c.conn = nil
 		return errors.Wrapf(err, "failed \"initialized\" notification to gopls in %q", addr)
@@ -119,8 +119,10 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
-// NotifyDidOpenOrChange sends a notification to `gopls` with the open file, which also sends the
-// file content (from `Client.fileCache` if available).
+// NotifyDidOpenOrChange sends a notification to `gopls` to open or change a file, which also sends the
+// file content (from `Client.fileCache` if available). It also handles the case when a file
+// gets deleted.
+//
 // File version sent is incremented.
 func (c *Client) NotifyDidOpenOrChange(ctx context.Context, filePath string) (err error) {
 	if !c.WaitConnection(ctx) {
@@ -143,6 +145,29 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 	if err != nil {
 		return err
 	}
+	if !fileUpdated {
+		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %q) -- no updates", filePath)
+		return
+	}
+
+	// If file got deleted since last time.
+	if fileData == nil {
+		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %q) -- file deleted", filePath)
+		delete(c.fileVersions, filePath)
+		params := &lsp.DidCloseTextDocumentParams{
+			TextDocument: lsp.TextDocumentIdentifier{
+				URI: uri.File(filePath),
+			},
+		}
+		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidClose, params)
+		if err != nil {
+			fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidClose ***\n")
+			err = errors.Wrapf(err, "Failed Client.MethodTextDocumentDidClose notification for %q", filePath)
+		}
+		return
+	}
+
+	// Update version counter.
 	fileVersion, previouslyOpened := c.fileVersions[filePath]
 	if previouslyOpened && !fileUpdated {
 		// File already opened, and it hasn't changed, nothing to do.
@@ -152,7 +177,8 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 	c.fileVersions[filePath] = fileVersion
 
 	if !previouslyOpened {
-		glog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file opened", fileData.URI)
+		// Notify opening a file not previously tracked.
+		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file opened", fileData.URI)
 		params := &lsp.DidOpenTextDocumentParams{
 			TextDocument: lsp.TextDocumentItem{
 				URI:        fileData.URI,
@@ -162,28 +188,32 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 			}}
 		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidOpen, params)
 		if err != nil {
-			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange notification for %q", filePath)
+			fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidOpen ***\n")
+			err = errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange notification for %q", filePath)
 		}
-	} else {
-		glog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file changed at %s", fileData.URI, fileData.ContentTime)
-		version := uint64(fileVersion)
-		params := &lsp.DidChangeTextDocumentParams{
-			TextDocument: lsp.VersionedTextDocumentIdentifier{
-				TextDocumentIdentifier: lsp.TextDocumentIdentifier{
-					URI: fileData.URI,
-				},
-				Version: &version,
+		return
+	}
+
+	// Update the contents of the file.
+	klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file changed at %s", fileData.URI, fileData.ContentTime)
+	version := uint64(fileVersion)
+	params := &lsp.DidChangeTextDocumentParams{
+		TextDocument: lsp.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: lsp.TextDocumentIdentifier{
+				URI: fileData.URI,
 			},
-			ContentChanges: []lsp.TextDocumentContentChangeEvent{
-				{
-					Text: fileData.Content,
-				},
+			Version: &version,
+		},
+		ContentChanges: []lsp.TextDocumentContentChangeEvent{
+			{
+				Text: fileData.Content,
 			},
-		}
-		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidChange, params)
-		if err != nil {
-			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange::change notification for %q", filePath)
-		}
+		},
+	}
+	err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidChange, params)
+	if err != nil {
+		fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidChange ***\n")
+		err = errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange::change notification for %q", filePath)
 	}
 	return
 }
@@ -207,7 +237,7 @@ func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col 
 }
 
 func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
-	glog.V(2).Infof("goplsclient.CallDefinition(ctx, %s, %d, %d)", uri.File(filePath), line, col)
+	klog.V(2).Infof("goplsclient.CallDefinition(ctx, %s, %d, %d)", uri.File(filePath), line, col)
 	if _, found := c.fileVersions[filePath]; !found {
 		err = c.notifyDidOpenOrChangeLocked(ctx, filePath)
 		if err != nil {
@@ -228,9 +258,9 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed call to `gopls` \"definition_request\"")
 	}
-	if glog.V(2) {
+	if klog.V(2).Enabled() {
 		for ii, r := range results {
-			glog.Infof(" Result[%d].URI=%s\n", ii, r.URI)
+			klog.Infof(" Result[%d].URI=%s\n", ii, r.URI)
 		}
 	}
 	return
@@ -257,7 +287,7 @@ func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) 
 }
 
 func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
-	glog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d)", uri.File(filePath), line, col)
+	klog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d)", uri.File(filePath), line, col)
 	if _, found := c.fileVersions[filePath]; !found {
 		err = c.notifyDidOpenOrChangeLocked(ctx, filePath)
 		if err != nil {
@@ -277,7 +307,7 @@ func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col
 
 	err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentHover, params, &hover)
 	if err != nil {
-		glog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d): %+v", uri.File(filePath), line, col, err)
+		klog.V(2).Infof("goplsclient.CallHover(ctx, %s, %d, %d): %+v", uri.File(filePath), line, col, err)
 		err = errors.Wrapf(err, "Failed Client.CallHover notification for %q", filePath)
 		return
 	}
@@ -352,34 +382,36 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 		var params lsp.ShowMessageParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			glog.Errorf("Failed to parse ShowMessageParams: %v", err)
+			klog.Errorf("Failed to parse ShowMessageParams: %v", err)
 			return true
 		}
 		h.client.messages = append(h.client.messages, params.Message)
-		glog.V(1).Infof("gopls message: %s", trimString(params.Message, 100))
+		klog.V(1).Infof("received gopls show message: %s", trimString(params.Message, 100))
 		return true
 	case lsp.MethodWindowLogMessage:
 		var params lsp.LogMessageParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			glog.Errorf("Failed to parse LogMessageParams: %v", err)
+			klog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
-		h.client.messages = append(h.client.messages, params.Message)
-		glog.V(1).Infof("gopls message: %s", trimString(params.Message, 100))
+		klog.V(2).Infof("received gopls window log message: %q", trimString(params.Message, 100))
 		return true
 	case lsp.MethodTextDocumentPublishDiagnostics:
 		var params lsp.PublishDiagnosticsParams
 		err := json.Unmarshal(*r.WireRequest.Params, &params)
 		if err != nil {
-			glog.Errorf("Failed to parse LogMessageParams: %v", err)
+			klog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
-		h.client.messages = append(h.client.messages, fmt.Sprintf("Diagnostics:\n%+v", params))
-		glog.V(1).Infof("gopls diagnostics: %s", trimString(fmt.Sprintf("%+v", params), 100))
+		h.client.messages = make([]string, 0, len(params.Diagnostics))
+		for _, diag := range params.Diagnostics {
+			h.client.messages = append(h.client.messages, diag.Message)
+		}
+		klog.V(2).Infof("received gopls diagnostics: %+v", trimString(fmt.Sprintf("%+v", params), 100))
 		return true
 	default:
-		glog.Errorf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
+		klog.Errorf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
 	}
 	return false
 }
@@ -389,7 +421,7 @@ func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id js
 	_ = ctx
 	_ = conn
 	_ = canceled
-	glog.Warningf("- jsonrpc2 cancelled request id=%+v", id)
+	klog.Warningf("- jsonrpc2 cancelled request id=%+v", id)
 	return false
 }
 
@@ -397,7 +429,7 @@ func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id js
 func (h *jsonrpc2Handler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
 	_ = conn
 	_ = direction
-	glog.V(2).Infof("- jsonrpc2 Request(direction=%s) %q", direction, r.Method)
+	klog.V(2).Infof("jsonrpc2 Request(direction=%s) %q", direction, r.Method)
 	return ctx
 }
 
@@ -408,7 +440,7 @@ func (h *jsonrpc2Handler) Response(ctx context.Context, conn *jsonrpc2.Conn, dir
 	if r.Result != nil && len(*r.Result) > 0 {
 		content = trimString(string(*r.Result), 100)
 	}
-	glog.V(2).Infof("- jsonrpc2 Response(direction=%s) id=%+v, content=%s", direction, r.ID, content)
+	klog.V(2).Infof("- jsonrpc2 Response(direction=%s) id=%+v, content=%s", direction, r.ID, content)
 	return ctx
 }
 
@@ -423,5 +455,5 @@ func (h *jsonrpc2Handler) Write(ctx context.Context, _ int64) context.Context { 
 
 // Error implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Error(ctx context.Context, err error) {
-	glog.Errorf("- jsonrpc2 Error: %+v", err)
+	klog.Errorf("- jsonrpc2 Error: %+v", err)
 }

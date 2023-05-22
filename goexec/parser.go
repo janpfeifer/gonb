@@ -2,13 +2,13 @@ package goexec
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"os"
 	"path"
@@ -436,15 +436,15 @@ const cursorStr = "‸"
 // "*" where the
 func (s *State) logCursor(cursor Cursor) {
 	if !cursor.HasCursor() {
-		glog.Infof("Cursor not defined.")
+		klog.Infof("Cursor not defined.")
 		return
 	}
 	content, err := s.readMainGo()
 	if err != nil {
-		glog.Errorf("Failed to read main.go, for debugging.")
+		klog.Errorf("Failed to read main.go, for debugging.")
 		return
 	}
-	glog.Infof("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
+	klog.Infof("Cursor in main.go (%+v): %s", cursor, lineWithCursor(content, cursor))
 }
 
 func lineWithCursor(content string, cursor Cursor) string {

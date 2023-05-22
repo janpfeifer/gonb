@@ -119,8 +119,10 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
-// NotifyDidOpenOrChange sends a notification to `gopls` with the open file, which also sends the
-// file content (from `Client.fileCache` if available).
+// NotifyDidOpenOrChange sends a notification to `gopls` to open or change a file, which also sends the
+// file content (from `Client.fileCache` if available). It also handles the case when a file
+// gets deleted.
+//
 // File version sent is incremented.
 func (c *Client) NotifyDidOpenOrChange(ctx context.Context, filePath string) (err error) {
 	if !c.WaitConnection(ctx) {
@@ -143,6 +145,29 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 	if err != nil {
 		return err
 	}
+	if !fileUpdated {
+		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %q) -- no updates", filePath)
+		return
+	}
+
+	// If file got deleted since last time.
+	if fileData == nil {
+		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %q) -- file deleted", filePath)
+		delete(c.fileVersions, filePath)
+		params := &lsp.DidCloseTextDocumentParams{
+			TextDocument: lsp.TextDocumentIdentifier{
+				URI: uri.File(filePath),
+			},
+		}
+		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidClose, params)
+		if err != nil {
+			fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidClose ***\n")
+			err = errors.Wrapf(err, "Failed Client.MethodTextDocumentDidClose notification for %q", filePath)
+		}
+		return
+	}
+
+	// Update version counter.
 	fileVersion, previouslyOpened := c.fileVersions[filePath]
 	if previouslyOpened && !fileUpdated {
 		// File already opened, and it hasn't changed, nothing to do.
@@ -152,6 +177,7 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 	c.fileVersions[filePath] = fileVersion
 
 	if !previouslyOpened {
+		// Notify opening a file not previously tracked.
 		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file opened", fileData.URI)
 		params := &lsp.DidOpenTextDocumentParams{
 			TextDocument: lsp.TextDocumentItem{
@@ -162,28 +188,32 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 			}}
 		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidOpen, params)
 		if err != nil {
-			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange notification for %q", filePath)
+			fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidOpen ***\n")
+			err = errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange notification for %q", filePath)
 		}
-	} else {
-		klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file changed at %s", fileData.URI, fileData.ContentTime)
-		version := uint64(fileVersion)
-		params := &lsp.DidChangeTextDocumentParams{
-			TextDocument: lsp.VersionedTextDocumentIdentifier{
-				TextDocumentIdentifier: lsp.TextDocumentIdentifier{
-					URI: fileData.URI,
-				},
-				Version: &version,
+		return
+	}
+
+	// Update the contents of the file.
+	klog.V(2).Infof("goplsclient.NotifyDidOpenOrChange(ctx, %s) -- file changed at %s", fileData.URI, fileData.ContentTime)
+	version := uint64(fileVersion)
+	params := &lsp.DidChangeTextDocumentParams{
+		TextDocument: lsp.VersionedTextDocumentIdentifier{
+			TextDocumentIdentifier: lsp.TextDocumentIdentifier{
+				URI: fileData.URI,
 			},
-			ContentChanges: []lsp.TextDocumentContentChangeEvent{
-				{
-					Text: fileData.Content,
-				},
+			Version: &version,
+		},
+		ContentChanges: []lsp.TextDocumentContentChangeEvent{
+			{
+				Text: fileData.Content,
 			},
-		}
-		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidChange, params)
-		if err != nil {
-			return errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange::change notification for %q", filePath)
-		}
+		},
+	}
+	err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidChange, params)
+	if err != nil {
+		fmt.Printf("\n\n\n*** FAILED MethodTextDocumentDidChange ***\n")
+		err = errors.Wrapf(err, "Failed Client.NotifyDidOpenOrChange::change notification for %q", filePath)
 	}
 	return
 }

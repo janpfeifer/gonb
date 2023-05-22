@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
+	"path"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -15,6 +16,21 @@ import (
 
 // This file implements inspecting an identifier (`InspectRequest`) in a Cell and auto-complete
 // functionalities.
+
+// standardFilesForNotification for gopls.
+var standardFilesForNotification = []string{
+	"main.go", "go.mod", "go.sum", "go.work", "other.go",
+}
+
+func (s *State) notifyAboutStandardFiles(ctx context.Context) (err error) {
+	for _, filePath := range standardFilesForNotification {
+		err = s.gopls.NotifyDidOpenOrChange(ctx, path.Join(s.TempDir, filePath))
+		if err != nil {
+			return
+		}
+	}
+	return
+}
 
 // InspectIdentifierInCell implements an `inspect_request` from Jupyter, using `gopls`.
 // It updates `main.go` with the cell contents (given as lines)
@@ -38,18 +54,34 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	cellId := -1 // Inspect doesn't actually execute it, so parsed contents of cell are not kept.
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
 	if err != nil {
-		if errors.Is(err, ParseError) || errors.Is(err, CursorLost) {
-			mimeMap = make(kernel.MIMEMap)
-			err = nil
+		klog.V(2).Infof("Ignoring parse error for InspectRequest: %+v", err)
+		err = nil
+		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
+		// auto-complete.
+		err = s.createAlternativeFileFromDecls(s.Decls)
+		klog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
+		if err != nil {
+			return
+		}
+		defer func() {
+			// Remove alternative file after
+			err2 := os.Remove(s.AlternativeDefinitionsPath())
+			if err2 != nil && !os.IsNotExist(err2) {
+				klog.Errorf("Failed to remove alternative definitions: %+v", err2)
+			}
+			klog.V(2).Infof(". Alternative file %q with memorized definitions removed", s.AlternativeDefinitionsPath())
+		}()
+
+	} else {
+		// Exec `goimports`: we just want to make sure that "go get" is executed for the needed packages.
+		cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
+		if err != nil {
+			err = errors.WithMessagef(err, "goimports failed")
 			return
 		}
 	}
-
-	// Exec `goimports`: we just want to make sure that "go get" is executed for the needed packages.
-	cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
-	if err != nil {
-		err = errors.WithMessagef(err, "goimports failed")
-		return
+	if klog.V(1).Enabled() {
+		s.logCursor(cursorInFile)
 	}
 
 	// Query `gopls`.
@@ -57,6 +89,12 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	var desc string
 	klog.V(2).Infof("InspectIdentifierInCell: gopls.Definition(ctx, %s, %d, %d)",
 		s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+
+	// Notify about standard files updates:
+	err = s.notifyAboutStandardFiles(ctx)
+	if err != nil {
+		return
+	}
 	desc, err = s.gopls.Definition(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
 	messages := s.gopls.ConsumeMessages()
 	if err != nil {
@@ -91,7 +129,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	cursorInCell := Cursor{cursorLine, cursorCol}
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
 	if err != nil {
-		klog.V(1).Infof("Non-ParseError during parsing: %+v", err)
+		klog.V(2).Infof("Ignoring ParseError for auto-complete: %+v", err)
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
 		// auto-complete.
@@ -123,6 +161,10 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 
 	// Query `gopls`.
 	ctx := context.Background()
+	err = s.notifyAboutStandardFiles(ctx)
+	if err != nil {
+		return
+	}
 	_ = cursorInFile
 	var matches []string
 	var replaceLength int
@@ -213,9 +255,7 @@ func adjustCursorForFunctionIdentifier(lines []string, skipLines common.Set[int]
 	for cursor != NoCursor {
 		r := atCursor()
 		//fmt.Printf("\trune@cursor(%+v): (%d)'%c'\n", cursor, int(r), r)
-		if r == 0 || r == ' ' || r == '\t' || r == '(' || r == '{' || r == '}' || r == '[' || r == ']' {
-			previousCursorPos()
-		} else if r == ',' || r == ')' {
+		if r == ',' || r == ')' {
 			// Move backwards until we find function/method name, or type name of a list.
 			// TODO: it won't work well with generics, when the type parameter is passed.
 			for cursor != NoCursor && r != '(' && r != '{' {
@@ -223,6 +263,12 @@ func adjustCursorForFunctionIdentifier(lines []string, skipLines common.Set[int]
 				r = atCursor()
 			}
 			previousCursorPos()
+
+		} else if r == 0 || r == ' ' || r == '\t' || r == '(' || r == '{' || r == '}' ||
+			r == '[' || r == ']' || r == '"' || r == '`' || r == '\'' {
+			// Skip symbols and go to previous rune.
+			previousCursorPos()
+
 		} else {
 			// Otherwise, any non-space rune is considered part of an identifier, return that.
 			return cursor

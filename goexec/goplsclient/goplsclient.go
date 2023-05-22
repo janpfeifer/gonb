@@ -20,6 +20,7 @@ package goplsclient
 import (
 	"context"
 	"io"
+	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"os/exec"
@@ -30,7 +31,6 @@ import (
 	"github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 )
 
@@ -120,7 +120,7 @@ func (c *Client) NotifyAboutStandardFiles(ctx context.Context) (err error) {
 // Definition return the definition for the identifier at the given position, rendered
 // in Markdown. It returns empty if position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
-	glog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
+	klog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
 	// Send filePath.
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
@@ -130,7 +130,7 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	var results []lsp.Location
 	results, err = c.CallDefinition(ctx, filePath, line, col)
 	if err != nil {
-		glog.Errorf("c.CallDefinition failed: %+v", err)
+		klog.Errorf("c.CallDefinition failed: %+v", err)
 		return "", err
 	}
 	_ = results
@@ -144,11 +144,11 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	}
 	hover, err := c.CallHover(ctx, filePath, line, col)
 	if err != nil {
-		glog.Errorf("c.CallHover failed: %+v", err)
+		klog.Errorf("c.CallHover failed: %+v", err)
 		return "", err
 	}
 	if hover.Contents.Kind != lsp.Markdown {
-		glog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
+		klog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
 	}
 	return hover.Contents.Value, nil
 }
@@ -157,7 +157,7 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 // of the matches and the number of characters before the cursor position that should
 // be replaced by the matches (the same value for every entry).
 func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (matches []string, replaceLength int, err error) {
-	glog.V(2).Infof("goplsclient.Complete(ctx, %s, %d, %d)", filePath, line, col)
+	klog.V(2).Infof("goplsclient.Complete(ctx, %s, %d, %d)", filePath, line, col)
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
 	if err != nil {
 		return
@@ -194,7 +194,7 @@ func (c *Client) Complete(ctx context.Context, filePath string, line, col int) (
 		matches = append(matches, edit.NewText)
 	}
 	if len(items.Items) != len(matches) {
-		glog.Infof("Complete found %d items, used only %d", len(items.Items), len(matches))
+		klog.Infof("Complete found %d items, used only %d", len(items.Items), len(matches))
 	}
 	return
 }
@@ -238,7 +238,7 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 			// Fine not changed.
 			return
 		}
-		glog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
+		klog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
 			filePath, content.ContentTime, fileInfo.ModTime())
 	}
 
@@ -281,7 +281,7 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 			numLines++
 		}
 	}
-	glog.V(2).Infof("goplsclient.FileData() loaded file %q", filePath)
+	klog.V(2).Infof("goplsclient.FileData() loaded file %q", filePath)
 	c.fileCache[filePath] = content
 	return
 }

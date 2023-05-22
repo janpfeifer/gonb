@@ -8,6 +8,7 @@ import (
 	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"io"
+	klog "k8s.io/klog/v2"
 	"log"
 	"os"
 )
@@ -19,13 +20,30 @@ var (
 	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
 )
 
-// UniqueID uniquely identifies a kernel execution. Used for logging and creating temporary directories.
-// Set by SetUpLogging.
-var UniqueID string
+var (
+	// UniqueID uniquely identifies a kernel execution. Used to create the temporary
+	// directory holding the kernel code, and for logging.
+	// Set by SetUpLogging.
+	UniqueID string
+
+	coloredUniqueID string
+)
+
+func init() {
+	// Sets UniqueID.
+	uuidTmp, _ := uuid.NewV7()
+	uuidStr := uuidTmp.String()
+	UniqueID = uuidStr[len(uuidStr)-8:]
+	coloredUniqueID = fmt.Sprintf("%s[%s]%s ", ColorBgYellow, UniqueID, ColorReset)
+}
 
 func main() {
+	klog.InitFlags(nil)
+	defer klog.Flush()
+
 	flag.Parse()
-	SetUpLogging() // Also sets UniqueID
+	SetUpLogging() // "log" package.
+	SetUpKlog()    // "github.com/golang/klog" package
 
 	if *flagInstall {
 		// Simply install kernel in Jupyter configuration.
@@ -57,7 +75,7 @@ func main() {
 
 	// Create a kernel.
 	k, err := kernel.NewKernel(*flagKernel)
-	log.Printf("kernel created\n")
+	klog.Infof("kernel created\n")
 	if err != nil {
 		log.Fatalf("Failed to start kernel: %+v", err)
 	}
@@ -74,7 +92,7 @@ func main() {
 
 	// Wait for all polling goroutines.
 	k.ExitWait()
-	log.Printf("Exiting...")
+	klog.Infof("Exiting...")
 }
 
 var (
@@ -86,10 +104,7 @@ var (
 // SetUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
 // requested.
 func SetUpLogging() {
-	uuidTmp, _ := uuid.NewV7()
-	uuidStr := uuidTmp.String()
-	UniqueID = uuidStr[len(uuidStr)-8:]
-	log.SetPrefix(fmt.Sprintf("%s[%s]%s ", ColorBgYellow, UniqueID, ColorReset))
+	log.SetPrefix(coloredUniqueID)
 	if *flagExtraLog != "" {
 		f, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
@@ -99,4 +114,37 @@ func SetUpLogging() {
 		w := io.MultiWriter(f, os.Stderr) // Write to STDERR and the newly open f.
 		log.SetOutput(w)
 	}
+}
+
+// UniqueIDFilter prepends the UniqueID for every log line.
+type UniqueIDFilter struct{}
+
+// prepend value to slice: it makes a copy of the slice.
+func prepend[T any](slice []T, value T) []T {
+	newSlice := make([]T, len(slice)+1)
+	if len(slice) > 0 {
+		copy(newSlice[1:], slice)
+	}
+	newSlice[0] = value
+	return newSlice
+}
+
+// Filter implements klog.LogFilter interface.
+func (_ UniqueIDFilter) Filter(args []interface{}) []interface{} {
+	return prepend(args, any(coloredUniqueID))
+}
+
+// FilterF implements klog.LogFilter interface.
+func (_ UniqueIDFilter) FilterF(format string, args []interface{}) (string, []interface{}) {
+	return "%s" + format, prepend(args, any(coloredUniqueID))
+}
+
+// FilterS implements klog.LogFilter interface.
+func (_ UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, []interface{}) {
+	return coloredUniqueID + msg, keysAndValues
+}
+
+// SetUpKlog to include prefix with kernel's UniqueID.
+func SetUpKlog() {
+	klog.SetLogFilter(UniqueIDFilter{})
 }

@@ -8,18 +8,19 @@ require (
 	github.com/go-language-server/uri v0.2.0
 	github.com/go-zeromq/zmq4 v0.15.0
 	github.com/gofrs/uuid v4.4.0+incompatible
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
-	golang.org/x/tools/gopls v0.11.0
+	k8s.io/klog/v2 v2.100.1
 )
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/atomic v1.5.0 // indirect
 	go.uber.org/multierr v1.3.0 // indirect

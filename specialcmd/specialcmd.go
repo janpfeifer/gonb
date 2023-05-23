@@ -12,6 +12,7 @@ import (
 	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 	"log"
 	"os"
 )
@@ -78,6 +79,15 @@ Executing shell commands:
   the notebook is created and maintained. Useful for manipulating "go.mod",
   for instance to get a package from some specific version, something 
   like "!*go get github.com/my/package@v3".
+
+Tracking of Go files being develped:
+
+- "%track [file_or_directory]": add file or directory to list of tracked files,
+  which are monitored by GoNB (and 'gopls') for auto-complete or contextual help.
+  If no file is given, it lists the currently tracked files.
+- "%untrack [file_or_directory][...]": remove file or directory from list of tracked files.
+  If suffixed with "..." it will remove all files prefixed with the string given (without the
+  "..."). If no file is given, it lists the currently tracked files. 
 `
 
 // cellStatus holds temporary status for the execution of the current cell.
@@ -121,6 +131,12 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 					err = execShell(msg, goExec, cmdStr, status)
 					if err != nil {
 						return
+					}
+
+					// Runs AutoTrack, in case go.mod has changed.
+					err = goExec.AutoTrack()
+					if err != nil {
+						klog.Errorf("goxec.AutoTrack failed: %+v", err)
 					}
 				}
 			}
@@ -190,6 +206,10 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			return errors.Errorf("%%with_password not available in this notebook, it doesn't allow input prompting")
 		}
 		status.withPassword = true
+	case "track":
+		execTrack(msg, goExec, parts[1:])
+	case "untrack":
+		execUntrack(msg, goExec, parts[1:])
 	default:
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
 		if err != nil {

@@ -22,12 +22,25 @@ var standardFilesForNotification = []string{
 	"main.go", "go.mod", "go.sum", "go.work", "other.go",
 }
 
-func (s *State) notifyAboutStandardFiles(ctx context.Context) (err error) {
+func (s *State) notifyAboutStandardAndTrackedFiles(ctx context.Context) (err error) {
 	for _, filePath := range standardFilesForNotification {
 		err = s.gopls.NotifyDidOpenOrChange(ctx, path.Join(s.TempDir, filePath))
 		if err != nil {
 			return
 		}
+	}
+
+	err = s.AutoTrack()
+	if err != nil {
+		return
+	}
+
+	err = s.EnumerateUpdatedFiles(func(filePath string) error {
+		klog.Infof("Notified of change to %q", filePath)
+		return s.gopls.NotifyDidOpenOrChange(ctx, filePath)
+	})
+	if err != nil {
+		return
 	}
 	return
 }
@@ -91,7 +104,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 		s.MainPath(), cursorInFile.Line, cursorInFile.Col)
 
 	// Notify about standard files updates:
-	err = s.notifyAboutStandardFiles(ctx)
+	err = s.notifyAboutStandardAndTrackedFiles(ctx)
 	if err != nil {
 		return
 	}
@@ -161,7 +174,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 
 	// Query `gopls`.
 	ctx := context.Background()
-	err = s.notifyAboutStandardFiles(ctx)
+	err = s.notifyAboutStandardAndTrackedFiles(ctx)
 	if err != nil {
 		return
 	}

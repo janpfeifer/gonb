@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## v0.6.5 - 2023/05/23
+
+* More contextual help and auto-complete improvements:
+  * Added tracking of files in development (`%track`, `%untrack`), for usage with `gopls`.
+  * Auto-track `replace` directives in `go.mod` pointing to local filesystem.
+
 ## v0.6.4 - 2023/05/22
 
 * More InspectRequest improvements:

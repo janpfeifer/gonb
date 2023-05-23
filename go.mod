@@ -3,6 +3,7 @@ module github.com/janpfeifer/gonb
 go 1.20
 
 require (
+	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-language-server/jsonrpc2 v0.4.2
 	github.com/go-language-server/protocol v0.7.0
 	github.com/go-language-server/uri v0.2.0

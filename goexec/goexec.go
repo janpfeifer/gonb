@@ -34,6 +34,9 @@ type State struct {
 
 	// gopls client
 	gopls *goplsclient.Client
+
+	// trackingInfo is everything related to tracking.
+	trackingInfo *trackingInfo
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.
@@ -48,10 +51,11 @@ type Declarations struct {
 // New returns an empty State object, that can be used to execute Cells.
 func New(uniqueID string) (*State, error) {
 	s := &State{
-		UniqueID: uniqueID,
-		Package:  "gonb_" + uniqueID,
-		Decls:    NewDeclarations(),
-		AutoGet:  true,
+		UniqueID:     uniqueID,
+		Package:      "gonb_" + uniqueID,
+		Decls:        NewDeclarations(),
+		AutoGet:      true,
+		trackingInfo: newTrackingInfo(),
 	}
 
 	// Create directory.

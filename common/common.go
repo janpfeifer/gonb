@@ -1,7 +1,10 @@
 // Package common holds functionality that is common to multiple other packages.
 package common
 
-import "sort"
+import (
+	"golang.org/x/exp/constraints"
+	"sort"
+)
 
 // Set implements a Set for the key type T.
 type Set[T comparable] map[T]struct{}
@@ -26,13 +29,25 @@ func (s Set[T]) Insert(key T) {
 	s[key] = struct{}{}
 }
 
-// SortedKeys enumerate keys from a string map and sort them.
-// TODO: make it for any key type.
-func SortedKeys[T any](m map[string]T) (keys []string) {
-	keys = make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
+// Delete key into set.
+func (s Set[T]) Delete(key T) {
+	delete(s, key)
+}
+
+// Keys returns the keys of a map in the form of a slice.
+func Keys[K comparable, V any](m map[K]V) []K {
+	s := make([]K, 0, len(m))
+	for k := range m {
+		s = append(s, k)
 	}
-	sort.Strings(keys)
-	return
+	return s
+}
+
+// SortedKeys returns the sorted keys of a map in the form of a slice.
+func SortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
+	s := Keys(m)
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+	return s
 }

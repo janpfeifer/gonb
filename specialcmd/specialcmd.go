@@ -12,6 +12,7 @@ import (
 	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 	"log"
 	"os"
 )
@@ -130,6 +131,12 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 					err = execShell(msg, goExec, cmdStr, status)
 					if err != nil {
 						return
+					}
+
+					// Runs AutoTrack, in case go.mod has changed.
+					err = goExec.AutoTrack()
+					if err != nil {
+						klog.Errorf("goxec.AutoTrack failed: %+v", err)
 					}
 				}
 			}

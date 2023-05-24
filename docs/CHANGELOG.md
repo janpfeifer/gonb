@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* More contextual help and auto-complete improvements:
+  * Tracking of files follow through symbolic links.
+
 ## v0.6.5 - 2023/05/23
 
 * More contextual help and auto-complete improvements:

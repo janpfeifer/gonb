@@ -8,7 +8,6 @@ import (
 	"k8s.io/klog/v2"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -41,6 +40,7 @@ type trackingInfo struct {
 type trackEntry struct {
 	IsDir          bool
 	UpdatedModTime time.Time
+	resolvedName   string // Final file name, after resolving symbolic links.
 }
 
 func newTrackingInfo() *trackingInfo {
@@ -52,30 +52,62 @@ func newTrackingInfo() *trackingInfo {
 
 // Track adds the fileOrDirPath to the list of tracked files and directories.
 // If fileOrDirPath is already tracked, it's a no-op.
+//
+// If the fileOrDirPath pointed is a symbolic link, follow instead the linked
+// file/directory.
 func (s *State) Track(fileOrDirPath string) (err error) {
 	ti := s.trackingInfo
 	ti.mu.Lock()
 	defer ti.mu.Unlock()
 
+	visited := common.MakeSet[string]()
+	return s.lockedTrack(fileOrDirPath, fileOrDirPath, visited)
+}
+
+// lockedTrack is the implementation of Track, it assumes `trackingInfo` is locked.
+// root is the original file path, while fileOrDirPath is the one after symbolic link resolution.
+// The visited set is used to prevent infinite loops with symbolic links.
+func (s *State) lockedTrack(root, fileOrDirPath string, visited common.Set[string]) (err error) {
+	// Check for infinite loops in symbolic links.
+	if visited.Has(fileOrDirPath) {
+		err = errors.Wrapf(err, "Track(%q) self-symbolic infinite loop: %v", root, visited)
+		return err
+	}
+	visited.Insert(fileOrDirPath)
+
+	ti := s.trackingInfo
 	_, found := ti.tracked[fileOrDirPath]
 	if found {
 		return
 	}
-	fileInfo, err := os.Stat(fileOrDirPath)
+	fileInfo, err := os.Lstat(fileOrDirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = errors.Wrapf(err, "path %q cannot be tracked because it does not exist", fileOrDirPath)
 		} else {
 			err = errors.Wrapf(err, "failed to track %q for changes", fileOrDirPath)
 		}
+		return
+	}
+
+	// Follow symbolic link.
+	if fileInfo.Mode().Type() == os.ModeSymlink {
+		linkedPath, err := os.Readlink(fileOrDirPath)
+		if err != nil {
+			err = errors.Wrapf(err, "Track(%q) failed to resolve symlink %q", root, fileOrDirPath)
+			return err
+		}
+		klog.V(2).Infof("Track(%q): following symbolic link to %q", root, linkedPath)
+		return s.lockedTrack(root, linkedPath, visited)
 	}
 
 	// Create entry.
 	entry := &trackEntry{
 		IsDir:          fileInfo.IsDir(),
 		UpdatedModTime: fileInfo.ModTime(),
+		resolvedName:   fileOrDirPath,
 	}
-	ti.tracked[fileOrDirPath] = entry
+	ti.tracked[root] = entry
 
 	// Add watcher.
 	if ti.watcher == nil {
@@ -122,7 +154,7 @@ func (s *State) Track(fileOrDirPath string) (err error) {
 	}
 
 	if entry.IsDir {
-		err = filepath.WalkDir(fileOrDirPath, func(path string, d fs.DirEntry, err error) error {
+		err = common.WalkDirWithSymbolicLinks(fileOrDirPath, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return errors.Wrapf(err, "failed to track file under tracked directory %q", fileOrDirPath)
 			}
@@ -155,8 +187,8 @@ func (s *State) Untrack(fileOrDirPath string) (err error) {
 
 	prefix := fileOrDirPath[:len(fileOrDirPath)-3]
 	var toUntrack []string
-	for p := range s.trackingInfo.tracked {
-		if strings.HasPrefix(p, prefix) {
+	for p, entry := range s.trackingInfo.tracked {
+		if strings.HasPrefix(p, prefix) || strings.HasPrefix(entry.resolvedName, prefix) {
 			toUntrack = append(toUntrack, p)
 		}
 	}
@@ -176,9 +208,10 @@ func (s *State) lockedUntrackEntry(fileOrDirPath string) (err error) {
 		err = errors.Errorf("file or directory %q is not tracked, cannot untrack", fileOrDirPath)
 		return
 	}
-	_ = entry
 	delete(ti.tracked, fileOrDirPath)
-	err = ti.watcher.Remove(fileOrDirPath)
+
+	// Remove watcher to the resolvedName.
+	err = ti.watcher.Remove(entry.resolvedName)
 	if err != nil {
 		klog.V(2).Infof("goexec.Untrack failed to close watcher: %+v", err)
 		err = nil
@@ -281,27 +314,10 @@ func (s *State) AutoTrack() (err error) {
 
 		// Because fsnotify doesn't support recursion in watching for changes in subdirectories,
 		// we need to add each subdirectory under the one defined.
-		visited := common.MakeSet[string]()
-		var visitorFn func(entryPath string, info fs.DirEntry, err error) error
-		visitorFn = func(entryPath string, info fs.DirEntry, err error) error {
-			// Check visited paths to break infinite loops with symbolic links.
-			if visited.Has(entryPath) {
-				return nil
-			}
-			visited.Insert(entryPath)
-
+		err = common.WalkDirWithSymbolicLinks(replaceTarget, func(entryPath string, info fs.DirEntry, err error) error {
 			// Visit function for each file in the directory:
 			if err != nil {
 				return errors.Wrapf(err, "failed to auto-track file under directory %q", replaceTarget)
-			}
-			if info.Type() == os.ModeSymlink {
-				// Recursively follow symbolic links.
-				linkedPath, err := os.Readlink(entryPath)
-				if err != nil {
-					err = errors.Wrapf(err, "looking for tracked files, failed to resolve symlink %q", entryPath)
-					return err
-				}
-				return filepath.WalkDir(linkedPath, visitorFn)
 			}
 			if !isGoRelated(entryPath) {
 				return nil
@@ -311,8 +327,7 @@ func (s *State) AutoTrack() (err error) {
 			// are quickly ignored.
 			dir := path.Dir(entryPath)
 			return s.Track(dir)
-		}
-		err = filepath.WalkDir(replaceTarget, visitorFn)
+		})
 		if err != nil {
 			klog.Errorf("Failed to auto-track subdirectories of %q: %+v", replaceTarget, err)
 			err = nil

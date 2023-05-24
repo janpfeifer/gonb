@@ -2,7 +2,11 @@
 package common
 
 import (
+	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -50,4 +54,34 @@ func SortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
 		return s[i] < s[j]
 	})
 	return s
+}
+
+// WalkDirWithSymbolicLinks is similar filepath.WalkDir, but it follows symbolic links. It also checks for
+// infinite loops in symbolic links, and returns an error if it finds one.
+func WalkDirWithSymbolicLinks(root string, dirFunc fs.WalkDirFunc) error {
+	visited := MakeSet[string]()
+	return walkDirWithSymbolicLinksImpl(root, root, dirFunc, visited)
+}
+
+func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, visited Set[string]) error {
+	// Break infinite loops
+	if visited.Has(current) {
+		return errors.Errorf("directory %q is in an infinite loop of symbolic links, cannot WalkDirWithSymbolicLinks(%q)", current, root)
+	}
+	visited.Insert(current)
+
+	return filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
+		if info.Type() == os.ModeSymlink {
+			// Recursively follow symbolic links.
+			linkedPath, err := os.Readlink(entryPath)
+			if err != nil {
+				err = errors.Wrapf(err, "WalkDirWithSymbolicLinks failed to resolve symlink %q", entryPath)
+				return err
+			}
+			return walkDirWithSymbolicLinksImpl(root, linkedPath, dirFunc, visited)
+		}
+
+		// If not a symbolic link, call the user's function.
+		return dirFunc(entryPath, info, err)
+	})
 }

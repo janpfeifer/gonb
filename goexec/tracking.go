@@ -281,9 +281,27 @@ func (s *State) AutoTrack() (err error) {
 
 		// Because fsnotify doesn't support recursion in watching for changes in subdirectories,
 		// we need to add each subdirectory under the one defined.
-		err = filepath.WalkDir(replaceTarget, func(entryPath string, d fs.DirEntry, err error) error {
+		visited := common.MakeSet[string]()
+		var visitorFn func(entryPath string, info fs.DirEntry, err error) error
+		visitorFn = func(entryPath string, info fs.DirEntry, err error) error {
+			// Check visited paths to break infinite loops with symbolic links.
+			if visited.Has(entryPath) {
+				return nil
+			}
+			visited.Insert(entryPath)
+
+			// Visit function for each file in the directory:
 			if err != nil {
 				return errors.Wrapf(err, "failed to auto-track file under directory %q", replaceTarget)
+			}
+			if info.Type() == os.ModeSymlink {
+				// Recursively follow symbolic links.
+				linkedPath, err := os.Readlink(entryPath)
+				if err != nil {
+					err = errors.Wrapf(err, "looking for tracked files, failed to resolve symlink %q", entryPath)
+					return err
+				}
+				return filepath.WalkDir(linkedPath, visitorFn)
 			}
 			if !isGoRelated(entryPath) {
 				return nil
@@ -293,7 +311,8 @@ func (s *State) AutoTrack() (err error) {
 			// are quickly ignored.
 			dir := path.Dir(entryPath)
 			return s.Track(dir)
-		})
+		}
+		err = filepath.WalkDir(replaceTarget, visitorFn)
 		if err != nil {
 			klog.Errorf("Failed to auto-track subdirectories of %q: %+v", replaceTarget, err)
 			err = nil

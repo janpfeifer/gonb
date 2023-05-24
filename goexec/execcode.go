@@ -39,7 +39,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	}
 
 	// Compilation successful: save merged declarations into current State.
-	s.Decls = updatedDecls
+	s.Definitions = updatedDecls
 
 	// Execute compiled code.
 	return s.Execute(msg, fileToCellIdAndLine)

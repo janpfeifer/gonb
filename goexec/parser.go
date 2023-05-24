@@ -409,7 +409,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 
 	// Merge cell declarations with a copy of the current state: we don't want to commit the new
 	// declarations until they compile successfully.
-	updatedDecls = s.Decls.Copy()
+	updatedDecls = s.Definitions.Copy()
 	updatedDecls.ClearCursor()
 	updatedDecls.MergeFrom(newDecls)
 

@@ -2,6 +2,7 @@
 
 ## Next
 
+
 * More contextual help and auto-complete improvements:
   * Tracking of files follow through symbolic links.
 

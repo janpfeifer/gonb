@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## v0.70.0 - 2023/05/29
 
 * Added "%ls" and "%rm" to manage memorized definitions directly.
 * More contextual help and auto-complete improvements:

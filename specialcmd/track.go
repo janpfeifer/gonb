@@ -59,7 +59,7 @@ func showTrackedList(msg kernel.Message, goExec *goexec.State) {
 	if len(tracked) == 0 {
 		htmlParts = append(htmlParts, "<b>No files or directory being tracked yet<b>")
 	} else {
-		htmlParts = append(htmlParts, "<h4>List of files/directories being tracked:</h3>")
+		htmlParts = append(htmlParts, "<h4>List of files/directories being tracked:</h4>")
 		htmlParts = append(htmlParts, "<ul>")
 		for _, p := range tracked {
 			htmlParts = append(htmlParts, "<li>"+p+"</li>")

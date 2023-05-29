@@ -20,7 +20,7 @@ import (
 // defined Go code.
 //
 // That is, if the user runs a cell that defines, let's say `func f(x int) int { return x+1 }`,
-// the definition of `f` will be stored in Decls field.
+// the definition of `f` will be stored in Definitions field.
 type State struct {
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
@@ -30,7 +30,7 @@ type State struct {
 	AutoGet bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
 
 	// Global elements defined mapped by their keys.
-	Decls *Declarations
+	Definitions *Declarations
 
 	// gopls client
 	gopls *goplsclient.Client
@@ -53,7 +53,7 @@ func New(uniqueID string) (*State, error) {
 	s := &State{
 		UniqueID:     uniqueID,
 		Package:      "gonb_" + uniqueID,
-		Decls:        NewDeclarations(),
+		Definitions:  NewDeclarations(),
 		AutoGet:      true,
 		trackingInfo: newTrackingInfo(),
 	}
@@ -309,5 +309,5 @@ var reDefaultImportPathAlias = regexp.MustCompile(`^.*?(\w[\w0-9_]*)\s*$`)
 //
 // It is connected to the special command `%reset`.
 func (s *State) Reset() {
-	s.Decls = NewDeclarations()
+	s.Definitions = NewDeclarations()
 }

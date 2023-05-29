@@ -2,6 +2,7 @@
 
 ## Next
 
+* Added "%ls" and "%rm" to manage memorized definitions directly.
 * More contextual help and auto-complete improvements:
   * Tracking of files follow through symbolic links.
 

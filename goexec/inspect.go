@@ -71,7 +71,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
 		// auto-complete.
-		err = s.createAlternativeFileFromDecls(s.Decls)
+		err = s.createAlternativeFileFromDecls(s.Definitions)
 		klog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
 		if err != nil {
 			return
@@ -146,7 +146,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
 		// auto-complete.
-		err = s.createAlternativeFileFromDecls(s.Decls)
+		err = s.createAlternativeFileFromDecls(s.Definitions)
 		klog.V(2).Infof(". Alternative file %q with memorized definitions created", s.AlternativeDefinitionsPath())
 		if err != nil {
 			return

@@ -127,67 +127,67 @@ func TestState_Parse(t *testing.T) {
 
 	var err error
 	cellId := NoCursorLine // Transient cellId.
-	s.Decls, err = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
+	s.Definitions, err = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
 	require.NoErrorf(t, err, "Failed to parse %q", s.MainPath())
 
-	fmt.Printf("\ttest imports: %+v\n", s.Decls.Imports)
-	assert.Lenf(t, s.Decls.Imports, 5, "Expected 5 imports, got %+v", s.Decls.Imports)
-	assert.Contains(t, s.Decls.Imports, "fmt")
-	assert.Contains(t, s.Decls.Imports, "math")
-	assert.Contains(t, s.Decls.Imports, "fmtOther")
-	assert.Contains(t, s.Decls.Imports, "errors")
-	assert.Contains(t, s.Decls.Imports, ".~gomlx/computation")
-	assert.ElementsMatch(t, []int{7}, s.Decls.Imports["errors"].CellLines.Lines,
+	fmt.Printf("\ttest imports: %+v\n", s.Definitions.Imports)
+	assert.Lenf(t, s.Definitions.Imports, 5, "Expected 5 imports, got %+v", s.Definitions.Imports)
+	assert.Contains(t, s.Definitions.Imports, "fmt")
+	assert.Contains(t, s.Definitions.Imports, "math")
+	assert.Contains(t, s.Definitions.Imports, "fmtOther")
+	assert.Contains(t, s.Definitions.Imports, "errors")
+	assert.Contains(t, s.Definitions.Imports, ".~gomlx/computation")
+	assert.ElementsMatch(t, []int{7}, s.Definitions.Imports["errors"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
-	fmt.Printf("\ttest functions: %+v\n", s.Decls.Functions)
+	fmt.Printf("\ttest functions: %+v\n", s.Definitions.Functions)
 	// Notice `func main` will be automatically included.
-	assert.Lenf(t, s.Decls.Functions, 7, "Expected 6 functions, got %d", len(s.Decls.Functions))
-	assert.Contains(t, s.Decls.Functions, "f")
-	assert.Contains(t, s.Decls.Functions, "sum")
-	assert.Contains(t, s.Decls.Functions, "init_c")
-	assert.Contains(t, s.Decls.Functions, "Kg~Weight")
-	assert.Contains(t, s.Decls.Functions, "Kg~Gain")
-	assert.Contains(t, s.Decls.Functions, "N~Weight")
-	assert.Contains(t, s.Decls.Functions, "main")
-	assert.ElementsMatch(t, []int{-1, -1, 72, 73, 74, 75, -1, -1}, s.Decls.Functions["main"].CellLines.Lines,
+	assert.Lenf(t, s.Definitions.Functions, 7, "Expected 6 functions, got %d", len(s.Definitions.Functions))
+	assert.Contains(t, s.Definitions.Functions, "f")
+	assert.Contains(t, s.Definitions.Functions, "sum")
+	assert.Contains(t, s.Definitions.Functions, "init_c")
+	assert.Contains(t, s.Definitions.Functions, "Kg~Weight")
+	assert.Contains(t, s.Definitions.Functions, "Kg~Gain")
+	assert.Contains(t, s.Definitions.Functions, "N~Weight")
+	assert.Contains(t, s.Definitions.Functions, "main")
+	assert.ElementsMatch(t, []int{-1, -1, 72, 73, 74, 75, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
-	fmt.Printf("\ttest variables: %+v\n", s.Decls.Variables)
-	assert.Lenf(t, s.Decls.Variables, 6, "Expected 4 variables, got %+v", s.Decls.Variables)
-	assert.Contains(t, s.Decls.Variables, "x")
-	assert.Contains(t, s.Decls.Variables, "y")
-	assert.Contains(t, s.Decls.Variables, "z")
-	assert.Contains(t, s.Decls.Variables, "b")
-	assert.Contains(t, s.Decls.Variables, "c")
+	fmt.Printf("\ttest variables: %+v\n", s.Definitions.Variables)
+	assert.Lenf(t, s.Definitions.Variables, 6, "Expected 4 variables, got %+v", s.Definitions.Variables)
+	assert.Contains(t, s.Definitions.Variables, "x")
+	assert.Contains(t, s.Definitions.Variables, "y")
+	assert.Contains(t, s.Definitions.Variables, "z")
+	assert.Contains(t, s.Definitions.Variables, "b")
+	assert.Contains(t, s.Definitions.Variables, "c")
 	// The 5th var is "_", which gets a random key.
-	assert.ElementsMatch(t, []int{21, 22}, s.Decls.Variables["b"].CellLines.Lines,
+	assert.ElementsMatch(t, []int{21, 22}, s.Definitions.Variables["b"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
-	fmt.Printf("\ttest types: %+v\n", s.Decls.Types)
-	assert.Lenf(t, s.Decls.Types, 4, "Expected 4 types, got %+v", s.Decls.Types)
-	assert.Contains(t, s.Decls.Types, "XY")
-	assert.Contains(t, s.Decls.Types, "Kg")
-	assert.Contains(t, s.Decls.Types, "N")
-	assert.Contains(t, s.Decls.Types, "Model")
-	assert.Equal(t, "XY struct { x, y float64 }", s.Decls.Types["XY"].TypeDefinition)
-	assert.Equal(t, "Model[T any] struct {\n\tData T\n}", s.Decls.Types["Model"].TypeDefinition)
-	assert.ElementsMatch(t, []int{27}, s.Decls.Types["XY"].CellLines.Lines,
+	fmt.Printf("\ttest types: %+v\n", s.Definitions.Types)
+	assert.Lenf(t, s.Definitions.Types, 4, "Expected 4 types, got %+v", s.Definitions.Types)
+	assert.Contains(t, s.Definitions.Types, "XY")
+	assert.Contains(t, s.Definitions.Types, "Kg")
+	assert.Contains(t, s.Definitions.Types, "N")
+	assert.Contains(t, s.Definitions.Types, "Model")
+	assert.Equal(t, "XY struct { x, y float64 }", s.Definitions.Types["XY"].TypeDefinition)
+	assert.Equal(t, "Model[T any] struct {\n\tData T\n}", s.Definitions.Types["Model"].TypeDefinition)
+	assert.ElementsMatch(t, []int{27}, s.Definitions.Types["XY"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
-	fmt.Printf("\ttest constants: %+v\n", s.Decls.Constants)
-	assert.Lenf(t, s.Decls.Constants, 7, "Expected 7 Constants, got %+v", s.Decls.Constants)
-	assert.Contains(t, s.Decls.Constants, "E")
-	assert.Contains(t, s.Decls.Constants, "PI")
-	assert.Contains(t, s.Decls.Constants, "PI32")
-	assert.Contains(t, s.Decls.Constants, "ToBe")
-	assert.Equal(t, "\"Or Not To Be\"", s.Decls.Constants["ToBe"].ValueDefinition)
-	assert.Contains(t, s.Decls.Constants, "K0")
-	assert.Contains(t, s.Decls.Constants, "K1")
-	assert.Contains(t, s.Decls.Constants, "K2")
-	assert.Equal(t, "K0", s.Decls.Constants["K1"].Prev.Key)
-	assert.Equal(t, "K2", s.Decls.Constants["K1"].Next.Key)
-	assert.ElementsMatch(t, []int{45}, s.Decls.Constants["K0"].CellLines.Lines,
+	fmt.Printf("\ttest constants: %+v\n", s.Definitions.Constants)
+	assert.Lenf(t, s.Definitions.Constants, 7, "Expected 7 Constants, got %+v", s.Definitions.Constants)
+	assert.Contains(t, s.Definitions.Constants, "E")
+	assert.Contains(t, s.Definitions.Constants, "PI")
+	assert.Contains(t, s.Definitions.Constants, "PI32")
+	assert.Contains(t, s.Definitions.Constants, "ToBe")
+	assert.Equal(t, "\"Or Not To Be\"", s.Definitions.Constants["ToBe"].ValueDefinition)
+	assert.Contains(t, s.Definitions.Constants, "K0")
+	assert.Contains(t, s.Definitions.Constants, "K1")
+	assert.Contains(t, s.Definitions.Constants, "K2")
+	assert.Equal(t, "K0", s.Definitions.Constants["K1"].Prev.Key)
+	assert.Equal(t, "K2", s.Definitions.Constants["K1"].Next.Key)
+	assert.ElementsMatch(t, []int{45}, s.Definitions.Constants["K0"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
 	// Check imports rendering.
@@ -202,7 +202,7 @@ func TestState_Parse(t *testing.T) {
 `
 	buf := bytes.NewBuffer(make([]byte, 0, 1024))
 	w := &WriterWithCursor{w: buf}
-	cursor, fileToCellIdAndLine := s.Decls.RenderImports(w, nil)
+	cursor, fileToCellIdAndLine := s.Definitions.RenderImports(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderImports()")
 	assert.Equal(t, wantImportsRendering, buf.String())
@@ -229,7 +229,7 @@ func TestState_Parse(t *testing.T) {
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor, fileToCellIdAndLine = s.Decls.RenderVariables(w, nil)
+	cursor, fileToCellIdAndLine = s.Definitions.RenderVariables(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderVariables()")
 	assert.Equal(t, wantVariablesRendering, buf.String())
@@ -279,7 +279,7 @@ func sum[T interface{int | float32 | float64}](a, b T) T {
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor, _ = s.Decls.RenderFunctions(w, nil)
+	cursor, _ = s.Definitions.RenderFunctions(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderFunctions()")
 	assert.Equal(t, wantFunctionsRendering, buf.String())
@@ -295,7 +295,7 @@ type XY struct { x, y float64 }
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor, _ = s.Decls.RenderTypes(w, nil)
+	cursor, _ = s.Definitions.RenderTypes(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, w.Error(), "Declarations.RenderTypes()")
 	assert.Equal(t, wantTypesRendering, buf.String())
@@ -318,7 +318,7 @@ const (
 `
 	buf = bytes.NewBuffer(make([]byte, 0, 1024))
 	w = &WriterWithCursor{w: buf}
-	cursor, _ = s.Decls.RenderConstants(w, nil)
+	cursor, _ = s.Definitions.RenderConstants(w, nil)
 	assert.False(t, cursor.HasCursor())
 	require.NoErrorf(t, err, "Declarations.RenderConstants()")
 	assert.Equal(t, wantConstantsRendering, buf.String())
@@ -364,12 +364,12 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		s.Decls, err = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
+		s.Definitions, err = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}
 
-		cursorInFile, fileToCellIdAndLine, err := s.createGoContentsFromDecls(buf, s.Decls, nil)
+		cursorInFile, fileToCellIdAndLine, err := s.createGoContentsFromDecls(buf, s.Definitions, nil)
 		_ = fileToCellIdAndLine
 		require.NoError(t, err)
 		content := buf.String()

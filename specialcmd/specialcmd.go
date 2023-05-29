@@ -58,13 +58,19 @@ Special non-Go commands:
   packages not yet available.
 - "%env VAR value": Sets the environment variable VAR to the given value. These variables
   will be available both for Go code as well as for shell scripts.
-- "%reset": clears all memorized declarations (imports, functions, variables, types and 
-  constants).
 - "%with_inputs": will prompt for inputs for the next shell command. Use this if
   the next shell command ("!") you execute reads the stdin. Jupyter will require
   you to enter one last value after the shell script executes.
 - "%with_password": will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
+
+Managing memorized definitions;
+
+- "%list" (or "%ls"): Lists all memorized definitions (imports, constants, types, variables and
+  functions) that are carried from one cell to another.
+- "%remove <definitions>" (or "%rm <definitions>"): Removes (forgets) given definition(s). Use as key the
+  value(s) listed with "%ls".
+- "%reset" clears memory of memorized definitions.
 
 Executing shell commands:
 
@@ -188,12 +194,15 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		goExec.AutoGet = false
 	case "help":
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStdout, HelpMessage)
+
+		// Definitions management.
 	case "reset":
-		goExec.Reset()
-		err := kernel.PublishWriteStream(msg, kernel.StreamStdout, "* State reset: all memorized declarations discarded.\n")
-		if err != nil {
-			log.Printf("Error while reseting kernel: %+v", err)
-		}
+		resetDefinitions(msg, goExec)
+	case "ls", "list":
+		listDefinitions(msg, goExec)
+	case "rm", "remove":
+		removeDefinitions(msg, goExec, parts[1:])
+
 	case "with_inputs":
 		allowInput := content["allow_stdin"].(bool)
 		if !allowInput && (status.withInputs || status.withPassword) {

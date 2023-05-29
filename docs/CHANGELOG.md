@@ -2,7 +2,8 @@
 
 ## Next
 
-* Added "%cd" to chance current directory.
+* Added special command `%cd` to chance current directory.
+* Commands `%cd` and `%env` prints results of its execution.
 
 ## v0.70.0 - 2023/05/29
 

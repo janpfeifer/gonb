@@ -182,12 +182,36 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		goExec.Args = parts[1:]
 		log.Printf("args=%+q", parts)
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
+
 	case "env":
 		// Set environment variables.
 		if len(parts) != 3 {
-			return errors.Errorf("`%%env FOO bar` takes 2 arguments, the variable name and it's content. %d were given", len(parts))
+			return errors.Errorf("`%%env <VAR_NAME> <value>`: it takes 2 arguments, the variable name and it's content, but %d were given", len(parts)-1)
 		}
-		os.Setenv(parts[1], parts[2])
+		err := os.Setenv(parts[1], parts[2])
+		if err != nil {
+			return errors.Wrapf(err, "`%%env %q %q` failed", parts[1], parts[2])
+		}
+		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+			fmt.Sprintf("Set: %s=%q\n", parts[1], parts[2]))
+		if err != nil {
+			klog.Errorf("Failed to output: %+v", err)
+		}
+
+	case "cd":
+		if len(parts) != 2 {
+			return errors.Errorf("`%%cd <directory>`: it takes one argument, but %d were given", len(parts)-1)
+		}
+		err := os.Chdir(parts[1])
+		if err != nil {
+			return errors.Wrapf(err, "`%%cd %q` failed", parts[1])
+		}
+		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+			fmt.Sprintf("Changed directory to %q\n", parts[1]))
+		if err != nil {
+			klog.Errorf("Failed to output: %+v", err)
+		}
+
 	case "autoget":
 		goExec.AutoGet = true
 	case "noautoget":

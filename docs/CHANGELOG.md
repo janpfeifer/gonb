@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Added "%cd" to chance current directory.
+
 ## v0.70.0 - 2023/05/29
 
 * Added "%ls" and "%rm" to manage memorized definitions directly.

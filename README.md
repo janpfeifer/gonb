@@ -44,7 +44,7 @@ to store the notebook files). It will be mounted on the `work/` sub-directory in
 To start it:
 
 ```shell
-docker pull janpfeifer/gonb_jupyter:latest
+docker pull janpfeifer/gonb_jupyterlab:latest
 docker run -it --rm -p 8888:8888 -v "${PWD}":/home/jovyan/work janpfeifer/gonb_jupyterlab:latest
 ```
 

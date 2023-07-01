@@ -72,6 +72,7 @@ And then (re-)start Jupyter.
 
 In Github's Codespace, if Jupyter is already started, restarting the docker is an easy way to restart Jupyter.
 
+**Note**: for `go.work` to be parsed correctly, you need `gopls` version greater or equal to v0.12.4 (or at least `v0.12.0`?). Check with `gopls version`.
 
 ## Windows
 

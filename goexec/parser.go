@@ -404,7 +404,14 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 		delete(newDecls.Functions, "main")
 	} else {
 		// Declare a stub main function, just so we can try to compile the final code.
-		mainDecl = &Function{Key: "main", Name: "main", Definition: "func main() { flag.Parse() }"}
+		mainDecl = &Function{
+			Cursor:     NoCursor,
+			CellLines:  CellLines{},
+			Key:        "main",
+			Name:       "main",
+			Receiver:   "",
+			Definition: "func main() { flag.Parse() }",
+		}
 	}
 
 	// Merge cell declarations with a copy of the current state: we don't want to commit the new

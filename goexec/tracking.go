@@ -4,6 +4,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/pkg/errors"
+	"golang.org/x/mod/modfile"
 	"io/fs"
 	"k8s.io/klog/v2"
 	"os"
@@ -32,8 +33,8 @@ type trackingInfo struct {
 	// watcher for files being tracked. It is notified of file system changes.
 	watcher *fsnotify.Watcher
 
-	// go.mod last modification time, used for the AutoTrack
-	goModModTime time.Time
+	// go.mod and go.work last modification time, used for the AutoTrack
+	goModModTime, goWorkModTime time.Time
 }
 
 // trackEntry has information about a file or directory.
@@ -269,16 +270,26 @@ func (s *State) EnumerateUpdatedFiles(fn func(filePath string) error) (err error
 	return
 }
 
-// AutoTrack adds automatic tracked directories. It looks at go.mod for
+// AutoTrack adds automatic tracked directories. It looks at go.mod and go.work for
 // redirects to the local filesystem.
-// TODO: add support for go.work as well.
 func (s *State) AutoTrack() (err error) {
+	klog.V(2).Infof("AutoTrack(): ...")
+	err = s.autoTrackGoMod()
+	if err != nil {
+		return
+	}
+	err = s.autoTrackGoWork()
+	return
+}
+
+// autoTrackGoMod tracks entries in `go.mod`.
+func (s *State) autoTrackGoMod() (err error) {
 	ti := s.trackingInfo
 	goModPath := path.Join(s.TempDir, "go.mod")
 	fileInfo, err := os.Stat(goModPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No go.mod, we dont' auto-track anything.
+			// No go.mod, we don't auto-track anything.
 			err = nil
 			return
 		}
@@ -301,7 +312,7 @@ func (s *State) AutoTrack() (err error) {
 	for _, match := range matches {
 		replaceTarget := string(match[1])
 		if replaceTarget[0] != '/' {
-			// We only auto-track if the target of the replace is a local directory.
+			// We only auto-track if the target of the "replace" rule is a local directory.
 			continue
 		}
 		_, found := ti.tracked[replaceTarget]
@@ -340,3 +351,68 @@ var (
 	// `(?m)` makes "^" and "$" match beginning and end of line.
 	regexpGoModReplace = regexp.MustCompile(`(?m)^\s*replace\s+.*?=>\s+(.*)$`)
 )
+
+// autoTrackGoWork tracks entries in `go.work`.
+func (s *State) autoTrackGoWork() (err error) {
+	ti := s.trackingInfo
+	goWorkPath := path.Join(s.TempDir, "go.work")
+	fileInfo, err := os.Stat(goWorkPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No go.work, we don't auto-track anything.
+			err = nil
+			return
+		}
+		err = errors.Wrapf(err, "failed to check %q for auto-tracking of files", goWorkPath)
+		return
+	}
+	if !fileInfo.ModTime().After(ti.goWorkModTime) {
+		// No changes.
+		return
+	}
+
+	ti.goWorkModTime = fileInfo.ModTime()
+	klog.V(2).Infof("goexec.AutoTrack: re-parsing %q for changes at %s", goWorkPath, ti.goWorkModTime)
+	contents, err := os.ReadFile(goWorkPath)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to read %q for auto-tracking of files", goWorkPath)
+		return
+	}
+	workFile, err := modfile.ParseWork(goWorkPath, contents, nil)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to parse %q for auto-tracking files", goWorkPath)
+		return
+	}
+	for _, useRule := range workFile.Use {
+		p := useRule.Path
+		_, found := ti.tracked[p]
+		if found {
+			// already tracked.
+			continue
+		}
+		klog.Infof("- go.work new replace: %s", p)
+		err = s.Track(p)
+
+		// Because fsnotify doesn't support recursion in watching for changes in subdirectories,
+		// we need to add each subdirectory under the one defined.
+		err = common.WalkDirWithSymbolicLinks(p, func(entryPath string, info fs.DirEntry, err error) error {
+			// Visit function for each file in the directory:
+			if err != nil {
+				return errors.Wrapf(err, "failed to auto-track file under directory %q", p)
+			}
+			if !isGoRelated(entryPath) {
+				return nil
+			}
+
+			// Only track directories that have go files. Notice repeated tracked directories
+			// are quickly ignored.
+			dir := path.Dir(entryPath)
+			return s.Track(dir)
+		})
+		if err != nil {
+			klog.Errorf("Failed to auto-track subdirectories of %q: %+v", p, err)
+			err = nil
+		}
+	}
+	return
+}

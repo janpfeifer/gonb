@@ -2,6 +2,9 @@
 
 ## Next
 
+* Added support for tracking `go.work`, which allows auto-complete and contextual help
+  to work with the local modules configured. It also requires `gopls` _v0.12.4_ or newer to work.
+* Fixed auto-complete bug when no `main` function (or no `%%`) was present in cell.
 * Added special command `%cd` to chance current directory.
 * Commands `%cd` and `%env` prints results of its execution.
 

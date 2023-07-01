@@ -103,9 +103,6 @@ Contributions are welcome!
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 * Controllable (per package or file) logging in GoNB code. 
-* Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
-  would be handy, but complicates tracking the position of the cursor on the changed
-  file.
 * Create a JupyterLab extension to allows the Go code to create and interact with widgets. Or 
   alternatively open a WebSocket from the widget to the kernel. Some links:
   * https://github.com/jupyterlab/extension-examples

@@ -232,6 +232,9 @@ func (s *State) lockedUntrackEntry(fileOrDirPath string) (err error) {
 func (s *State) ListTracked() []string {
 	s.trackingInfo.mu.Lock()
 	defer s.trackingInfo.mu.Unlock()
+	if klog.V(2).Enabled() {
+		klog.Infof("ListTracked(): %d tracked files", len(s.trackingInfo.tracked))
+	}
 	return common.SortedKeys(s.trackingInfo.tracked)
 }
 
@@ -320,7 +323,7 @@ func (s *State) autoTrackGoMod() (err error) {
 			// already tracked.
 			continue
 		}
-		klog.Infof("- go.mod new replace: %s", replaceTarget)
+		klog.V(2).Infof("- go.mod new replace: %s", replaceTarget)
 		err = s.Track(replaceTarget)
 
 		// Because fsnotify doesn't support recursion in watching for changes in subdirectories,
@@ -354,20 +357,29 @@ var (
 
 // autoTrackGoWork tracks entries in `go.work`.
 func (s *State) autoTrackGoWork() (err error) {
+	klog.V(2).Infof("autoTrackGoWork()")
 	ti := s.trackingInfo
 	goWorkPath := path.Join(s.TempDir, "go.work")
 	fileInfo, err := os.Stat(goWorkPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// No go.work, we don't auto-track anything.
+			klog.V(2).Infof("autoTrackGoWork(): go.work doesn't exist")
 			err = nil
 			return
 		}
 		err = errors.Wrapf(err, "failed to check %q for auto-tracking of files", goWorkPath)
 		return
 	}
-	if !fileInfo.ModTime().After(ti.goWorkModTime) {
+
+	// Re-parse in 2 cases:
+	//   * File modified since last modification time.
+	//   * Current time (now) is < 1 second after modification time: the modification time resolution is
+	//     relatively coarse, and we are seeing cases where it didn't differ between file modifications.
+	needsParsing := fileInfo.ModTime().After(ti.goWorkModTime) || ti.goWorkModTime.Add(time.Second).After(time.Now())
+	if !needsParsing {
 		// No changes.
+		klog.V(2).Infof("autoTrackGoWork(): no changes to go.work")
 		return
 	}
 
@@ -385,12 +397,15 @@ func (s *State) autoTrackGoWork() (err error) {
 	}
 	for _, useRule := range workFile.Use {
 		p := useRule.Path
+		if p == "." {
+			continue
+		}
 		_, found := ti.tracked[p]
 		if found {
 			// already tracked.
 			continue
 		}
-		klog.Infof("- go.work new replace: %s", p)
+		klog.V(2).Infof("- go.work new replace: %s", p)
 		err = s.Track(p)
 
 		// Because fsnotify doesn't support recursion in watching for changes in subdirectories,
@@ -414,5 +429,6 @@ func (s *State) autoTrackGoWork() (err error) {
 			err = nil
 		}
 	}
+	klog.V(2).Infof("autoTrackGoWork(): go.work re-parsed, %d tracked files in total", len(ti.tracked))
 	return
 }

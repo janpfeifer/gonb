@@ -36,7 +36,7 @@ func (s *State) notifyAboutStandardAndTrackedFiles(ctx context.Context) (err err
 	}
 
 	err = s.EnumerateUpdatedFiles(func(filePath string) error {
-		klog.Infof("Notified of change to %q", filePath)
+		klog.V(1).Infof("Notified of change to %q", filePath)
 		return s.gopls.NotifyDidOpenOrChange(ctx, filePath)
 	})
 	if err != nil {

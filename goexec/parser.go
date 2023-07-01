@@ -427,11 +427,11 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 		return
 	}
 	if cursorInCell.HasCursor() && !cursorInFile.HasCursor() {
-		// Returns empty data, which returns a "not found".
+		// Returns empty data, which returns a "not found."
 		err = errors.WithStack(CursorLost)
 		return
 	}
-	if cursorInCell.HasCursor() {
+	if cursorInCell.HasCursor() && klog.V(1).Enabled() {
 		s.logCursor(cursorInFile)
 	}
 	return

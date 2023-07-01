@@ -9,7 +9,7 @@
 
 * Added "%ls" and "%rm" to manage memorized definitions directly.
 * More contextual help and auto-complete improvements:
-  * Tracking of files follow through symbolic links.
+  * Tracking of files follows through symbolic links.
 
 ## v0.6.5 - 2023/05/23
 

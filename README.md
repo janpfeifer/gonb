@@ -18,9 +18,9 @@ It already includes many goodies: cache between cell of results, contextual help
 [`gopls`](https://github.com/golang/tools/tree/master/gopls)), compilation error context (by
 mousing over), bash command execution, images, html, etc. See the [tutorial](examples/tutorial.ipynb).
 
-It's been heavily (and successfully) used by the author, but should still be seen as **experimental** -- 
-if we hear success stories from others we can change this. Reports of issues as well as fixes are 
-always welcome.
+It's been heavily used by the author (in developing [GoMLX](https://github.com/gomlx/gomlx), a machine 
+learning framework for Go), but should still be seen as **experimental** -- if we hear success stories
+from others we can change this. Reports of issues as well as fixes are always welcome.
 
 There is also
 [a live version in Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing)
@@ -44,7 +44,7 @@ to store the notebook files). It will be mounted on the `work/` sub-directory in
 To start it:
 
 ```shell
-docker pull janpfeifer/gonb_jupyter:latest
+docker pull janpfeifer/gonb_jupyterlab:latest
 docker run -it --rm -p 8888:8888 -v "${PWD}":/home/jovyan/work janpfeifer/gonb_jupyterlab:latest
 ```
 
@@ -103,9 +103,6 @@ Contributions are welcome!
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 * Controllable (per package or file) logging in GoNB code. 
-* Run `goimports` before calling `gopls` to inspect a variable, or auto-complete. This
-  would be handy, but complicates tracking the position of the cursor on the changed
-  file.
 * Create a JupyterLab extension to allows the Go code to create and interact with widgets. Or 
   alternatively open a WebSocket from the widget to the kernel. Some links:
   * https://github.com/jupyterlab/extension-examples

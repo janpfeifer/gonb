@@ -200,14 +200,18 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 
 	case "cd":
 		if len(parts) != 2 {
+			pwd, _ := os.Getwd()
+			_ = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+				fmt.Sprintf("Current directory: %q\n", pwd))
 			return errors.Errorf("`%%cd <directory>`: it takes one argument, but %d were given", len(parts)-1)
 		}
-		err := os.Chdir(parts[1])
+		err := os.Chdir(ReplaceTildeInDir(parts[1]))
 		if err != nil {
 			return errors.Wrapf(err, "`%%cd %q` failed", parts[1])
 		}
+		pwd, _ := os.Getwd()
 		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
-			fmt.Sprintf("Changed directory to %q\n", parts[1]))
+			fmt.Sprintf("Changed directory to %q\n", pwd))
 		if err != nil {
 			klog.Errorf("Failed to output: %+v", err)
 		}

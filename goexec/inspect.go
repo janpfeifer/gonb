@@ -36,7 +36,7 @@ func (s *State) notifyAboutStandardAndTrackedFiles(ctx context.Context) (err err
 	}
 
 	err = s.EnumerateUpdatedFiles(func(filePath string) error {
-		klog.Infof("Notified of change to %q", filePath)
+		klog.V(1).Infof("Notified of change to %q", filePath)
 		return s.gopls.NotifyDidOpenOrChange(ctx, filePath)
 	})
 	if err != nil {
@@ -123,7 +123,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	return
 }
 
-// AutoCompleteOptionsInCell implements an `complete_request` from Jupyter, using `gopls`.
+// AutoCompleteOptionsInCell implements a `complete_request` from Jupyter, using `gopls`.
 // It updates `main.go` with the cell contents (given as lines)
 func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]struct{},
 	cursorLine, cursorCol int, reply *kernel.CompleteReply) (err error) {

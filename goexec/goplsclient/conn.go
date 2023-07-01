@@ -395,7 +395,7 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 			klog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return true
 		}
-		klog.V(2).Infof("received gopls window log message: %q", trimString(params.Message, 100))
+		klog.V(2).Infof("received gopls window log message: %s", params.Message)
 		return true
 	case lsp.MethodTextDocumentPublishDiagnostics:
 		var params lsp.PublishDiagnosticsParams
@@ -408,7 +408,9 @@ func (h *jsonrpc2Handler) Deliver(ctx context.Context, r *jsonrpc2.Request, deli
 		for _, diag := range params.Diagnostics {
 			h.client.messages = append(h.client.messages, diag.Message)
 		}
-		klog.V(2).Infof("received gopls diagnostics: %+v", trimString(fmt.Sprintf("%+v", params), 100))
+		if (klog.V(2).Enabled() && len(params.Diagnostics) > 0) || klog.V(3).Enabled() {
+			klog.V(2).Infof("received gopls diagnostics: %+v", trimString(fmt.Sprintf("%+v", params), 100))
+		}
 		return true
 	default:
 		klog.Errorf("gopls jsonrpc2 delivered but not handled: %q", r.Method)
@@ -428,7 +430,6 @@ func (h *jsonrpc2Handler) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id js
 // Request implements jsonrpc2.Handler.
 func (h *jsonrpc2Handler) Request(ctx context.Context, conn *jsonrpc2.Conn, direction jsonrpc2.Direction, r *jsonrpc2.WireRequest) context.Context {
 	_ = conn
-	_ = direction
 	klog.V(2).Infof("jsonrpc2 Request(direction=%s) %q", direction, r.Method)
 	return ctx
 }

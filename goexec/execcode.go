@@ -7,6 +7,7 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"io"
+	"k8s.io/klog/v2"
 	"log"
 	"os/exec"
 	"path"
@@ -88,6 +89,7 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 //
 // It returns the updated cursorInFile and fileToCellIdAndLines that reflect any changes in `main.go`.
 func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error) {
+	klog.V(2).Infof("GoImports():")
 	cursorInFile = NoCursor
 	goimportsPath, err := exec.LookPath("goimports")
 	if err != nil {
@@ -142,6 +144,7 @@ can install it from the notebook with:
 		err = errors.WithMessagef(err, "while composing main.go with all declarations")
 		return
 	}
+	klog.V(2).Infof("GoImports(): cursorInFile=%s", cursorInFile)
 
 	// Download missing dependencies.
 	if !s.AutoGet {

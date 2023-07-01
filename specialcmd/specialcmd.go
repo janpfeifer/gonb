@@ -56,6 +56,8 @@ Special non-Go commands:
   overwrite the values here.
 - "%autoget" and "%noautoget": Default is "%autoget", which automatically does "go get" for
   packages not yet available.
+- "%cd [<directory>]": Change current directory of the Go kernel, and the directory from where
+  the cells are executed. If no directory is given it reports the current directory.
 - "%env VAR value": Sets the environment variable VAR to the given value. These variables
   will be available both for Go code as well as for shell scripts.
 - "%with_inputs": will prompt for inputs for the next shell command. Use this if
@@ -182,12 +184,42 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		goExec.Args = parts[1:]
 		log.Printf("args=%+q", parts)
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
+
 	case "env":
 		// Set environment variables.
 		if len(parts) != 3 {
-			return errors.Errorf("`%%env FOO bar` takes 2 arguments, the variable name and it's content. %d were given", len(parts))
+			return errors.Errorf("`%%env <VAR_NAME> <value>`: it takes 2 arguments, the variable name and it's content, but %d were given", len(parts)-1)
 		}
-		os.Setenv(parts[1], parts[2])
+		err := os.Setenv(parts[1], parts[2])
+		if err != nil {
+			return errors.Wrapf(err, "`%%env %q %q` failed", parts[1], parts[2])
+		}
+		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+			fmt.Sprintf("Set: %s=%q\n", parts[1], parts[2]))
+		if err != nil {
+			klog.Errorf("Failed to output: %+v", err)
+		}
+
+	case "cd":
+		if len(parts) == 1 {
+			pwd, _ := os.Getwd()
+			_ = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+				fmt.Sprintf("Current directory: %q\n", pwd))
+		}
+		if len(parts) > 2 {
+			return errors.Errorf("`%%cd [<directory>]`: it takes none or one argument, but %d were given", len(parts)-1)
+		}
+		err := os.Chdir(ReplaceTildeInDir(parts[1]))
+		if err != nil {
+			return errors.Wrapf(err, "`%%cd %q` failed", parts[1])
+		}
+		pwd, _ := os.Getwd()
+		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+			fmt.Sprintf("Changed directory to %q\n", pwd))
+		if err != nil {
+			klog.Errorf("Failed to output: %+v", err)
+		}
+
 	case "autoget":
 		goExec.AutoGet = true
 	case "noautoget":

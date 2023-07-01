@@ -6,8 +6,11 @@ import (
 	"golang.org/x/exp/constraints"
 	"io/fs"
 	"os"
+	"os/user"
+	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // Set implements a Set for the key type T.
@@ -84,4 +87,14 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 		// If not a symbolic link, call the user's function.
 		return dirFunc(entryPath, info, err)
 	})
+}
+
+// ReplaceTildeInDir by the user's home directory. Returns dir if it doesn't start with "~".
+func ReplaceTildeInDir(dir string) string {
+	if dir != "~" && !strings.HasPrefix(dir, "~/") {
+		return dir
+	}
+	usr, _ := user.Current()
+	homeDir := usr.HomeDir
+	return path.Join(homeDir, dir[1:])
 }

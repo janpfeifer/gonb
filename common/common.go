@@ -74,6 +74,9 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 	visited.Insert(current)
 
 	return filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
+		if info == nil {
+			return errors.Errorf("file %q does not exist!?", entryPath)
+		}
 		if info.Type() == os.ModeSymlink {
 			// Recursively follow symbolic links.
 			linkedPath, err := os.Readlink(entryPath)

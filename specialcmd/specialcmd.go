@@ -1,7 +1,8 @@
 // Package specialcmd handles special commands, that come in two flavors:
 //
-// - `%<cmd> {...args...}` : Control the environment (variables) and configure gonb.
-// - `!<shell commands>` : Execute shell commands. Similar to the ipython kernel.
+//   - `%<cmd> {...args...}`: Control the environment (variables) and configure gonb.
+//   - `!<shell commands>`: Execute shell commands.
+//     Similar to the ipython kernel.
 //
 // In particular `%help` will print out currently available commands.
 package specialcmd
@@ -88,7 +89,7 @@ Executing shell commands:
   for instance to get a package from some specific version, something 
   like "!*go get github.com/my/package@v3".
 
-Tracking of Go files being develped:
+Tracking of Go files being developed:
 
 - "%track [file_or_directory]": add file or directory to list of tracked files,
   which are monitored by GoNB (and 'gopls') for auto-complete or contextual help.
@@ -144,7 +145,7 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 					// Runs AutoTrack, in case go.mod has changed.
 					err = goExec.AutoTrack()
 					if err != nil {
-						klog.Errorf("goxec.AutoTrack failed: %+v", err)
+						klog.Errorf("goExec.AutoTrack failed: %+v", err)
 					}
 				}
 			}
@@ -284,7 +285,7 @@ func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *
 }
 
 // splitCmd split the special command into it's parts separated by space(s). It also
-// accepts quotes to allow spaces to be included in a part. Eg.: `%args --text "hello world"`
+// accepts quotes to allow spaces to be included in a part. E.g.: `%args --text "hello world"`
 // should be split into ["%args", "--text", "hello world"].
 func splitCmd(cmd string) (parts []string) {
 	partStarted := false

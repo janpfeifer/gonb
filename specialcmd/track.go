@@ -57,16 +57,16 @@ func showTrackedList(msg kernel.Message, goExec *goexec.State) {
 	tracked := goExec.ListTracked()
 	htmlParts := make([]string, 0, len(tracked)+5)
 	if len(tracked) == 0 {
-		htmlParts = append(htmlParts, "<b>No files or directory being tracked yet<b>")
+		htmlParts = append(htmlParts, "<b>No files or directory being tracked yet</b>")
 	} else {
-		htmlParts = append(htmlParts, "<h4>List of files/directories being tracked:</h4>")
+		htmlParts = append(htmlParts, "<b>List of files/directories being tracked:</b>")
 		htmlParts = append(htmlParts, "<ul>")
 		for _, p := range tracked {
 			htmlParts = append(htmlParts, "<li>"+p+"</li>")
 		}
 		htmlParts = append(htmlParts, "</ul>")
 	}
-	err := kernel.PublishDisplayDataWithHTML(msg, strings.Join(htmlParts, "\n"))
+	err := kernel.PublishDisplayDataWithHTML(msg, strings.Join(htmlParts, "\n")+"\n")
 	if err != nil {
 		klog.Errorf("Failed to publish %track results back to jupyter: %+v", err)
 	}

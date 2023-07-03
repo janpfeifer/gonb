@@ -30,7 +30,7 @@ RUN apt-get install --yes --no-install-recommends git
 # Go and GoNB Libraries
 #######################################################################################################
 ENV GO_VERSION=1.20.4
-ENV GONB_VERSION="v0.6.5"
+ENV GONB_VERSION="v0.7.1"
 ENV GOROOT=/usr/local/go
 ENV GOPATH=${HOME}/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -50,6 +50,10 @@ RUN go install "github.com/janpfeifer/gonb@${GONB_VERSION}" && \
 
 # Make tutorial available by default, so it can be used.
 COPY --link examples/tutorial.ipynb ${HOME}
+
+# Include latest version of gonb locally.
+RUN mkdir Projects && cd Projects && \
+    git clone 'https://github.com/janpfeifer/gonb.git'
 
 #######################################################################################################
 # Finishing touches

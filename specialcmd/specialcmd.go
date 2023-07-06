@@ -206,19 +206,19 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			pwd, _ := os.Getwd()
 			_ = kernel.PublishWriteStream(msg, kernel.StreamStdout,
 				fmt.Sprintf("Current directory: %q\n", pwd))
-		}
-		if len(parts) > 2 {
+		} else if len(parts) > 2 {
 			return errors.Errorf("`%%cd [<directory>]`: it takes none or one argument, but %d were given", len(parts)-1)
-		}
-		err := os.Chdir(ReplaceTildeInDir(parts[1]))
-		if err != nil {
-			return errors.Wrapf(err, "`%%cd %q` failed", parts[1])
-		}
-		pwd, _ := os.Getwd()
-		err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
-			fmt.Sprintf("Changed directory to %q\n", pwd))
-		if err != nil {
-			klog.Errorf("Failed to output: %+v", err)
+		} else {
+			err := os.Chdir(ReplaceTildeInDir(parts[1]))
+			if err != nil {
+				return errors.Wrapf(err, "`%%cd %q` failed", parts[1])
+			}
+			pwd, _ := os.Getwd()
+			err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+				fmt.Sprintf("Changed directory to %q\n", pwd))
+			if err != nil {
+				klog.Errorf("Failed to output: %+v", err)
+			}
 		}
 
 	case "autoget":

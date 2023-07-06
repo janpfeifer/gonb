@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Fixed bug crashing command "%cd" with no argument.
+
 ## 0.7.1 - 2023/07/03
 
 * Added support for tracking `go.work`, which allows auto-complete and contextual help

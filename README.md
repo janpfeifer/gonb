@@ -106,7 +106,6 @@ Contributions are welcome!
 * Windows version: 
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
-* Controllable (per package or file) logging in GoNB code. 
 * Create a JupyterLab extension to allow the Go code to create and interact with widgets. 
   Alternatively, open a WebSocket from the widget to the kernel.
   Some links:

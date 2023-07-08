@@ -12,7 +12,7 @@ import (
 // The tests here uses the sample code and utility functions defined in `parser_test.go`.
 
 func TestCreateGoFileFromLines(t *testing.T) {
-	// Test cursor positioning in generated lines.
+	// Test cursor positioning in generated cellLines.
 	s := newEmptyState(t)
 	defer func() {
 		err := s.Finalize()
@@ -21,17 +21,17 @@ func TestCreateGoFileFromLines(t *testing.T) {
 	fmt.Println(s.MainPath())
 
 	content := sampleCellCode
-	lines := strings.Split(content, "\n")
+	cellLines := strings.Split(content, "\n")
 	skipLines := MakeSet[int]()
-	for ii, line := range lines {
-		if line == "!echo nonono" {
+	for ii, line := range cellLines {
+		if strings.HasPrefix(line, "!") {
 			skipLines.Insert(ii)
 		}
 	}
 
 	cursorInCell := Cursor{38, 27} // "func (k *Kg) Gain(lasagna K_g) {"
-	cursorLine := lines[cursorInCell.Line]
-	cursorInFile, fileToCellMap, err := s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	cursorLine := cellLines[cursorInCell.Line]
+	cursorInFile, fileToCellLines, err := s.createGoFileFromLines(s.MainPath(), cellLines, skipLines, cursorInCell)
 	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.MainPath())
 
 	// Read generated contents:
@@ -41,21 +41,25 @@ func TestCreateGoFileFromLines(t *testing.T) {
 	require.Contains(t, content, "func main() {")
 	require.NotContains(t, content, "echo nonono", "Line should have been filtered out, since it is in skipLine.")
 
-	originalNumLines := len(lines)
-	newLines := strings.Split(content, "\n")
-	newNumLines := len(newLines)
-	require.Equal(t, originalNumLines+5, newNumLines, "Number of lines of generated main.go")
-	require.Equal(t, cursorLine, newLines[cursorInFile.Line], "Cursor line remains the same.")
+	numCellLines := len(cellLines)
+	fileLines := strings.Split(content, "\n")
+	numFileLines := len(fileLines)
+	require.Equal(t, numCellLines+5, numFileLines, "Number of lines of generated main.go")
+	require.Equal(t, cursorLine, fileLines[cursorInFile.Line], "Cursor line remains the same.")
 
-	for ii, newLine := range newLines {
-		if ii >= newNumLines-8 {
-			// Content of lines change (an indentation is added) so we skip these.
+	for ii, newLine := range fileLines {
+		if ii >= numFileLines-8 {
+			// Content of cellLines change (an indentation is added) so we skip these.
 			break
 		}
-		originalLineIdx := fileToCellMap[ii]
-		if originalLineIdx == NoCursorLine {
+		cellLineIdx := fileToCellLines[ii]
+		if cellLineIdx == NoCursorLine {
 			continue
 		}
-		require.Equalf(t, lines[originalLineIdx], newLine, "Line mapping look wrong: file line %d --> cell line %d", ii, originalLineIdx)
+		if cellLines[cellLineIdx] == "%%" {
+			// The "%%" is mapped to `func main() { \n flags.Parse()\n`, we also skip these.
+			continue
+		}
+		require.Equalf(t, cellLines[cellLineIdx], newLine, "Line mapping look wrong: file line %d --> cell line %d", ii, cellLineIdx)
 	}
 }

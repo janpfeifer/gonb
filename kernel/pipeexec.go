@@ -3,7 +3,7 @@ package kernel
 import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"io"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"sync"
@@ -87,7 +87,7 @@ func (builder *PipeExecToJupyterBuilder) WithPassword(millisecondsWait int) *Pip
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
 // program returns an error for any reason.
 func (builder *PipeExecToJupyterBuilder) Exec() error {
-	log.Printf("Executing: %s %v", builder.command, builder.args)
+	klog.Infof("Executing: %s %v", builder.command, builder.args)
 
 	cmd := exec.Command(builder.command, builder.args...)
 	cmd.Dir = builder.dir
@@ -141,7 +141,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 			}
 			content := input.Composed.Content.(map[string]any)
 			value := content["value"].(string) + "\n"
-			log.Printf("stdin value: %q", value)
+			klog.V(2).Infof("stdin value: %q", value)
 			go func() {
 				// Write concurrently, not to block, in case program doesn't
 				// actually read anything from the stdin.
@@ -149,7 +149,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 				if err != nil {
 					// Could happen if something was not fully written, and channel was closed, in
 					// which case it's ok.
-					log.Printf("failed to write to stdin of %q %v: %+v", builder.command, builder.args, err)
+					klog.Warningf("failed to write to stdin of %q %v: %+v", builder.command, builder.args, err)
 				}
 			}()
 			// Reschedule itself for the next message.
@@ -206,7 +206,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	}
 	doneFn()
 
-	log.Printf("Execution finished successfully")
+	klog.V(2).Infof("Execution finished successfully")
 	return nil
 }
 
@@ -269,7 +269,7 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 		var pipeReader *os.File
 		pipeReader, err = os.Open(pipePath)
 		if err != nil {
-			log.Printf("Failed to open pipe (Mkfifo) %q for reading: %+v", pipePath, err)
+			klog.Warningf("Failed to open pipe (Mkfifo) %q for reading: %+v", pipePath, err)
 			return
 		}
 		muFifo.Lock()

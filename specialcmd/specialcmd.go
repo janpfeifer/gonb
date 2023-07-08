@@ -14,7 +14,6 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
-	"log"
 	"os"
 )
 
@@ -183,7 +182,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	case "%", "main", "args":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
-		log.Printf("args=%+q", parts)
+		klog.V(2).Infof("Program args to use (%%): %+q", parts)
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
 
 	case "env":
@@ -255,7 +254,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	default:
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
 		if err != nil {
-			log.Printf("Error while reporting back on unimplmented message command \"%%%s\" kernel: %+v", parts[0], err)
+			klog.Errorf("Error while reporting back on unimplemented message command \"%%%s\" kernel: %+v", parts[0], err)
 		}
 	}
 	return nil

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
 	"github.com/pkg/errors"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
@@ -71,7 +71,7 @@ func New(uniqueID string) (*State, error) {
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("Failed to run `go mod init %s`:\n%s", s.Package, output)
+		klog.Errorf("Failed to run `go mod init %s`:\n%s", s.Package, output)
 		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 
@@ -79,16 +79,9 @@ func New(uniqueID string) (*State, error) {
 		s.gopls = goplsclient.New(s.TempDir)
 		err = s.gopls.Start()
 		if err != nil {
-			log.Printf("Failed to start `gopls`: %v", err)
+			klog.Errorf("Failed to start `gopls`: %v", err)
 		}
-		log.Printf("Started `gopls`.")
-		//s.gopls.SetAddress("/tmp/gopls-daemon-socket")
-		//err = s.gopls.Connect(context.Background())
-		//if err != nil {
-		//	log.Printf("Failed to connect to `gopls`: %v", err)
-		//}
-		//log.Printf("Connected to `gopls`.")
-
+		klog.V(1).Infof("Started `gopls`.")
 	} else {
 		msg := `
 Program gopls is not installed. It is used to inspect into code
@@ -99,10 +92,10 @@ with:
 ` + "```" + `
 !go install golang.org/x/tools/gopls@latest
 ` + "```\n"
-		log.Printf(msg)
+		klog.Errorf(msg)
 	}
 
-	log.Printf("Initialized goexec.State in %s", s.TempDir)
+	klog.Infof("Initialized goexec.State in %s", s.TempDir)
 	return s, nil
 }
 

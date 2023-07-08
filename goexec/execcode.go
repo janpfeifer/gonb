@@ -8,7 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
-	"log"
 	"os/exec"
 	"path"
 	"regexp"
@@ -175,7 +174,7 @@ type jupyterStackTraceMapperWriter struct {
 func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPath string, fileToCellIdAndLine []CellIdAndLine) io.Writer {
 	r, err := regexp.Compile(fmt.Sprintf("%s:(\\d+)", regexp.QuoteMeta(mainPath)))
 	if err != nil {
-		log.Printf("Failed to compile expression to match %q: won't map stack traces with cell lines", mainPath)
+		klog.Errorf("Failed to compile expression to match %q: won't be able to map stack traces with cell lines", mainPath)
 	}
 
 	return &jupyterStackTraceMapperWriter{
@@ -192,25 +191,27 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 		return w.jupyterWriter.Write(p)
 	}
 	p = w.regexpMainPath.ReplaceAllFunc(p, func(match []byte) []byte {
-		log.Printf("\tFiltering stderr: %s", match)
+		klog.V(2).Infof("\tFiltering stderr: %s", match)
 		lineNumStr := strings.Split(string(match), ":")[1]
 		lineNum, err := strconv.Atoi(lineNumStr)
 		if err != nil {
-			log.Printf("Can't parse line number %q, skipping", lineNumStr)
+			klog.Warningf("Can't parse line number in error output %q, skipping", match)
 			return match
 		}
-		if lineNum < 0 || lineNum > len(w.fileToCellIdAndLine) {
-			log.Printf("Can't line number %d is invalid, skipping", lineNum)
+		lineNum -= 1 // Since line reporting starts with 1, but our indices start with 0.
+		if lineNum < 0 || lineNum >= len(w.fileToCellIdAndLine) {
+			klog.Warningf("Can't find line number %d in %q: skipping", lineNum, w.mainPath)
 			return match
 		}
 		cellId, cellLineNum := w.fileToCellIdAndLine[lineNum].Id, w.fileToCellIdAndLine[lineNum].Line
 		var cellText []byte
 		const invertColor = "\033[7m"
 		const resetColor = "\033[0m"
+		// Since line reports usually start with 1, we report cellLineNum+1
 		if cellId == -1 {
-			cellText = []byte(fmt.Sprintf(" %s[[ Cell Line %d ]]%s ", invertColor, cellLineNum, resetColor))
+			cellText = []byte(fmt.Sprintf(" %s[[ Cell Line %d ]]%s ", invertColor, cellLineNum+1, resetColor))
 		} else {
-			cellText = []byte(fmt.Sprintf(" %s[[ Cell [%d] Line %d ]]%s ", invertColor, cellId, cellLineNum, resetColor))
+			cellText = []byte(fmt.Sprintf(" %s[[ Cell [%d] Line %d ]]%s ", invertColor, cellId, cellLineNum+1, resetColor))
 		}
 		res := bytes.Join([][]byte{cellText, match}, nil)
 		return res

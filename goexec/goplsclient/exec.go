@@ -2,7 +2,7 @@ package goplsclient
 
 import (
 	"context"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"strings"
@@ -43,7 +43,7 @@ func (c *Client) Start() error {
 	}
 	c.goplsExec = exec.Command(goplsPath, "-listen", addr)
 	c.goplsExec.Dir = c.dir
-	log.Printf("Starting %s", c.goplsExec)
+	klog.Infof("Starting %s", c.goplsExec)
 	err = c.goplsExec.Start()
 	if err != nil {
 		err = errors.Wrapf(err, "failed to start %s", c.goplsExec)
@@ -55,7 +55,7 @@ func (c *Client) Start() error {
 
 	// In parallel tries to connect.
 	go func() {
-		log.Printf("Polling connection with %s", c.goplsExec)
+		klog.V(2).Infof("Polling connection with %s", c.goplsExec)
 		onDeadline := time.After(StartTimeout)
 		ctx := context.Background()
 		for {
@@ -63,13 +63,13 @@ func (c *Client) Start() error {
 			select {
 			case <-onDeadline:
 				// Still failing to connect, kill job.
-				log.Printf("started `gopls`, but after %s it failed to connect, stopping it.", StartTimeout)
+				klog.V(2).Infof("started `gopls`, but after %s it failed to connect, stopping it.", StartTimeout)
 				c.Stop()
 				return
 			case <-time.After(ConnectTimeout):
 				// Wait before trying to connect (again)
 			}
-			log.Printf("* trying to connect to %s", c.Address())
+			klog.V(2).Infof("* trying to connect to %s", c.Address())
 			err := c.Connect(ctx)
 			if err == nil {
 				// Connected!
@@ -83,9 +83,9 @@ func (c *Client) Start() error {
 	go func() {
 		err := c.goplsExec.Wait()
 		if err != nil {
-			log.Printf("gopls failed with: %+v", err)
+			klog.Warningf("gopls failed with: %+v", err)
 		} else {
-			log.Printf("gopls terminated normally.")
+			klog.V(2).Infof("gopls terminated normally.")
 		}
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -141,7 +141,7 @@ func (c *Client) removeUnixSocketFile() {
 		addr = addr[5:]
 	}
 	if strings.HasPrefix(addr, "/") {
-		log.Printf("Removing %s", addr)
+		klog.V(2).Infof("Removing %s", addr)
 		// Remove unix socket file, if it exists -- we ignore any errors.
 		_ = os.Remove(addr)
 	}

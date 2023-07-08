@@ -150,7 +150,7 @@ func TestState_Parse(t *testing.T) {
 	assert.Contains(t, s.Definitions.Functions, "Kg~Gain")
 	assert.Contains(t, s.Definitions.Functions, "N~Weight")
 	assert.Contains(t, s.Definitions.Functions, "main")
-	assert.ElementsMatch(t, []int{-1, -1, 72, 73, 74, 75, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
+	assert.ElementsMatch(t, []int{71, 71, 72, 73, 74, 75, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Definitions.Variables)

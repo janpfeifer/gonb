@@ -11,6 +11,7 @@ import (
 	"github.com/janpfeifer/gonb/specialcmd"
 	"github.com/pkg/errors"
 	"io"
+	"k8s.io/klog/v2"
 	"log"
 	"strings"
 	"sync"
@@ -35,8 +36,7 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 				case msg := <-ch:
 					err := fn(msg, goExec)
 					if err != nil {
-						log.Printf("*** Failed to process incoming message: %+v", err)
-						log.Printf("*** Stopping kernel.")
+						klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
 						k.Stop()
 						return
 					}
@@ -53,7 +53,7 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 	})
 	poll(k.Shell(), handleMsg)
 	poll(k.Control(), func(msg kernel.Message, goExec *goexec.State) error {
-		log.Printf("Control MessageImpl: %+v", msg.ComposedMsg())
+		klog.V(2).Infof("Control MessageImpl: %+v", msg.ComposedMsg())
 		return handleMsg(msg, goExec)
 	})
 	wg.Wait()
@@ -75,7 +75,7 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
 		return
 	}
-	log.Printf("\tReceived message %q from shell", msg.ComposedMsg().Header.MsgType)
+	klog.V(2).Infof("Received message %q from shell socket", msg.ComposedMsg().Header.MsgType)
 
 	// Defer publishing of status idle again, before returning.
 	defer func() {
@@ -103,14 +103,14 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 			err = errors.WithMessagef(err, "replying to 'inspect_request'")
 		}
 	case "is_complete_request":
-		log.Printf("Received is_complete_request: ignoring, since it's not a console like kernel.")
+		klog.V(2).Infof("Received is_complete_request: ignoring, since it's not a console like kernel.")
 	case "complete_request":
 		if err := handleCompleteRequest(msg, goExec); err != nil {
 			log.Fatal(err)
 		}
 	default:
 		// Log, ignore, and hope for the best.
-		log.Printf("unhandled shell message %q", msg.ComposedMsg().Header.MsgType)
+		klog.Infof("Unhandled shell-socket message %q", msg.ComposedMsg().Header.MsgType)
 	}
 	return
 }
@@ -128,7 +128,7 @@ func handleShutdownRequest(msg kernel.Message) error {
 	if err := msg.Reply("shutdown_reply", reply); err != nil {
 		return errors.WithMessagef(err, "replying shutdown_reply")
 	}
-	log.Printf("Shutting down in response to shutdown_request")
+	klog.Infof("Shutting down in response to shutdown_request")
 	msg.Kernel().Stop()
 	return nil
 }
@@ -205,7 +205,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	code := content["code"].(string)
 	cursorPos := int(content["cursor_pos"].(float64))
 	detailLevel := int(content["detail_level"].(float64))
-	log.Printf("inspect_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
+	klog.V(1).Infof("inspect_request: cursorPos(utf16)=%d, detailLevel=%d", cursorPos, detailLevel)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
@@ -246,7 +246,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 
 // handleCompleteRequest replies with a `complete_reply` message, to auto-complete code.
 func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error) {
-	log.Printf("`complete_request`:")
+	klog.V(2).Infof("`complete_request`:")
 
 	// Start with empty reply, and makes sure reply is sent at the end.
 	reply := &kernel.CompleteReply{
@@ -258,10 +258,10 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	}
 	defer func() {
 		if err != nil {
-			log.Printf("Handling `complete_request` failed: %+v", err)
+			klog.Warningf("Handling `complete_request` failed: %+v", err)
 			reply.Status = "error"
 		}
-		log.Printf("`complete_reply`: %s, %d matches", reply.Status, len(reply.Matches))
+		klog.V(2).Infof("`complete_reply`: %s, %d matches", reply.Status, len(reply.Matches))
 		err = msg.Reply("complete_reply", reply)
 	}()
 
@@ -276,7 +276,7 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	cursorPos := int(content["cursor_pos"].(float64))
 	reply.CursorStart = cursorPos
 	reply.CursorEnd = cursorPos
-	log.Printf("complete_request: cursorPos(utf16)=%d", cursorPos)
+	klog.V(2).Infof("complete_request: cursorPos(utf16)=%d", cursorPos)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)

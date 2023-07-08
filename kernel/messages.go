@@ -416,13 +416,12 @@ func NewJupyterStreamWriter(msg Message, stream string) io.Writer {
 }
 
 // Write implements `io.Writer.Write` by publishing the data via `PublishWriteStream`
-func (w *jupyterStreamWriter) Write(p []byte) (int, error) {
+func (w *jupyterStreamWriter) Write(p []byte) (n int, err error) {
 	data := string(p)
-	n := len(p)
 	if err := PublishWriteStream(w.msg, w.stream, data); err != nil {
-		return 0, errors.WithMessagef(err, "failed to stream %d bytes of data to stream %q", n, w.stream)
+		klog.Errorf("Failed to stream %d bytes of data to stream %q: %+v", n, w.stream, err)
 	}
-	return n, nil
+	return len(p), nil
 }
 
 // PublishKernelStatus publishes a status message notifying front-ends of the state the kernel

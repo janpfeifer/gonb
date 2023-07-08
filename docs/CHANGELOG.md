@@ -1,12 +1,12 @@
 # GoNB Changelog
 
-## Next
+## 0.7.2 - 2023/07/08
 
 * Fixed bug crashing command "%cd" with no argument.
 * Fixed error parsing: matching line number mix up with lines starting with 1 (instead of 0).
 * Cleaned up logs: moved more logging to `klog`: most is disabled by default, but can be enabled
   for debugging passing the flags `--logtostderr --vmodule=...` (they work with `--install`).
-* TODO: Race condition on panic of cells: program exit before all the stderr is read
+* Fixed bug where #bytes written of parsed stderr was reported wrong, which lead to truncated errors.
 
 ## 0.7.1 - 2023/07/03
 

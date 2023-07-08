@@ -187,6 +187,7 @@ func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPat
 
 // Write implements io.Writer, and maps references to the `main.go` file to their corresponding lines in cells.
 func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
+	n := len(p) // Save original number of bytes.
 	if w.regexpMainPath == nil {
 		return w.jupyterWriter.Write(p)
 	}
@@ -216,5 +217,10 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 		res := bytes.Join([][]byte{cellText, match}, nil)
 		return res
 	})
-	return w.jupyterWriter.Write(p)
+	_, err := w.jupyterWriter.Write(p)
+	if err != nil {
+		return 0, err
+	}
+	// Return the original number of bytes: since we change what is written, we actually write more bytes.
+	return n, nil
 }

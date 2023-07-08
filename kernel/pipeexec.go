@@ -112,11 +112,17 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	streamersWG.Add(2)
 	go func() {
 		defer streamersWG.Done()
-		_, _ = io.Copy(builder.stdoutWriter, cmdStdout)
+		_, err := io.Copy(builder.stdoutWriter, cmdStdout)
+		if err != nil {
+			klog.Errorf("Failed copying execution stdout: %+v", err)
+		}
 	}()
 	go func() {
 		defer streamersWG.Done()
-		_, _ = io.Copy(builder.stderrWriter, cmdStderr)
+		_, err := io.Copy(builder.stderrWriter, cmdStderr)
+		if err != nil && err != io.EOF {
+			klog.Errorf("Failed copying execution stderr: %+v", err)
+		}
 	}()
 
 	// Optionally prepare stdin to start after millisecondsToInput.
@@ -162,6 +168,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 			// Wait for the given time, and if command still running, ask
 			// Jupyter for stdin input.
 			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
+			klog.V(2).Infof("%d milliseconds elapsed, prompt for input", builder.millisecondsToInput)
 			muDone.Lock()
 			if !done {
 				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
@@ -189,6 +196,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 
 	// Start command.
 	if err := cmd.Start(); err != nil {
+		klog.Warningf("Failed to start command %q", builder.command)
 		_ = cmdStderr.Close()
 		_ = cmdStdout.Close()
 		doneFn()

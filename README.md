@@ -10,6 +10,11 @@ Go is a compiled language, but with very fast compilation, that allows one to us
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
 of the loop -- so it's a Read-Compile-Run-Print-Loop — while still feeling very interactive. 
 
+<video width="320" height="240" controls>
+  <source src="/janpfeifer/gonb/raw/main/docs/demo-720.webm" type="video/mp4">
+</video>
+
+
 **GoNB** leverages that compilation speed to implement a full-featured (at least it's getting there)
 [Jupyter notebook](https://jupyter.org/) kernel.
 As a side benefit it works with packages that use CGO — although it won't parse C code in the cells,

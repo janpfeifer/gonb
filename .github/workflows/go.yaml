@@ -3,7 +3,7 @@ permissions:
   # read|write|none
   actions: read
   checks: read
-  contents: read
+  contents: write
   deployments: read
   # id-token: read    --> doesn't work
   issues: read

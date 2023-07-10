@@ -1,4 +1,5 @@
 # GoNB, A Go Notebook Kernel for Jupyter
+![Coverage](https://img.shields.io/badge/Coverage-24.9%25-red)
 
 [![GoDev](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/janpfeifer/gonb?tab=doc)
 [![GitHub](https://img.shields.io/github/license/janpfeifer/gonb)](https://github.com/Kwynto/gosession/blob/master/LICENSE)

@@ -1,19 +1,19 @@
 name: "GoNB Tests and Badges" # The name of the workflow that will appear on Github
-permissions: read-all
+permissions:
   # read|write|none
-  #actions: read|write|none
-  #checks: read|write|none
-  #contents: read
-  #deployments: read|write|none
-  #id-token: read|write|none
-  #issues: read|write|none
-  #discussions: read|write|none
-  #packages: read|write|none
-  #pages: read|write|none
-  #pull-requests: read|write|none
-  #repository-projects: read|write|none
-  #security-events: read|write|none
-  #statuses: read|write|none
+  actions: read
+  checks: read
+  contents: read
+  deployments: read
+  id-token: read
+  issues: read
+  discussions: read
+  packages: read
+  pages: read
+  pull-requests: write
+  repository-projects: read
+  security-events: read
+  statuses: read
 
 on:
   push:

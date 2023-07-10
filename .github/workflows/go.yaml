@@ -1,4 +1,19 @@
-name: Go  # The name of the workflow that will appear on Github
+name: "GoNB Tests and Badges" # The name of the workflow that will appear on Github
+permissions: read-all
+  # read|write|none
+  #actions: read|write|none
+  #checks: read|write|none
+  #contents: read
+  #deployments: read|write|none
+  #id-token: read|write|none
+  #issues: read|write|none
+  #discussions: read|write|none
+  #packages: read|write|none
+  #pages: read|write|none
+  #pull-requests: read|write|none
+  #repository-projects: read|write|none
+  #security-events: read|write|none
+  #statuses: read|write|none
 
 on:
   push:
@@ -12,6 +27,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+
     steps:
     - uses: actions/checkout@v3
 

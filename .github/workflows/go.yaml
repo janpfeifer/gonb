@@ -5,7 +5,7 @@ permissions:
   checks: read
   contents: read
   deployments: read
-  id-token: read
+  # id-token: read    --> doesn't work
   issues: read
   discussions: read
   packages: read

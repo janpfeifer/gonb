@@ -1,0 +1,55 @@
+name: Go  # The name of the workflow that will appear on Github
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        go: [1.20]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Build
+      run: go install
+
+    - name: Test
+      run: |
+        go test -v -cover ./... -coverprofile coverage.out -coverpkg ./...
+        go tool cover -func coverage.out -o coverage.out  # Replaces coverage.out with the analysis of coverage.out
+
+    - name: Go Coverage Badge
+      uses: tj-actions/coverage-badge-go@v1
+      if: ${{ runner.os == 'Linux' && matrix.go == '1.20' }} # Runs this on only one of the ci builds.
+      with:
+        green: 80
+        filename: coverage.out
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      id: auto-commit-action
+      with:
+        commit_message: Apply Code Coverage Badge
+        skip_fetch: true
+        skip_checkout: true
+        file_pattern: ./README.md
+
+    - name: Push Changes
+      if: steps.auto-commit-action.outputs.changes_detected == 'true'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ github.token }}
+        branch: ${{ github.ref }}

@@ -1,4 +1,4 @@
-name: "GoNB Tests and Badges" # The name of the workflow that will appear on Github
+name: "Tests" # The name of the workflow that will appear on Github
 permissions:
   # read|write|none
   actions: read

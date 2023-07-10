@@ -4,6 +4,8 @@
 [![GitHub](https://img.shields.io/github/license/janpfeifer/gonb)](https://github.com/Kwynto/gosession/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/janpfeifer/gonb)](https://goreportcard.com/report/github.com/janpfeifer/gonb)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/janpfeifer/gonb/HEAD?labpath=examples%2Ftutorial.ipynb)
+[![TestStatus](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml/badge.svg)](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml)
+
 
 ## For a quick start, see the 5 minutes [**tutorial**](examples/tutorial.ipynb)!
 

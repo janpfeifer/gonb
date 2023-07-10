@@ -12,6 +12,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb
+	golang.org/x/mod v0.7.0
 	k8s.io/klog/v2 v2.100.1
 )
 
@@ -29,7 +30,6 @@ require (
 	go.uber.org/zap v1.13.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20221031165847-c99f073a8326 // indirect
 	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
-	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect

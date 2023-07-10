@@ -1,11 +1,11 @@
 # GoNB, A Go Notebook Kernel for Jupyter
-![Coverage](https://img.shields.io/badge/Coverage-24.9%25-red)
 
 [![GoDev](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/janpfeifer/gonb?tab=doc)
 [![GitHub](https://img.shields.io/github/license/janpfeifer/gonb)](https://github.com/Kwynto/gosession/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/janpfeifer/gonb)](https://goreportcard.com/report/github.com/janpfeifer/gonb)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/janpfeifer/gonb/HEAD?labpath=examples%2Ftutorial.ipynb)
 [![TestStatus](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml/badge.svg)](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml)
+![Coverage](https://img.shields.io/badge/Coverage-24.9%25-red)
 
 
 ## For a quick start, see the 5 minutes [**tutorial**](examples/tutorial.ipynb)!
@@ -104,6 +104,17 @@ the library offers a convenient API to everything available. Examples of use in 
 If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol
 details.
 
+# FAQ
+
+* What is the `%%` symbol seen everywhere?
+  * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
+    There are many other special commands, see `%help` for the complete list, 
+    or check out the [**tutorial**](examples/tutorial.ipynb).
+* Why is the test coverage so low? 
+  * Orchestrating the tests from front-end and Jupyter is not trivial — I didn't find a tool to easily do
+    that.
+    Same with `gopls`.
+    Help, or pointers are wanted here (see TODO below).
 
 # TODOs
 
@@ -119,6 +130,7 @@ Contributions are welcome!
   * https://jupyter-notebook.readthedocs.io/en/4.x/comms.html
   * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
   * https://discourse.jupyter.org/c/jupyterlab/extensions/43
+* Integration testing with `JupyterLab` (or `Jupyter`) and with `gopls`.
 
 
 # Implementation

@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Issue #35: Fixed installation (--install): it now uses the absolute path to the gonb binary
+  (as opposed to simply `os.Args[0]`).
+
 ## 0.7.2 - 2023/07/08
 
 * Fixed bug crashing command "%cd" with no argument.

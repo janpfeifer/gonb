@@ -25,8 +25,12 @@ type jupyterKernelConfig struct {
 // the kernel is implemented by the same binary that is calling this function (os.Args[0])
 // and that the flag to pass the `connection_file` is `--kernel`.
 func Install(extraArgs []string, force bool) error {
+	gonbPath, err := os.Executable()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to find path to GoNB binary")
+	}
 	config := jupyterKernelConfig{
-		Argv:        []string{os.Args[0], "--kernel", "{connection_file}"},
+		Argv:        []string{gonbPath, "--kernel", "{connection_file}"},
 		DisplayName: "Go (gonb)",
 		Language:    "go",
 		Env:         make(map[string]string),

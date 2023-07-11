@@ -11,6 +11,7 @@ import (
 	klog "k8s.io/klog/v2"
 	"log"
 	"os"
+	"os/exec"
 )
 
 var (
@@ -71,6 +72,11 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "Use either --install to install the kernel, or if started by Jupyter the flag --kernel must be provided.\n")
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+
+	_, err := exec.LookPath("go")
+	if err != nil {
+		klog.Exitf("Failed to find path for the `go` program: %+v\n\nCurrent PATH=%q", err, os.Getenv("PATH"))
 	}
 
 	// Create a kernel.

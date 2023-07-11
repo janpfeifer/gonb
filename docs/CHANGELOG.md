@@ -4,6 +4,7 @@
 
 * Issue #35: Fixed installation (--install): it now uses the absolute path to the gonb binary
   (as opposed to simply `os.Args[0]`).
+  Also added check that it can find the "go" binary.
 
 ## 0.7.2 - 2023/07/08
 

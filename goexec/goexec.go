@@ -6,6 +6,7 @@ package goexec
 
 import (
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
@@ -37,6 +38,19 @@ type State struct {
 
 	// trackingInfo is everything related to tracking.
 	trackingInfo *trackingInfo
+
+	// hasGoWork: whether a go.work was created: this requires some special treatment when
+	// executing `go get`, that doesn't support it. See issue #31, and gonuts discussion in
+	// https://groups.google.com/g/golang-nuts/c/2Ht4c-eZzgQ.
+	//
+	// This is set by State.autoTrackGoWork.
+	hasGoWork bool
+
+	// goWorkUsePaths contains the paths that are marked as `use` in the `go.work` file for the kernel.
+	// It is only valid if hasGoWork is true.
+	//
+	// This is set by State.autoTrackGoWork.
+	goWorkUsePaths common.Set[string]
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.

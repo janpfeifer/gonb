@@ -96,6 +96,14 @@ Tracking of Go files being developed:
 - "%untrack [file_or_directory][...]": remove file or directory from list of tracked files.
   If suffixed with "..." it will remove all files prefixed with the string given (without the
   "..."). If no file is given, it lists the currently tracked files. 
+
+Other:
+
+- "%goworkfix": work around 'go get' inability to handle 'go.work' files. If you are
+  using 'go.work' file to point to locally modified modules, consider using this. It creates
+  'go mod edit --replace' rules to point to the modules pointed to the 'use' rules in 'go.work'
+  file. It overwrites/updates 'replace' rules for those modules, if they already exist. See tutorial
+  for an example.
 `
 
 // cellStatus holds temporary status for the execution of the current cell.
@@ -235,6 +243,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	case "rm", "remove":
 		removeDefinitions(msg, goExec, parts[1:])
 
+		// Input handling.
 	case "with_inputs":
 		allowInput := content["allow_stdin"].(bool)
 		if !allowInput && (status.withInputs || status.withPassword) {
@@ -247,10 +256,17 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			return errors.Errorf("%%with_password not available in this notebook, it doesn't allow input prompting")
 		}
 		status.withPassword = true
+
+		// Files that need tracking for `gopls` (for auto-complete and contextual help).
 	case "track":
 		execTrack(msg, goExec, parts[1:])
 	case "untrack":
 		execUntrack(msg, goExec, parts[1:])
+
+		// Others.
+	case "goworkfix":
+		return goExec.GoWorkFix(msg)
+
 	default:
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
 		if err != nil {

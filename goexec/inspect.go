@@ -29,12 +29,6 @@ func (s *State) notifyAboutStandardAndTrackedFiles(ctx context.Context) (err err
 			return
 		}
 	}
-
-	err = s.AutoTrack()
-	if err != nil {
-		return
-	}
-
 	err = s.EnumerateUpdatedFiles(func(filePath string) error {
 		klog.V(1).Infof("Notified of change to %q", filePath)
 		return s.gopls.NotifyDidOpenOrChange(ctx, filePath)
@@ -56,6 +50,12 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	if _, found := skipLines[cursorLine]; found {
 		// Only Go code can be inspected here.
 		err = errors.Errorf("goexec.InspectIdentifierInCell() can only inspect Go code, line %d is a secial command line: %q", cursorLine, lines[cursorLine])
+		return
+	}
+
+	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
+	err = s.AutoTrack()
+	if err != nil {
 		return
 	}
 
@@ -134,6 +134,12 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	if _, found := skipLines[cursorLine]; found {
 		// Only Go code can be inspected here.
 		err = errors.Errorf("goexec.AutoCompleteOptionsInCell() can only auto-complete Go code, line %d is a secial command line: %q", cursorLine, cellLines[cursorLine])
+		return
+	}
+
+	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
+	err = s.AutoTrack()
+	if err != nil {
 		return
 	}
 

@@ -371,6 +371,7 @@ func (s *State) autoTrackGoWork() (err error) {
 		err = errors.Wrapf(err, "failed to check %q for auto-tracking of files", goWorkPath)
 		return
 	}
+	s.hasGoWork = true
 
 	// Re-parse in 2 cases:
 	//   * File modified since last modification time.
@@ -395,11 +396,13 @@ func (s *State) autoTrackGoWork() (err error) {
 		err = errors.Wrapf(err, "failed to parse %q for auto-tracking files", goWorkPath)
 		return
 	}
+	s.goWorkUsePaths = common.MakeSet[string]()
 	for _, useRule := range workFile.Use {
 		p := useRule.Path
 		if p == "." {
 			continue
 		}
+		s.goWorkUsePaths.Insert(p)
 		_, found := ti.tracked[p]
 		if found {
 			// already tracked.
@@ -430,5 +433,45 @@ func (s *State) autoTrackGoWork() (err error) {
 		}
 	}
 	klog.V(2).Infof("autoTrackGoWork(): go.work re-parsed, %d tracked files in total", len(ti.tracked))
+	return
+}
+
+// findGoWorkModules will go over each of the known `go.work` "use" clauses, and find the
+// module name of that path.
+// It returns a map of the module name to its local path.
+//
+// Notice it looks over the currently known "use" paths in State.goWorkUsePaths.
+// It is updated with State.AutoTrack, so make sure to call it first (it is usually called in all
+// cell interactions already).
+func (s *State) findGoWorkModules() (modToPath map[string]string, err error) {
+	if !s.hasGoWork {
+		return
+	}
+	modToPath = make(map[string]string, len(s.goWorkUsePaths))
+	for p := range s.goWorkUsePaths {
+		var contents []byte
+		goModPath := path.Join(p, "go.mod")
+		contents, err = os.ReadFile(goModPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				// If this path doesn't have any go.mod, simply skip.
+				klog.Warningf("`go.work` use path %q doesn't have a `go.mod` file.", p)
+				err = nil
+				continue
+			} else {
+				err = errors.Wrapf(err, "can't read contents of %q, to find the modules name", goModPath)
+				return
+			}
+		}
+
+		var modFile *modfile.File
+		modFile, err = modfile.ParseLax(p, contents, nil)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to parse contents of %q, while trying to find its name", goModPath)
+			return
+		}
+		modName := modFile.Module.Mod.Path
+		modToPath[modName] = p
+	}
 	return
 }

@@ -22,6 +22,12 @@ import (
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
+	err := s.AutoTrack()
+	if err != nil {
+		return err
+	}
+
 	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
@@ -153,8 +159,10 @@ can install it from the notebook with:
 	cmd.Dir = s.TempDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())
+		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
+		strOutput = s.filterGoGetError(strOutput)
+		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
 		return
 	}
 	return
@@ -223,4 +231,48 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 	}
 	// Return the original number of bytes: since we change what is written, we actually write more bytes.
 	return n, nil
+}
+
+const (
+	// GoGetWorkspaceIssue is an error output by `go get` due to it not interpreting correctly `go.work`.
+	GoGetWorkspaceIssue = "cannot find module providing package"
+
+	// GoGetWorkspaceNote is the note that explains the issue with `go get` and `go work`.
+	GoGetWorkspaceNote = `---------------
+Note: 'go get' doesn't know how to process go.work files. 
+Consider adding the paths in 'use' clauses to 'go.mod' replace clauses.
+You can do this manually with '!*go mod edit --replace=[module URI]=[local_path]'
+Alternatively try '%goworkfix' that will do it automatically for you.
+`
+)
+
+// filterGoGetError parses the "go get" execution error, and adds a warning in case it's about the
+// `go get` not supporting workspaces (`go.work`).
+func (s *State) filterGoGetError(output string) string {
+	if !s.hasGoWork {
+		// Nothing to do.
+		return output
+	}
+	if strings.Index(output, "cannot find module providing package") == -1 {
+		return output
+	}
+
+	modToPath, err := s.findGoWorkModules()
+	if err != nil {
+		return fmt.Sprintf("%s\n\nError while tracking potential issues with `go.work`:\n%+v", output, err.Error())
+	}
+	var parts []string
+	for mod, p := range modToPath {
+		if strings.Index(output, mod) != -1 {
+			parts = append(parts, fmt.Sprintf("%s=%s", mod, p))
+		}
+	}
+
+	var extraMsg string
+	if len(parts) > 0 {
+		extraMsg = fmt.Sprintf("\nConsider the following replace rules to your 'go.mod' file:\n\t%s\n\n"+
+			"Again, or use '%%goworkfix' to have it done for you.\n", strings.Join(parts, "\n\t"))
+	}
+	output = fmt.Sprintf("%s\n%s%s", output, GoGetWorkspaceNote, extraMsg)
+	return output
 }

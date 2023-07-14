@@ -1,8 +1,10 @@
 package goexec
 
 import (
+	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/mod/modfile"
 	"io/fs"
@@ -472,6 +474,100 @@ func (s *State) findGoWorkModules() (modToPath map[string]string, err error) {
 		}
 		modName := modFile.Module.Mod.Path
 		modToPath[modName] = p
+	}
+	return
+}
+
+// GoWorkFix takes all modules in `go.work` "use" clauses, and add them as "replace" clauses in
+// `go.mod`. This is needed for `go get` to work.
+func (s *State) GoWorkFix(msg kernel.Message) (err error) {
+	err = s.AutoTrack()
+	if err != nil {
+		return
+	}
+	if !s.hasGoWork {
+		err = errors.New("there is no `go.work` file set up, nothing to do")
+		return
+	}
+
+	// Get modules included through `go.work`.
+	modToPath, err := s.findGoWorkModules()
+	if err != nil {
+		return err
+	}
+
+	// Parse current `go.mod` and list existing "replace" rules.
+	goModPath := path.Join(s.TempDir, "go.mod")
+	goModContents, err := os.ReadFile(goModPath)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to read %q", goModPath)
+		return
+	}
+	modFile, err := modfile.Parse(s.TempDir, goModContents, nil)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to parse %q", goModPath)
+		return
+	}
+	replaceRules := make(map[string]*modfile.Replace)
+	for _, replace := range modFile.Replace {
+		replaceRules[replace.Old.Path] = replace
+	}
+
+	// Add missing replace rules.
+	var goModModified bool
+	for mod, p := range modToPath {
+		if replace, found := replaceRules[mod]; found {
+			if replace.New.Path == p {
+				// The correct "replace" rule already exists.
+				err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+					fmt.Sprintf("\t- replace rule for module %q to local directory %q already exists.",
+						mod, p))
+				if err != nil {
+					return
+				}
+				continue
+			}
+
+			// Update previous "replace" rule.
+			err = kernel.PublishWriteStream(msg, kernel.StreamStderr,
+				fmt.Sprintf(
+					"WARNING: replace rule for module %q mapping to %q, updated to `go.work` location %q",
+					mod, replace.New.Path, p))
+			if err != nil {
+				return
+			}
+			err = modFile.DropReplace(replace.Old.Path, replace.Old.Version)
+			if err != nil {
+				err = errors.Wrapf(err, "failed to remove previous replace rule for %q", mod)
+				return
+			}
+		} else {
+			err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+				fmt.Sprintf("\t- added replace rule for module %q to local directory %q.",
+					mod, p))
+		}
+		err = modFile.AddReplace(mod, "", p, "")
+		if err != nil {
+			err = errors.Wrapf(err, "failed to add replace rule from %q to %q", mod, p)
+			return
+		}
+		if err != nil {
+			return
+		}
+		goModModified = true
+	}
+	if goModModified {
+		// Update go.mod file.
+		goModContents, err = modFile.Format()
+		if err != nil {
+			err = errors.Wrapf(err, "failed to format the updated `go.mod` file %q", goModPath)
+			return
+		}
+		err = os.WriteFile(goModPath, goModContents, 0666)
+		if err != nil {
+			err = errors.Wrapf(err, "failed to write the updated `go.mod` file to %q", goModPath)
+			return
+		}
 	}
 	return
 }

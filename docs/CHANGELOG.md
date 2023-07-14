@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.3 - 2023/07/14
 
 * Issue #35: Fixed installation (--install): it now uses the absolute path to the gonb binary
   (as opposed to simply `os.Args[0]`).
@@ -8,6 +8,7 @@
 * Workaround for `go get` not working with `go.work`: parse `go get` errors, and if it's complaining about
   a missing package that is defined in one of the `go.work` "use" paths, it will add a suggestion the user
   add a `go.mod` replace rule.
+* Added `%goworkfix` to add `use` clauses as `replace` clauses in `go.mod`.
 
 ## 0.7.2 - 2023/07/08
 

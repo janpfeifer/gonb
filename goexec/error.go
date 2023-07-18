@@ -47,6 +47,9 @@ func (err *GonbError) Traceback() []string {
 func (err *GonbError) ErrorMsg() string {
 	return err.errMsg
 }
+func (err *GonbError) ErrorName() string {
+	return "Error (new)"
+}
 func (err *GonbError) reportHtml(msg kernel.Message) {
 	if msg == nil {
 		// Ignore, if there is no kernel.Message to reply to.

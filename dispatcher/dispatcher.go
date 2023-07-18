@@ -176,7 +176,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	} // Final execution result.
 	if nbErr != nil {
 		replyContent["status"] = "error"
-		replyContent["ename"] = "ERROR"
+		replyContent["ename"] = nbErr.ErrorMsg()
 		replyContent["evalue"] = nbErr.ErrorMsg()
 		replyContent["traceback"] = nbErr.Traceback()
 		// Publish an execution_error message.

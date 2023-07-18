@@ -5,12 +5,23 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"k8s.io/klog/v2"
 	"strings"
+	"text/template"
 )
 
 type GonbError struct {
 	lines  []errorLine
 	errMsg string
 }
+
+var templateTraceback = template.Must(template.New("traceback").Parse(`
+An error occurred while executing the following cell:
+------------------
+{cell.source}
+------------------
+{stream_output}
+
+{traceback}
+`))
 
 func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *GonbError {
 	// Read main.go into lines.

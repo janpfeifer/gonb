@@ -21,34 +21,41 @@ import (
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) (err error, nberr *GonbError) {
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
-	err := s.AutoTrack()
+	err = s.AutoTrack()
 	if err != nil {
-		return err
+		return
 	}
 
-	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
+	updatedDecls, mainDecl, _, fileToCellIdAndLine, err, nberr := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
+	if nberr != nil {
+		return
+	}
 	if err != nil {
-		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
+		return errors.WithMessagef(err, "in goexec.ExecuteCell()"), nil
 	}
 
 	// Exec `goimports` (or the code that implements it)
-	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+	_, fileToCellIdAndLine, err, nberr = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+	if nberr != nil {
+		return
+	}
+
 	if err != nil {
-		return errors.WithMessagef(err, "goimports failed")
+		return errors.WithMessagef(err, "goimports failed"), nil
 	}
 
 	// And then compile it.
 	if err := s.Compile(msg, fileToCellIdAndLine); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Compilation successful: save merged declarations into current State.
 	s.Definitions = updatedDecls
 
 	// Execute compiled code.
-	return s.Execute(msg, fileToCellIdAndLine)
+	return s.Execute(msg, fileToCellIdAndLine), nil
 }
 
 // BinaryPath is the path to the generated binary file.
@@ -77,14 +84,13 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 //
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
-func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) error {
+func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) *GonbError {
 	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
 	cmd.Dir = s.TempDir
 	var output []byte
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
-		return errors.Wrapf(err, "failed to run %q", cmd.String())
+		return s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
 	}
 	return nil
 }
@@ -93,7 +99,7 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 // It also runs "go get" to download any missing dependencies.
 //
 // It returns the updated cursorInFile and fileToCellIdAndLines that reflect any changes in `main.go`.
-func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error) {
+func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error, nberr *GonbError) {
 	klog.V(2).Infof("GoImports():")
 	cursorInFile = NoCursor
 	goimportsPath, err := exec.LookPath("goimports")
@@ -114,15 +120,14 @@ can install it from the notebook with:
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
-		err = errors.Wrapf(err, "failed to run %q", cmd.String())
+		nberr = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
 		return
 	}
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
-	if err != nil {
+	newDecls, err, nberr = s.parseFromMainGo(msg, -1, NoCursor, nil)
+	if err != nil || nberr != nil {
 		return
 	}
 
@@ -159,10 +164,9 @@ can install it from the notebook with:
 	cmd.Dir = s.TempDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
 		strOutput = s.filterGoGetError(strOutput)
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
+		nberr = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
 		return
 	}
 	return

@@ -114,7 +114,7 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 //     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
 //     that have no correspondent value in the cell code. It can be nil if there is no information mapping
 //     file lines to cell lines.
-func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
+func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error, nberr *GonbError) {
 	decls = NewDeclarations()
 	pi := &parseInfo{
 		cursor:  cursor,
@@ -127,7 +127,8 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
-			s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
+			nberr = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
+
 		}
 		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 		return
@@ -150,7 +151,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 			filePath := path.Join(s.TempDir, fileObj.Name.Name) + ".go"
 			content, err := os.ReadFile(filePath)
 			if err != nil {
-				return nil, errors.Wrapf(err, "Failed to read %q", fileObj.Name)
+				return nil, errors.Wrapf(err, "Failed to read %q", fileObj.Name), nil
 			}
 			pi.filesContents[filePath] = string(content)
 			// Incorporate Imports
@@ -379,7 +380,7 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
 func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
-	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
+	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error, nbErr *GonbError) {
 	cursorInFile = NoCursor
 
 	var fileToCellLine []int
@@ -391,8 +392,9 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInFile, fileToCellIdAndLine)
-	if err != nil {
+	newDecls, err, nbErr = s.parseFromMainGo(msg, cellId, cursorInFile, fileToCellIdAndLine)
+
+	if err != nil || nbErr != nil {
 		return
 	}
 

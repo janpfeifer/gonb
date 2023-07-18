@@ -1,14 +1,12 @@
 package goexec
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"html"
 	"io"
-	"k8s.io/klog/v2"
 	"os"
 	"regexp"
 	"strconv"
@@ -29,6 +27,10 @@ type errorLine struct {
 
 	HasCellInfo bool
 	CellInfo    string
+}
+
+func (e *errorLine) getTraceback() string {
+	return e.Message
 }
 
 // To check the standard Jupyter colors to choose from, see:
@@ -101,44 +103,10 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 //
 // Any errors within here are logged and simply ignored, since this is already
 // used to report errors
-func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) {
-	if msg == nil {
-		// Ignore, if there is no kernel.Message to reply to.
-		return
-	}
-	// Default report, and makes sure display is called at the end.
-	reportHTML := "<pre>" + errorMsg + "</pre>" // If anything goes wrong, simply display the error message.
-	defer func() {
-		// Display HTML report on exit.
-		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
-		if err != nil {
-			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
-		}
-	}()
-
-	// Read main.go into lines.
-	mainGo, err := s.readMainGo()
-	if err != nil {
-		klog.Errorf("DisplayErrorWithContext: %+v", err)
-		return
-	}
-	codeLines := strings.Split(mainGo, "\n")
-
-	// Parse error lines.
-	lines := strings.Split(errorMsg, "\n")
-	report := &errorReport{Lines: make([]errorLine, len(lines))}
-	for ii, line := range lines {
-		report.Lines[ii] = s.parseErrorLine(line, codeLines, fileToCellIdAndLine)
-	}
-
-	// Render error block.
-	buf := bytes.NewBuffer(make([]byte, 0, 512*len(lines)))
-	if err := templateErrorReport.Execute(buf, report); err != nil {
-		klog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
-		return
-	}
-	reportHTML = buf.String()
-	// reportHTML will be displayed on the deferred function above.
+func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *GonbError {
+	nbErr := newError(s, fileToCellIdAndLine, errorMsg)
+	nbErr.reportHtml(msg)
+	return nbErr
 }
 
 var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)

@@ -12,7 +12,7 @@ type errorLine struct {
 	HasContext  bool   // Whether this line has a contextual mouse-over content.
 	Message     string // Error message, what comes after the `file:line_number:col_number`
 	Location    string // `file:line_number:col_number` prefix, only if HasContext == true.
-	htmlContext string // htmlContext to display on a mouse-over window, only if HasContext == true.
+	HtmlContext string // HtmlContext to display on a mouse-over window, only if HasContext == true.
 	rawContext  string // rawContext to display on a traceback, only if HasContext == true.
 
 	HasCellInfo bool
@@ -81,7 +81,7 @@ func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdA
 		partsRaw = append(partsRaw, partRaw)
 
 	}
-	l.htmlContext = strings.Join(partsHtml, "")
+	l.HtmlContext = strings.Join(partsHtml, "")
 	l.rawContext = strings.Join(partsRaw, "")
 
 	// Gather CellInfo

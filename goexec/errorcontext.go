@@ -67,7 +67,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 {{if .HasContext}}{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span>
 {{end}}<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
 <div class="gonb-error-context">
-{{.htmlContext}}
+{{.HtmlContext}}
 </div>
 {{else}}
 <span style="white-space: pre;">{{.Location}} {{.Message}}</span>

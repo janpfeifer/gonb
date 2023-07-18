@@ -9,10 +9,11 @@ import (
 )
 
 type errorLine struct {
-	HasContext bool   // Whether this line has a contextual mouse-over content.
-	Message    string // Error message, what comes after the `file:line_number:col_number`
-	Location   string // `file:line_number:col_number` prefix, only if HasContext == true.
-	Context    string // Context to display on a mouse-over window, only if HasContext == true.
+	HasContext  bool   // Whether this line has a contextual mouse-over content.
+	Message     string // Error message, what comes after the `file:line_number:col_number`
+	Location    string // `file:line_number:col_number` prefix, only if HasContext == true.
+	htmlContext string // htmlContext to display on a mouse-over window, only if HasContext == true.
+	rawContext  string // rawContext to display on a traceback, only if HasContext == true.
 
 	HasCellInfo bool
 	CellInfo    string
@@ -20,22 +21,32 @@ type errorLine struct {
 
 func (e *errorLine) getTraceback() (message string) {
 
-	split := strings.Split(e.Location, ":")
-	if split[0] != "" {
-		file := split[0]
-		line := split[1]
-		//_ := split[2]
-		message += color.New(color.FgBlue).Sprint("\tFile ")
-		message += color.New(color.FgGreen).Sprint("\"" + file + "\"")
-		message += color.New(color.FgBlue).Sprint(", line ")
-		message += color.New(color.FgGreen).Sprint(line)
-		message += "\n"
+	if e.HasCellInfo {
+		message += e.CellInfo + "\n"
 	}
-
+	if e.HasContext {
+		message += e.rawContext + "\n"
+	}
 	message += color.New(color.FgRed).Sprint(e.Message)
 	return message
 }
-
+func (e *errorLine) getCol() int {
+	split := strings.Split(e.Location, ":")
+	if split[0] != "" {
+		col, _ := strconv.Atoi(split[2])
+		return col
+	}
+	return -1
+}
+func (e *errorLine) getColLine() string {
+	col := e.getCol()
+	if col == -1 {
+		return ""
+	}
+	line := strings.Repeat(" ", col-1)
+	line += "^"
+	return line + "\n"
+}
 func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdAndLine []CellIdAndLine) (l errorLine) {
 	l.HasContext = false
 	matches := reFileLinePrefix.FindStringSubmatch(lineStr)
@@ -57,15 +68,21 @@ func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdA
 	toLines := lineNum + LinesForErrorContext
 	toLines = inBetween(toLines, 0, len(codeLines))
 
-	parts := make([]string, 0, toLines-fromLines)
+	partsHtml := make([]string, 0, toLines-fromLines)
+	partsRaw := make([]string, 0, toLines-fromLines)
 	for ii := fromLines; ii < toLines; ii++ {
-		part := html.EscapeString(codeLines[ii]) + "\n"
+		partRaw := codeLines[ii] + "\n"
+		partHtml := html.EscapeString(codeLines[ii]) + "\n"
 		if ii == lineNum {
-			part = fmt.Sprintf(`<div class="gonb-error-line">%s</div>`, part)
+			partHtml = fmt.Sprintf(`<div class="gonb-error-line">%s</div>`, partHtml)
+			partRaw += l.getColLine()
 		}
-		parts = append(parts, part)
+		partsHtml = append(partsHtml, partHtml)
+		partsRaw = append(partsRaw, partRaw)
+
 	}
-	l.Context = strings.Join(parts, "")
+	l.htmlContext = strings.Join(partsHtml, "")
+	l.rawContext = strings.Join(partsRaw, "")
 
 	// Gather CellInfo
 	if lineNum > 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {

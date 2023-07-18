@@ -41,6 +41,9 @@ func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *G
 	}
 	return nberr
 }
+func (err *GonbError) Error() string {
+	return err.ErrorMsg()
+}
 func (err *GonbError) toReport() *errorReport {
 	report := &errorReport{Lines: make([]errorLine, len(err.lines))}
 	for ii, line := range err.lines {

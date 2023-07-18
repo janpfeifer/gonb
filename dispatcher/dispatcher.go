@@ -180,7 +180,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		replyContent["evalue"] = nbErr.ErrorMsg()
 		replyContent["traceback"] = nbErr.Traceback()
 		// Publish an execution_error message.
-		if err := kernel.PublishExecutionError(msg, nbErr.ErrorMsg(), nbErr.Traceback()); err != nil {
+		if err := kernel.PublishExecutionError(msg, nbErr.ErrorMsg(), nbErr.Traceback(), nbErr.ErrorName()); err != nil {
 			return errors.WithMessagef(err, "publishing back execution error")
 		}
 	} else if executionErr == nil {
@@ -194,7 +194,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		replyContent["traceback"] = nil
 
 		// Publish an execution_error message.
-		if err := kernel.PublishExecutionError(msg, executionErr.Error(), []string{executionErr.Error()}); err != nil {
+		if err := kernel.PublishExecutionError(msg, executionErr.Error(), []string{executionErr.Error()}, "Error"); err != nil {
 			return errors.WithMessagef(err, "publishing back execution error")
 		}
 	}

@@ -99,6 +99,10 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	if err != nil {
 		return errors.WithMessagef(err, "failed to create pipe for stderr")
 	}
+	cmdStdin, err := cmd.StdinPipe()
+	if err != nil {
+		return errors.WithMessagef(err, "failed to create pipe for stdin")
+	}
 
 	// Pipe all stdout and stderr to Jupyter.
 	if builder.stdoutWriter == nil {
@@ -129,12 +133,8 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 		done     bool
 		doneChan = make(chan struct{})
 		muDone   sync.Mutex
-		cmdStdin io.WriteCloser
 	)
-	cmdStdin, err = cmd.StdinPipe()
-	if err != nil {
-		return errors.WithMessagef(err, "failed to create pipe for stdin")
-	}
+
 	if builder.millisecondsToInput > 0 {
 		// Set function to handle incoming content.
 		var writeStdinFn OnInputFn
@@ -176,7 +176,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	}
 
 	// Prepare named-pipe to use for rich-data display.
-	if err = StartNamedPipe(builder.msg, builder.dir, doneChan); err != nil {
+	if err = StartNamedPipe(builder.msg, builder.dir, doneChan, cmdStdin); err != nil {
 		return errors.WithMessagef(err, "failed to create named pipe for display content")
 	}
 
@@ -224,7 +224,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 // remove it and quit.
 //
 // TODO: make this more secure, maybe with a secret key also passed by the environment.
-func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
+func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) error {
 	// Create a temporary file name.
 	f, err := os.CreateTemp(dir, "gonb_pipe_")
 	if err != nil {
@@ -281,7 +281,7 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 		muFifo.Lock()
 		fifoOpenedForReading = true
 		muFifo.Unlock()
-		go PollDisplayRequests(msg, pipeReader)
+		go PollGonbPipe(msg, pipeReader, cmdStdin)
 
 		// Wait till channel is closed and then close reader.
 		<-doneChan

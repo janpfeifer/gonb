@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"image"
 	"image/png"
+	"log"
 	"os"
 	"sync"
 )
@@ -70,8 +71,9 @@ func sendData(data *protocol.DisplayData) {
 	}
 	err := gonbEncoder.Encode(data)
 	if err != nil {
-		gonbPipeError = errors.Wrapf(err, "failed to write to pipe %q", os.Getenv(protocol.GONB_PIPE_ENV))
+		gonbPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
 		gonbPipe.Close()
+		log.Printf("%+v", gonbPipeError)
 	}
 }
 
@@ -169,4 +171,28 @@ func EmbedImageAsPNGSrc(img image.Image) (string, error) {
 	}
 	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
 	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
+}
+
+// RequestInput from the Jupyter notebook.
+// It triggers the opening of a small text field in the cell output area where the user
+// can type something.
+// Whatever the user writes is written to the stdin of cell program -- and can be read,
+// for instance, with `fmt.Scanf`.
+//
+// Args:
+//   - prompt: string displayed in front of the field to be entered. Leave empty ("") if not needed.
+//   - password: if whatever the user is typing is not to be displayed.
+func RequestInput(prompt string, password bool) {
+	if !IsNotebook {
+		return
+	}
+	req := protocol.InputRequest{
+		Prompt:   prompt,
+		Password: password,
+	}
+	sendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{
+			protocol.MIMEJupyterInput: &req,
+		},
+	})
 }

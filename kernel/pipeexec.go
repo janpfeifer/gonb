@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
 	"os"
@@ -9,8 +10,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // PipeExecToJupyterBuilder holds the configuration to executing a command that is piped to Jupyter.
@@ -60,12 +59,12 @@ func (builder *PipeExecToJupyterBuilder) WithStdout(stdoutWriter io.Writer) *Pip
 	return builder
 }
 
-// WithInput configures the PipeExecToJupyterBuilder to also plumb
+// WithInputs configures the PipeExecToJupyterBuilder to also plumb
 // the input from Jupyter input prompt.
 //
 // The prompt is displayed after millisecondsWait: so if the program exits quickly, nothing
 // is displayed.
-func (builder *PipeExecToJupyterBuilder) WithInput(millisecondsWait int) *PipeExecToJupyterBuilder {
+func (builder *PipeExecToJupyterBuilder) WithInputs(millisecondsWait int) *PipeExecToJupyterBuilder {
 	builder.millisecondsToInput = millisecondsWait
 	builder.inputPassword = false
 	return builder
@@ -139,6 +138,17 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	if builder.millisecondsToInput > 0 {
 		// Set function to handle incoming content.
 		var writeStdinFn OnInputFn
+		schedulePromptFn := func() {
+			// Wait for the given time, and if command still running, ask
+			// Jupyter for stdin input.
+			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
+			klog.V(2).Infof("%d milliseconds elapsed, prompt for input", builder.millisecondsToInput)
+			muDone.Lock()
+			if !done {
+				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
+			}
+			muDone.Unlock()
+		}
 		writeStdinFn = func(original, input *MessageImpl) error {
 			muDone.Lock()
 			defer muDone.Unlock()
@@ -159,22 +169,10 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 				}
 			}()
 			// Reschedule itself for the next message.
-			if !builder.inputPassword {
-				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
-			}
+			go schedulePromptFn()
 			return err
 		}
-		go func() {
-			// Wait for the given time, and if command still running, ask
-			// Jupyter for stdin input.
-			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
-			klog.V(2).Infof("%d milliseconds elapsed, prompt for input", builder.millisecondsToInput)
-			muDone.Lock()
-			if !done {
-				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
-			}
-			muDone.Unlock()
-		}()
+		go schedulePromptFn()
 	}
 
 	// Prepare named-pipe to use for rich-data display.

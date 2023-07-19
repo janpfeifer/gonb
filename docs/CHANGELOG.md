@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## Next
+
+* Issue #38:
+  * `%with_inputs` and `%with_password` now wait 200 milliseconds each time (a constant), before 
+    prompting user with an input in the Jupyter Notebook.
+
 ## 0.7.3 - 2023/07/14
 
 * Issue #35: Fixed installation (--install): it now uses the absolute path to the gonb binary

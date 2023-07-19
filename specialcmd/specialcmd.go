@@ -17,6 +17,11 @@ import (
 	"os"
 )
 
+// MillisecondsWaitForInput is the wait time for a bash script (started with `!` or `!*`
+// special commands, when `%with_inputs` or `%with_password` is used) to run, before an
+// input is prompted to the Jupyter Notebook.
+const MillisecondsWaitForInput = 200
+
 const HelpMessage = `GoNB is a Go kernel that compiles and executed on-the-fly Go code. 
 
 When executing a cell, *GoNB* will save the cell contents (except non-Go commands see
@@ -289,11 +294,11 @@ func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithInput(500).Exec()
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithInputs(MillisecondsWaitForInput).Exec()
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithPassword(1).Exec()
+		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).WithPassword(MillisecondsWaitForInput).Exec()
 	} else {
 		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).InDir(execDir).Exec()
 	}

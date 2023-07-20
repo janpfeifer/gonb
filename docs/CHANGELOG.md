@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.4 -- 2023/07/20
 
 * Issue #38:
   * `%with_inputs` and `%with_password` now wait 200 milliseconds each time (a constant), before 

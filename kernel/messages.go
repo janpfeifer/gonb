@@ -374,7 +374,9 @@ func PublishDisplayDataWithHTML(msg Message, html string) error {
 		Transient: make(MIMEMap),
 	}
 	msgData.Data[string(protocol.MIMETextHTML)] = html
-	logDisplayData(msgData.Data)
+	if klog.V(1).Enabled() {
+		logDisplayData(msgData.Data)
+	}
 	return PublishDisplayData(msg, msgData)
 }
 

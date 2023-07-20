@@ -1,20 +1,21 @@
 package kernel
 
-// This file implements the protocol to display rich content: it provides PollDisplayRequests that continuously
+// This file implements the protocol to display rich content: it provides PollGonbPipe that continuously
 // read from a named pipe (mkfifo(3)) and display it.
 
 import (
 	"encoding/gob"
+	"fmt"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"io"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 )
 
-// PollDisplayRequests will continuously read for incoming requests for displaying content on the notebook.
+// PollGonbPipe will continuously read for incoming requests for displaying content on the notebook.
 // It expects pipeIn to be closed when the polling is to stop.
-func PollDisplayRequests(msg Message, pipeReader *os.File) {
+func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
 	decoder := gob.NewDecoder(pipeReader)
 	knownBlockIds := make(map[string]struct{})
 	for {
@@ -23,10 +24,31 @@ func PollDisplayRequests(msg Message, pipeReader *os.File) {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
 			return
 		} else if err != nil {
-			log.Printf("Failed to read from named pipe, stopped polling for new data content: %+v", err)
+			klog.V(2).Infof("Named pipe closed / EOF: %v", err)
 			return
 		}
+		if reqAny, found := data.Data[protocol.MIMEJupyterInput]; found {
+			// This is actually a request for input, process it separately.
+			klog.V(2).Infof("Received InputRequest: %v", reqAny)
+			req, ok := reqAny.(*protocol.InputRequest)
+			if !ok {
+				reportCellError(msg, errors.New("A MIMEJupyterInput sent to GONB_PIPE without an associated protocol.InputRequest!?"))
+				continue
+			}
+			processInputRequest(msg, cmdStdin, req)
+			continue
+		}
 		processDisplayData(msg, data, knownBlockIds)
+	}
+}
+
+// reportCellError reports error to both, the notebook and the standard logger (gonb's stderr).
+func reportCellError(msg Message, err error) {
+	errStr := fmt.Sprintf("%+v", err) // Error with stack.
+	klog.Errorf("%s", errStr)
+	err = PublishWriteStream(msg, StreamStderr, errStr)
+	if err != nil {
+		klog.Errorf("%+v", errors.WithStack(err))
 	}
 }
 
@@ -38,11 +60,11 @@ func logDisplayData(data MIMEMap) {
 			if len(displayValue) > 20 {
 				displayValue = displayValue[:20] + "..."
 			}
-			log.Printf("DisplayData(%s): %q", key, displayValue)
+			klog.Infof("DisplayData(%s): %q", key, displayValue)
 		case []byte:
-			log.Printf("DisplayData(%s): %d bytes", key, len(value))
+			klog.Infof("DisplayData(%s): %d bytes", key, len(value))
 		default:
-			log.Printf("DisplayData(%s): unknown type %t", key, value)
+			klog.Infof("DisplayData(%s): unknown type %t", key, value)
 		}
 	}
 }
@@ -58,7 +80,9 @@ func processDisplayData(msg Message, data *protocol.DisplayData, knownBlockIds m
 	for mimeType, content := range data.Data {
 		msgData.Data[string(mimeType)] = content
 	}
-	logDisplayData(msgData.Data)
+	if klog.V(1).Enabled() {
+		logDisplayData(msgData.Data)
+	}
 	for key, content := range data.Metadata {
 		msgData.Metadata[key] = content
 	}
@@ -77,6 +101,30 @@ func processDisplayData(msg Message, data *protocol.DisplayData, knownBlockIds m
 		err = PublishDisplayData(msg, msgData)
 	}
 	if err != nil {
-		log.Printf("Failed to display data (ignoring): %v", err)
+		klog.Errorf("Failed to display data (ignoring): %v", err)
+	}
+}
+
+func processInputRequest(msg Message, cmdStdin io.Writer, req *protocol.InputRequest) {
+	klog.V(2).Infof("Received InputRequest %+v", req)
+	writeStdinFn := func(original, input *MessageImpl) error {
+		content := input.Composed.Content.(map[string]any)
+		value := content["value"].(string) + "\n"
+		klog.V(2).Infof("stdin value: %q", value)
+		go func() {
+			// Write concurrently, not to block, in case program doesn't
+			// actually read anything from the stdin.
+			_, err := cmdStdin.Write([]byte(value))
+			if err != nil {
+				// Could happen if something was not fully written, and channel was closed, in
+				// which case it's ok.
+				klog.Warningf("failed to write to stdin of cell: %+v", err)
+			}
+		}()
+		return nil
+	}
+	err := msg.PromptInput(req.Prompt, req.Password, writeStdinFn)
+	if err != nil {
+		reportCellError(msg, err)
 	}
 }

@@ -2,6 +2,8 @@
 // kernel, using the standard Go `encoding/gob` package.
 package protocol
 
+import "encoding/gob"
+
 const GONB_PIPE_ENV = "GONB_PIPE"
 
 type MIMEType string
@@ -13,6 +15,10 @@ const (
 	MIMETextPlain               = "text/plain"
 	MIMEImagePNG                = "image/png"
 	MIMEImageSVG                = "image/svg+xml"
+
+	// MIMEJupyterInput should be associated with an `*InputRequest`.
+	// It's a GoNB specific mime type.
+	MIMEJupyterInput = "input/jupyter"
 )
 
 // DisplayData mimics the contents of the "display_data" message used by Jupyter, see
@@ -30,4 +36,17 @@ type DisplayData struct {
 	// unique IDs to start with, and then re-use them to update them. If set, after the first time that it's
 	// used, it will trigger the use of the `update_display_data` as opposed to `display_data` message.
 	DisplayID string
+}
+
+// InputRequest for the front-end.
+type InputRequest struct {
+	// Prompt to display to user. Can be left empty.
+	Prompt string
+
+	// Password input, in which case the contents are not displayed.
+	Password bool
+}
+
+func init() {
+	gob.Register(&InputRequest{})
 }

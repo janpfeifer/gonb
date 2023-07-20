@@ -19,6 +19,7 @@ var (
 	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
 	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
+	flagRawError = flag.Bool("raw_error", false, "Force raw text errors instead of HTML errors")
 )
 
 var (
@@ -88,7 +89,7 @@ func main() {
 	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
 
 	// Create a Go executor.
-	goExec, err := goexec.New(UniqueID)
+	goExec, err := goexec.New(UniqueID, *flagRawError)
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}

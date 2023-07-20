@@ -62,6 +62,9 @@ func main() {
 		if glogFlag := flag.Lookup("alsologtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
 			extraArgs = append(extraArgs, "--alsologtostderr")
 		}
+		if glogFlag := flag.Lookup("raw_error"); glogFlag != nil && glogFlag.Value.String() != "false" {
+			extraArgs = append(extraArgs, "--raw_error")
+		}
 		err := kernel.Install(extraArgs, *flagForce)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)

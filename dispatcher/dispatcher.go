@@ -166,35 +166,26 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	lines := strings.Split(code, "\n")
 	usedLines := MakeSet[int]()
 	var executionErr error
-	var nbErr *goexec.GonbError
 	if err := specialcmd.Parse(msg, goExec, true, lines, usedLines); err != nil {
 		executionErr = errors.WithMessagef(err, "executing special commands in cell")
 	}
 	hasMoreToRun := len(usedLines) < len(lines)
 	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
-		executionErr, nbErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
+		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
 	} // Final execution result.
-	if nbErr != nil {
-		replyContent["status"] = "error"
-		replyContent["ename"] = nbErr.ErrorMsg()
-		replyContent["evalue"] = nbErr.ErrorMsg()
-		replyContent["traceback"] = nbErr.Traceback()
-		// Publish an execution_error message.
-		if err := kernel.PublishExecutionError(msg, nbErr.ErrorMsg(), nbErr.Traceback(), nbErr.ErrorName()); err != nil {
-			return errors.WithMessagef(err, "publishing back execution error")
-		}
-	} else if executionErr == nil {
+	if executionErr == nil {
 		// if the only non-nil value should be auto-rendered graphically, render it
 		replyContent["status"] = "ok"
 		replyContent["user_expressions"] = make(map[string]string)
 	} else {
+		name, value, traceback := unwrap(executionErr)
 		replyContent["status"] = "error"
-		replyContent["ename"] = "ERROR"
-		replyContent["evalue"] = executionErr.Error()
-		replyContent["traceback"] = nil
+		replyContent["ename"] = name
+		replyContent["evalue"] = value
+		replyContent["traceback"] = traceback
 
 		// Publish an execution_error message.
-		if err := kernel.PublishExecutionError(msg, executionErr.Error(), []string{executionErr.Error()}, "Error"); err != nil {
+		if err := kernel.PublishExecutionError(msg, value, traceback, name); err != nil {
 			return errors.WithMessagef(err, "publishing back execution error")
 		}
 	}

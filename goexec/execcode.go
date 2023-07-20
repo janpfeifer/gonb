@@ -21,7 +21,7 @@ import (
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) (err error, nberr *GonbError) {
+func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) (err error) {
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
 	err = s.AutoTrack()
 	if err != nil {
@@ -33,7 +33,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return
 	}
 	if err != nil {
-		return errors.WithMessagef(err, "in goexec.ExecuteCell()"), nil
+		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
 	// Exec `goimports` (or the code that implements it)
@@ -43,19 +43,19 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	}
 
 	if err != nil {
-		return errors.WithMessagef(err, "goimports failed"), nil
+		return errors.WithMessagef(err, "goimports failed")
 	}
 
 	// And then compile it.
 	if err := s.Compile(msg, fileToCellIdAndLine); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Compilation successful: save merged declarations into current State.
 	s.Definitions = updatedDecls
 
 	// Execute compiled code.
-	return s.Execute(msg, fileToCellIdAndLine), nil
+	return s.Execute(msg, fileToCellIdAndLine)
 }
 
 // BinaryPath is the path to the generated binary file.

@@ -65,8 +65,8 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 
 	// Generate `main.go` with contents of current cell.
 	cellId := -1 // Inspect doesn't actually execute it, so parsed contents of cell are not kept.
-	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err, nberr := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
-	if err != nil && nberr != nil {
+	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
+	if err != nil {
 		klog.V(2).Infof("Ignoring parse error for InspectRequest: %+v", err)
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
@@ -87,8 +87,8 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 
 	} else {
 		// Exec `goimports`: we just want to make sure that "go get" is executed for the needed packages.
-		cursorInFile, _, err, nberr = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
-		if err != nil || nberr != nil {
+		cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
+		if err != nil {
 			err = errors.WithMessagef(err, "goimports failed")
 			return
 		}
@@ -146,8 +146,8 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	// Generate `main.go` (and maybe `other.go`) with contents of current cell.
 	cellId := -1 // AutoComplete doesn't actually execute it, so parsed contents of cell are not kept.
 	cursorInCell := Cursor{cursorLine, cursorCol}
-	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err, nberr := s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
-	if err != nil && nberr != nil {
+	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, cellLines, skipLines, cursorInCell)
+	if err != nil {
 		klog.V(2).Infof("Ignoring ParseError for auto-complete: %+v", err)
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
@@ -168,7 +168,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	} else {
 		// If parsing succeeded, execute `goimports`: we just want to make sure that "go get" is executed for the
 		// needed packages.
-		cursorInFile, _, err, nberr = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
+		cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
 		if err != nil {
 			err = errors.WithMessagef(err, "goimports failed")
 			return

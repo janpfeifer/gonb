@@ -28,19 +28,13 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return
 	}
 
-	updatedDecls, mainDecl, _, fileToCellIdAndLine, err, nberr := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
-	if nberr != nil {
-		return
-	}
+	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
 	// Exec `goimports` (or the code that implements it)
-	_, fileToCellIdAndLine, err, nberr = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
-	if nberr != nil {
-		return
-	}
+	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
 
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
@@ -84,7 +78,7 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 //
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
-func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) *GonbError {
+func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) error {
 	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
 	cmd.Dir = s.TempDir
 	var output []byte
@@ -99,7 +93,7 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 // It also runs "go get" to download any missing dependencies.
 //
 // It returns the updated cursorInFile and fileToCellIdAndLines that reflect any changes in `main.go`.
-func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error, nberr *GonbError) {
+func (s *State) GoImports(msg kernel.Message, decls *Declarations, mainDecl *Function, fileToCellIdAndLine []CellIdAndLine) (cursorInFile Cursor, updatedFileToCellIdAndLine []CellIdAndLine, err error) {
 	klog.V(2).Infof("GoImports():")
 	cursorInFile = NoCursor
 	goimportsPath, err := exec.LookPath("goimports")
@@ -120,14 +114,14 @@ can install it from the notebook with:
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		nberr = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
 		return
 	}
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err, nberr = s.parseFromMainGo(msg, -1, NoCursor, nil)
-	if err != nil || nberr != nil {
+	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
+	if err != nil {
 		return
 	}
 
@@ -166,7 +160,7 @@ can install it from the notebook with:
 	if err != nil {
 		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
 		strOutput = s.filterGoGetError(strOutput)
-		nberr = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
 		return
 	}
 	return

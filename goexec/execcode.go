@@ -21,11 +21,11 @@ import (
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
-func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) (err error) {
+func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
-	err = s.AutoTrack()
+	err := s.AutoTrack()
 	if err != nil {
-		return
+		return err
 	}
 
 	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
@@ -84,7 +84,8 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 	var output []byte
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
+		err := s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
+		return errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 	return nil
 }
@@ -115,6 +116,7 @@ can install it from the notebook with:
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		return
 	}
 
@@ -158,6 +160,7 @@ can install it from the notebook with:
 	cmd.Dir = s.TempDir
 	output, err = cmd.CombinedOutput()
 	if err != nil {
+		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
 		strOutput = s.filterGoGetError(strOutput)
 		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)

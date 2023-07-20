@@ -127,7 +127,7 @@ func TestState_Parse(t *testing.T) {
 
 	var err error
 	cellId := NoCursorLine // Transient cellId.
-	s.Definitions, err = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
+	s.Definitions, err, _ = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
 	require.NoErrorf(t, err, "Failed to parse %q", s.MainPath())
 
 	fmt.Printf("\ttest imports: %+v\n", s.Definitions.Imports)
@@ -364,7 +364,7 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		s.Definitions, err = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
+		s.Definitions, err, _ = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}

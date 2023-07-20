@@ -87,8 +87,12 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 // used to report errors
 func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *GonbError {
 	nbErr := newError(s, fileToCellIdAndLine, errorMsg)
-	nbErr.reportHtml(msg)
-	return nbErr
+	if s.rawError {
+		return nbErr
+	} else {
+		nbErr.reportHtml(msg)
+		return nil
+	}
 }
 
 var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)

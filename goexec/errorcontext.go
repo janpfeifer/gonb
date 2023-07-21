@@ -85,13 +85,13 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 //
 // Any errors within here are logged and simply ignored, since this is already
 // used to report errors
-func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string) error {
+func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string, error error) error {
 	nbErr := newError(s, fileToCellIdAndLine, errorMsg)
 	if s.rawError {
 		return nbErr
 	} else {
 		nbErr.reportHtml(msg)
-		return nil
+		return error
 	}
 }
 

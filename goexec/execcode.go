@@ -84,7 +84,7 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 	var output []byte
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		err := s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
+		err := s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output), err)
 		return errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 	return nil
@@ -115,7 +115,7 @@ can install it from the notebook with:
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error(), err)
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		return
 	}
@@ -163,7 +163,7 @@ can install it from the notebook with:
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
 		strOutput = s.filterGoGetError(strOutput)
-		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput, err)
 		return
 	}
 	return

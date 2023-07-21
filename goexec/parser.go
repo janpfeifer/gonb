@@ -127,7 +127,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
-			err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
+			err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error(), err)
 		}
 		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 		return

@@ -11,6 +11,7 @@ import (
 type GonbError struct {
 	lines  []errorLine
 	errMsg string
+	error  error
 }
 
 var templateTraceback = template.Must(template.New("traceback").Parse(`
@@ -23,7 +24,7 @@ An error occurred while executing the following cell:
 {traceback}
 `))
 
-func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *GonbError {
+func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string, error error) *GonbError {
 	// Read main.go into lines.
 	mainGo, err := s.readMainGo()
 	if err != nil {
@@ -34,12 +35,15 @@ func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string) *G
 
 	// Parse error lines.
 	lines := strings.Split(errorMsg, "\n")
-	nberr := &GonbError{lines: make([]errorLine, len(lines)), errMsg: errorMsg}
+	nberr := &GonbError{lines: make([]errorLine, len(lines)), errMsg: errorMsg, error: error}
 	for ii, line := range lines {
 		parsed := s.parseErrorLine(line, codeLines, fileToCellIdAndLine)
 		nberr.lines[ii] = parsed
 	}
 	return nberr
+}
+func (err *GonbError) Unwrap() error {
+	return err.error
 }
 func (err *GonbError) Error() string {
 	return err.ErrorMsg()

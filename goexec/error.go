@@ -24,6 +24,9 @@ An error occurred while executing the following cell:
 {traceback}
 `))
 
+// newError creates a new Gonb Error, translating line numbers to cell IDs.
+//
+// Since gonb errors are context dependent, this must be done immediately after the error is generated.
 func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string, error error) *GonbError {
 	// Read main.go into lines.
 	mainGo, err := s.readMainGo()
@@ -42,12 +45,18 @@ func newError(s *State, fileToCellIdAndLine []CellIdAndLine, errorMsg string, er
 	}
 	return nberr
 }
+
+// Unwrap returns the underlying error
 func (err *GonbError) Unwrap() error {
 	return err.error
 }
+
+// Error returns the error message
 func (err *GonbError) Error() string {
 	return err.ErrorMsg()
 }
+
+// toReport creates an error report (for use in html reports)
 func (err *GonbError) toReport() *errorReport {
 	report := &errorReport{Lines: make([]errorLine, len(err.lines))}
 	for ii, line := range err.lines {
@@ -55,6 +64,8 @@ func (err *GonbError) toReport() *errorReport {
 	}
 	return report
 }
+
+// Traceback corresponds to traceback in jupyter
 func (err *GonbError) Traceback() []string {
 	traceback := make([]string, len(err.lines))
 	for ii, line := range err.lines {
@@ -62,12 +73,18 @@ func (err *GonbError) Traceback() []string {
 	}
 	return traceback
 }
+
+// ErrorMsg corresponds to evalue in jupyter
 func (err *GonbError) ErrorMsg() string {
 	return err.errMsg
 }
+
+// ErrorName corresponds to ename in jupyter
 func (err *GonbError) ErrorName() string {
 	return "ERROR"
 }
+
+// reportHtml reports the error as an HTML report in jupyter
 func (err *GonbError) reportHtml(msg kernel.Message) {
 	if msg == nil {
 		// Ignore, if there is no kernel.Message to reply to.

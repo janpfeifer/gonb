@@ -24,12 +24,12 @@ func wrapGonbError(t *testing.T) (string, error) {
 	return errorMsg, errors.Wrapf(gonbError, "WRAPPER")
 }
 func TestRawError(t *testing.T) {
-	var gonbError GonbError
+	var gonbError *GonbError
 	_, err := getGonbError(t)
 	assert.NotNil(t, err)
-	assert.True(t, errors.Is(err, &gonbError))
+	assert.True(t, errors.As(err, &gonbError))
 	_, err = getError(t, false)
 	assert.NotNil(t, err)
-	assert.False(t, errors.Is(err, &gonbError))
+	assert.False(t, errors.As(err, &gonbError))
 
 }

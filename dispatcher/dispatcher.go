@@ -178,7 +178,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		replyContent["status"] = "ok"
 		replyContent["user_expressions"] = make(map[string]string)
 	} else {
-		name, value, traceback := unwrap(executionErr)
+		name, value, traceback := goexec.Unwrap(executionErr)
 		replyContent["status"] = "error"
 		replyContent["ename"] = name
 		replyContent["evalue"] = value

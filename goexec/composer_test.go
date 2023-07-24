@@ -13,7 +13,7 @@ import (
 
 func TestCreateGoFileFromLines(t *testing.T) {
 	// Test cursor positioning in generated cellLines.
-	s := newEmptyState(t)
+	s := newEmptyState(t, false)
 	defer func() {
 		err := s.Finalize()
 		require.NoError(t, err, "Failed to finalized state")

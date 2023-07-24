@@ -12,11 +12,11 @@ import (
 )
 
 // newEmptyState returns an empty state with a temporary directory created.
-func newEmptyState(t *testing.T) *State {
+func newEmptyState(t *testing.T, rawError bool) *State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
-	s, err := New(uniqueID, false)
+	s, err := New(uniqueID, rawError)
 	if err != nil {
 		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}
@@ -120,7 +120,7 @@ fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 )
 
 func TestState_Parse(t *testing.T) {
-	s := newEmptyState(t)
+	s := newEmptyState(t, false)
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fmt.Printf("Code:\t%s\n", s.MainPath())
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
@@ -327,7 +327,7 @@ const (
 
 func TestCursorPositioning(t *testing.T) {
 	// Test cursor positioning in generated lines.
-	s := newEmptyState(t)
+	s := newEmptyState(t, false)
 	defer func() {
 		err := s.Finalize()
 		if err != nil {

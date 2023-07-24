@@ -62,7 +62,7 @@ func (err *GonbError) ErrorMsg() string {
 	return err.errMsg
 }
 func (err *GonbError) ErrorName() string {
-	return "Error (new)"
+	return "ERROR"
 }
 func (err *GonbError) reportHtml(msg kernel.Message) {
 	if msg == nil {

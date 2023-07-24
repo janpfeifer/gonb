@@ -16,7 +16,7 @@ func TestUnwrap(t *testing.T) {
 	gonbError := s.DisplayErrorWithContext(nil, fileToCellIdAndLine, errorMsg, sampleError)
 	assert.NotNil(t, gonbError)
 	name, msg, traceback := Unwrap(gonbError)
-	assert.NotEmpty(t, name)
-	assert.NotEmpty(t, msg)
-	assert.NotEmpty(t, traceback)
+	assert.Equal(t, name, "ERROR")
+	assert.Equal(t, msg, errorMsg)
+	assert.NotEmpty(t, traceback, []string{errorMsg})
 }

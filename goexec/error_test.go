@@ -19,7 +19,7 @@ func getError(t *testing.T, rawError bool) (string, error) {
 func getGonbError(t *testing.T) (string, error) {
 	return getError(t, true)
 }
-func wrapGonbError(t *testing.T) (string, error) {
+func getWrappedError(t *testing.T) (string, error) {
 	errorMsg, gonbError := getGonbError(t)
 	return errorMsg, errors.Wrapf(gonbError, "WRAPPER")
 }
@@ -31,5 +31,8 @@ func TestRawError(t *testing.T) {
 	_, err = getError(t, false)
 	assert.NotNil(t, err)
 	assert.False(t, errors.As(err, &gonbError))
+	_, err = getWrappedError(t)
+	assert.NotNil(t, err)
+	assert.True(t, errors.As(err, &gonbError))
 
 }

@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.5 -- 2023/07/28
 
 * Issue #30 (cont):
   * Added GONB_DIR and GONB_TMP_DIR even with the directories being used by GONB.

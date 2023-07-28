@@ -8,12 +8,17 @@ import (
 	"fmt"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
+)
+
+const (
+	GonbTempDirEnvName = "GONB_TMP_DIR"
 )
 
 // State holds information about Go code execution for this kernel. It's a singleton (for now).
@@ -79,7 +84,25 @@ func New(uniqueID string) (*State, error) {
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
 	}
 
-	// Exec go mod init on given directory.
+	// Set environment variables with currently used GoNB directories.
+	pwd, err := os.Getwd()
+	if err != nil {
+		klog.Exitf("Failed to get current directory with os.Getwd(): %+v", err)
+		err = nil
+	} else {
+		err = os.Setenv(protocol.GONB_DIR_ENV, pwd)
+		if err != nil {
+			klog.Errorf("Failed to set environment variable %q: %+v", protocol.GONB_DIR_ENV, err)
+			err = nil
+		}
+	}
+	err = os.Setenv(protocol.GONB_TMP_DIR_ENV, s.TempDir)
+	if err != nil {
+		klog.Errorf("Failed to set environment variable %q: %+v", protocol.GONB_TMP_DIR_ENV, err)
+		err = nil
+	}
+
+	// Exec `go mod init` on given directory.
 	cmd := exec.Command("go", "mod", "init", s.Package)
 	cmd.Dir = s.TempDir
 	var output []byte

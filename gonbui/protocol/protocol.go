@@ -4,7 +4,30 @@ package protocol
 
 import "encoding/gob"
 
-const GONB_PIPE_ENV = "GONB_PIPE"
+const (
+	// GONB_PIPE_ENV is the name of the environment variable holding
+	// the path to the unix named pipe to communicate rich content to the kernel.
+	//
+	// One doesn't need to use this directly usually, just use gonbui package instead,
+	// they will use this.
+	GONB_PIPE_ENV = "GONB_PIPE"
+
+	// GONB_DIR_ENV is the name of the environment variable holding the
+	// current execution directory for the Go cells, and the scripts executed
+	// with `!` special command.
+	//
+	// This value is visible for both, Go cells, and shell script (started with the `!` or
+	// `!*` special commands.
+	GONB_DIR_ENV = "GONB_DIR"
+
+	// GONB_TMP_DIR_ENV is the name of the environment variable holding the
+	// temporary directory created for the compilation of the Go code.
+	// This is also the directory where scripts executed with `!*` are run from.
+	//
+	// This value is visible for both, Go cells, and shell script (started with the `!` or
+	// `!*` special commands.
+	GONB_TMP_DIR_ENV = "GONB_TMP_DIR"
+)
 
 type MIMEType string
 

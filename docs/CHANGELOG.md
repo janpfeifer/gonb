@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.6 -- 2023/07/28
 
 * Issue #43:
   * %reset now also resets `go.mod`.

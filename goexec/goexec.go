@@ -102,14 +102,8 @@ func New(uniqueID string) (*State, error) {
 		err = nil
 	}
 
-	// Exec `go mod init` on given directory.
-	cmd := exec.Command("go", "mod", "init", s.Package)
-	cmd.Dir = s.TempDir
-	var output []byte
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		klog.Errorf("Failed to run `go mod init %s`:\n%s", s.Package, output)
-		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+	if err = s.GoModInit(); err != nil {
+		return nil, err
 	}
 
 	if _, err = exec.LookPath("gopls"); err == nil {
@@ -134,6 +128,25 @@ with:
 
 	klog.Infof("Initialized goexec.State in %s", s.TempDir)
 	return s, nil
+}
+
+// GoModInit removes current `go.mod` if it already exists, and recreate it with `go mod init`.
+func (s *State) GoModInit() error {
+	err := os.Remove(path.Join(s.TempDir, "go.mod"))
+	if err != nil && !os.IsNotExist(err) {
+		klog.Errorf("Failed to remove go.mod: %+v", err)
+		return errors.Wrapf(err, "failed to remove go.mod")
+	}
+	// Exec `go mod init` on given directory.
+	cmd := exec.Command("go", "mod", "init", s.Package)
+	cmd.Dir = s.TempDir
+	var output []byte
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Failed to run `go mod init %s`:\n%s", s.Package, output)
+		return errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+	return nil
 }
 
 // Finalize stops gopls and removes temporary files and directories.

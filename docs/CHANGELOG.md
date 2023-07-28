@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## Next
+
+* Issue #43:
+  * %reset now also resets `go.mod`.
+  * Added `%reset go.mod` which only resets `go.mod` but not the Go definitions memorized.
+
 ## 0.7.5 -- 2023/07/28
 
 * Issue #30 (cont):

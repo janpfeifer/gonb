@@ -78,7 +78,10 @@ Managing memorized definitions;
   functions) that are carried from one cell to another.
 - "%remove <definitions>" (or "%rm <definitions>"): Removes (forgets) given definition(s). Use as key the
   value(s) listed with "%ls".
-- "%reset" clears memory of memorized definitions.
+- "%reset [go.mod]" clears all memorized definitions (imports, constants, types, functions, etc.)
+  as well as re-initializes the go.mod file. If the optional "go.mod" parameter is given, it 
+  will re-initialize only the go.mod file -- useful when testing different set up of versions 
+  of libraries.
 
 Executing shell commands:
 
@@ -102,6 +105,19 @@ Tracking of Go files being developed:
 - "%untrack [file_or_directory][...]": remove file or directory from list of tracked files.
   If suffixed with "..." it will remove all files prefixed with the string given (without the
   "..."). If no file is given, it lists the currently tracked files. 
+
+Environment Variables:
+
+For convenience, GoNB defines the following environment variables -- available for the shell 
+scripts ("! and "!*") and for the Go cells:
+
+- "GONB_DIR": the directory where commands are executed from. This can be changed with "%cd".
+- "GONB_TMP_DIR": the directory where the temporary Go code, with the cell code, is stored 
+  and compiled. This is the directory where "!*" scripts are executed. It only changes when a kernel
+  is restarted, and a new temporary directory is created.
+- "GONB_PIPE": is the _named pipe_ directory used to communicate rich content (HTML, images)
+  to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
+  This is used by the "gonbui"" functions described above, and doesn't need to be accessed directly.
 
 Other:
 
@@ -252,7 +268,14 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 
 		// Definitions management.
 	case "reset":
-		resetDefinitions(msg, goExec)
+		if len(parts) == 1 {
+			resetDefinitions(msg, goExec)
+		} else {
+			if len(parts) > 2 || parts[1] != "go.mod" {
+				return errors.Errorf("%%reset only take one optional parameter \"go.mod\"")
+			}
+		}
+		return goExec.GoModInit()
 	case "ls", "list":
 		listDefinitions(msg, goExec)
 	case "rm", "remove":

@@ -393,6 +393,10 @@ const (
 // PublishWriteStream prints the data string to a stream on the front-end. This is
 // either `StreamStdout` or `StreamStderr`.
 func PublishWriteStream(msg Message, stream string, data string) error {
+	if msg == nil {
+		klog.Infof("PublishWriteStream(nil, %s): %q", stream, data)
+		return nil
+	}
 	return msg.Publish("stream",
 		struct {
 			Stream string `json:"name"`

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
@@ -187,9 +188,14 @@ func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) 
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
+//
+// It supports msg == nil for testing.
 func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
 	_ = goExec
-	content := msg.ComposedMsg().Content.(map[string]any)
+	var content map[string]any
+	if msg != nil && msg.ComposedMsg().Content != nil {
+		content = msg.ComposedMsg().Content.(map[string]any)
+	}
 	parts := splitCmd(cmdStr)
 	switch parts[0] {
 	case "%", "main", "args":
@@ -230,6 +236,10 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 				fmt.Sprintf("Changed directory to %q\n", pwd))
 			if err != nil {
 				klog.Errorf("Failed to output: %+v", err)
+			}
+			err = os.Setenv(protocol.GONB_DIR_ENV, pwd)
+			if err != nil {
+				klog.Errorf("Failed to set environment variable %q: %+v", protocol.GONB_DIR_ENV, err)
 			}
 		}
 

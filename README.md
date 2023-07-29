@@ -8,13 +8,27 @@
 ![Coverage](https://img.shields.io/badge/Coverage-25.2%25-red)
 
 
-## For a quick start, see the 5 minutes [**tutorial**](examples/tutorial.ipynb)!
+## For a quick start, see the [**tutorial**](examples/tutorial.ipynb)!
+
+## Highlights:
+
+* Auto-complete and contextual help while coding.
+* Rich content display: HTML, images, javascript, svg, videos, etc.
+* Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
+* Support for `go.mod` and `go.work`, to allow local development.
+* Several handy special commands, see `%help`.
+* Shell command executions with `!` -- handy at times, for instance to install packages.
+* Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.
+* Very well documented and supported.
+* Great for data-science, testing, writing reports.
+
+![Demo](docs/demo-720.gif)
+
+## Introduction
 
 Go is a compiled language, but with very fast compilation, that allows one to use
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
 of the loop -- so it's a Read-Compile-Run-Print-Loop — while still feeling very interactive. 
-
-![Demo](docs/demo-720.gif)
 
 **GoNB** leverages that compilation speed to implement a full-featured (at least it's getting there)
 [Jupyter notebook](https://jupyter.org/) kernel.
@@ -29,15 +43,13 @@ See the [tutorial](examples/tutorial.ipynb).
 It's been heavily used by the author (in developing [GoMLX](https://github.com/gomlx/gomlx), a machine 
 learning framework for Go), but should still be seen as **experimental** — if we hear success stories
 from others, we can change this.
+
 Reports of issues as well as fixes are always welcome.
 
 There is also
 [a live version in Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing)
 that one can interact with (make a copy first) — if the link doesn't work (Google Drive sharing publicly
 is odd), [download it from GitHub](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
-
-It also works in VSCode and GitHub's Codespace. Just follow the installation below.
-
 
 # Installation
 
@@ -132,10 +144,9 @@ Contributions are welcome!
   * https://discourse.jupyter.org/c/jupyterlab/extensions/43
 * Integration testing with `JupyterLab` (or `Jupyter`) and with `gopls`.
 
-
 # Implementation
 
 The Jupyter kernel started from [gophernotes](https://github.com/gopherdata/gophernotes)
-implementation, but was heavily modified and very little from it is left. Also, the
+implementation, but was heavily modified and little from it is left. Also, the
 execution loop and mechanisms are completely different and new: GoNB compiles and 
 executes on-the-fly, instead of using a REPL engine.

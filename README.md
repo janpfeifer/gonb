@@ -21,6 +21,7 @@
 * Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.
 * Very well documented and supported.
 * Great for data-science, testing, writing reports, live demos, etc.
+* Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out.
 
 ![Demo](docs/demo-720.gif)
 

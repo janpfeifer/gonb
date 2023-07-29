@@ -15,12 +15,12 @@
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, images, javascript, svg, videos, etc.
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
-* Support for `go.mod` and `go.work`, to allow local development.
+* Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Several handy special commands, see `%help`.
 * Shell command executions with `!` -- handy at times, for instance to install packages.
 * Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.
 * Very well documented and supported.
-* Great for data-science, testing, writing reports.
+* Great for data-science, testing, writing reports, live demos, etc.
 
 ![Demo](docs/demo-720.gif)
 

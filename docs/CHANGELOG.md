@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* `init_*` functions: fixed duplicate rendering;
+
 ## 0.7.6 -- 2023/07/28
 
 * Issue #43:

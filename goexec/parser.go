@@ -378,6 +378,10 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 //
 // skipLines are lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
+//
+// Note: `func init_*()` functions are rendered as `func init()`: that means if one is parsing an
+// already generated code, the original `func init_*()` will be missing (which is usually ok), but
+// there will be a newly generated `func init()` that shouldn't be memorized. See
 func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursorInFile = NoCursor

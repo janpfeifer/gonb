@@ -44,12 +44,12 @@ after is wrapped inside a "func main() { ... }". So our revised "hello world" lo
 	%%
 	fmt.Printf("Hello world!\n")
 
+Init Functions -- "func init()":
 
-- "init()" functions: since there is always only one definition per function name, 
-  it's not possible for each cell to have it's own init() function. Instead GoNB
-  converts any function named "init_<my_stuff>()" to "init()" before compiling and
-  executing. This way each cell can create its own "init_...()" and have it called
-  at every cell execution.
+  Since there is always only one definition per function name, it's not possible for
+  each cell to have it's own init() function. Instead GoNB converts any function named 
+  "init_<my_stuff>()" to "init()" before compiling and executing. This way each cell can
+  create its own "init_...()" and have it called at every cell execution.
 
 Special non-Go commands: 
 

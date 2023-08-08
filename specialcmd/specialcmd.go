@@ -72,7 +72,7 @@ Special non-Go commands:
 - "%with_password": will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
 
-Managing memorized definitions;
+Managing Memorized Definitions:
 
 - "%list" (or "%ls"): Lists all memorized definitions (imports, constants, types, variables and
   functions) that are carried from one cell to another.

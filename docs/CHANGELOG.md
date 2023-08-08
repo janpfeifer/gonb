@@ -2,7 +2,10 @@
 
 ## Next
 
-* `init_*` functions: fixed duplicate rendering;
+* `init_*` functions: 
+  * Fixed duplicate rendering.
+  * Added section about it in `tutorial.ipynb`
+* Updated tutorial to used `%rm` to remove no longer wanted definitions.
 
 ## 0.7.6 -- 2023/07/28
 

@@ -1,5 +1,14 @@
 # GoNB Changelog
 
+## 0.7.7 -- 2023/08/08
+
+* Added `DisplayMarkdown` and `UpdateMarkdown`.
+* Changed `%help` to use markdown.
+* `init_*` functions: 
+  * Fixed duplicate rendering.
+  * Added section about it in `tutorial.ipynb`
+* Updated tutorial to used `%rm` to remove no longer wanted definitions.
+
 ## 0.7.6 -- 2023/07/28
 
 * Issue #43:

@@ -380,6 +380,20 @@ func PublishDisplayDataWithHTML(msg Message, html string) error {
 	return PublishDisplayData(msg, msgData)
 }
 
+// PublishDisplayDataWithMarkdown is a shortcut to PublishDisplayData for markdown content.
+func PublishDisplayDataWithMarkdown(msg Message, markdown string) error {
+	msgData := Data{
+		Data:      make(MIMEMap, 1),
+		Metadata:  make(MIMEMap),
+		Transient: make(MIMEMap),
+	}
+	msgData.Data[string(protocol.MIMETextMarkdown)] = markdown
+	if klog.V(1).Enabled() {
+		logDisplayData(msgData.Data)
+	}
+	return PublishDisplayData(msg, msgData)
+}
+
 const (
 	// StreamStdout defines the stream name for standard out on the front-end. It
 	// is used in `PublishWriteStream` to specify the stream to write to.

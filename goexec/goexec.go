@@ -18,7 +18,14 @@ import (
 )
 
 const (
+	// GonbTempDirEnvName is the name of the environment variable that is set with
+	// the temporary directory used to compile user's Go code.
+	// It can be used by the executed Go code or by the bash scripts (started with `!`).
 	GonbTempDirEnvName = "GONB_TMP_DIR"
+
+	// InitFunctionPrefix -- functions named with this prefix will be rendered as
+	// a separate `func init()`.
+	InitFunctionPrefix = "init_"
 )
 
 // State holds information about Go code execution for this kernel. It's a singleton (for now).
@@ -215,6 +222,14 @@ func (d *Declarations) ClearCursor() {
 func clearCursor[K comparable, V interface{ ClearCursor() }](data map[K]V) {
 	for _, v := range data {
 		v.ClearCursor()
+	}
+}
+
+// DropFuncInit drops declarations of `func init()`: the parser generates this for the `func init_*`,
+// and it shouldn't be considered new declarations if reading from generated code.
+func (d *Declarations) DropFuncInit() {
+	if _, found := d.Functions["init"]; found {
+		delete(d.Functions, "init")
 	}
 }
 

@@ -33,7 +33,8 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
-	// Exec `goimports` (or the code that implements it)
+	// Exec `goimports` (or the code that implements it) -- it updates `updatedDecls` with
+	// the new imports, if there are any.
 	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
@@ -122,6 +123,7 @@ can install it from the notebook with:
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
 	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
+	newDecls.DropFuncInit() // These may be generated, we don't want to memorize these.
 	if err != nil {
 		return
 	}

@@ -87,10 +87,22 @@ func DisplayHTML(html string) {
 	})
 }
 
-// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`: the block is created
-// automatically the first time this function is called, and simply updated thereafter.
+// DisplayMarkdown will display the given markdown content in the notebook, as the output of the cell being executed.
+func DisplayMarkdown(markdown string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
+	})
+}
+
+// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`:
+// the block identified by 'id' is created automatically the first time this function is
+// called, and simply updated thereafter.
 //
-// The contents of these cells are considered transient, and intended to live only during a kernel session.
+// The contents of these output blocks are considered transient, and intended to live
+// only during a kernel session.
 //
 // Usage example:
 //
@@ -114,13 +126,31 @@ func UpdateHTML(id, html string) {
 	})
 }
 
-// UniqueID returns a unique id that can be used for UpdateHTML. Should be generated once per display block
-// the program wants to update.
+// UniqueID returns a unique id that can be used for UpdateHTML.
+// It should be generated once per display block the program wants to update.
 func UniqueID() string {
 	uuid, _ := uuid.NewV7()
 	uuidStr := uuid.String()
 	uid := uuidStr[len(uuidStr)-8:]
 	return fmt.Sprintf("gonb_id_%s", uid)
+}
+
+// UpdateMarkdown updates the contents of the output identified by id:
+// the block identified by 'id' is created automatically the first time this function is
+// called, and simply updated thereafter.
+//
+// The contents of these output blocks are considered transient, and intended to live only
+// during a kernel session.
+//
+// See example in UpdateHTML, just instead this used Markdown content.
+func UpdateMarkdown(id, markdown string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data:      map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
+		DisplayID: id,
+	})
 }
 
 // DisplayPNG displays the given PNG, given as raw bytes.

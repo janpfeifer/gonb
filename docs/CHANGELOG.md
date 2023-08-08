@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.7 -- 2023/08/08
 
 * Added `DisplayMarkdown` and `UpdateMarkdown`.
 * Changed `%help` to use markdown.

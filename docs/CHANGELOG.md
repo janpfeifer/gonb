@@ -2,6 +2,8 @@
 
 ## Next
 
+* Added `DisplayMarkdown` and `UpdateMarkdown`.
+* Changed `%help` to use markdown.
 * `init_*` functions: 
   * Fixed duplicate rendering.
   * Added section about it in `tutorial.ipynb`

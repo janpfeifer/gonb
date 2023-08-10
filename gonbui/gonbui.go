@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"image"
 	"image/png"
+	"log"
 	"os"
 	"sync"
 )
@@ -70,8 +71,9 @@ func sendData(data *protocol.DisplayData) {
 	}
 	err := gonbEncoder.Encode(data)
 	if err != nil {
-		gonbPipeError = errors.Wrapf(err, "failed to write to pipe %q", os.Getenv(protocol.GONB_PIPE_ENV))
+		gonbPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
 		gonbPipe.Close()
+		log.Printf("%+v", gonbPipeError)
 	}
 }
 
@@ -85,10 +87,22 @@ func DisplayHTML(html string) {
 	})
 }
 
-// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`: the block is created
-// automatically the first time this function is called, and simply updated thereafter.
+// DisplayMarkdown will display the given markdown content in the notebook, as the output of the cell being executed.
+func DisplayMarkdown(markdown string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
+	})
+}
+
+// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`:
+// the block identified by 'id' is created automatically the first time this function is
+// called, and simply updated thereafter.
 //
-// The contents of these cells are considered transient, and intended to live only during a kernel session.
+// The contents of these output blocks are considered transient, and intended to live
+// only during a kernel session.
 //
 // Usage example:
 //
@@ -112,13 +126,31 @@ func UpdateHTML(id, html string) {
 	})
 }
 
-// UniqueID returns a unique id that can be used for UpdateHTML. Should be generated once per display block
-// the program wants to update.
+// UniqueID returns a unique id that can be used for UpdateHTML.
+// It should be generated once per display block the program wants to update.
 func UniqueID() string {
 	uuid, _ := uuid.NewV7()
 	uuidStr := uuid.String()
 	uid := uuidStr[len(uuidStr)-8:]
 	return fmt.Sprintf("gonb_id_%s", uid)
+}
+
+// UpdateMarkdown updates the contents of the output identified by id:
+// the block identified by 'id' is created automatically the first time this function is
+// called, and simply updated thereafter.
+//
+// The contents of these output blocks are considered transient, and intended to live only
+// during a kernel session.
+//
+// See example in UpdateHTML, just instead this used Markdown content.
+func UpdateMarkdown(id, markdown string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data:      map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
+		DisplayID: id,
+	})
 }
 
 // DisplayPNG displays the given PNG, given as raw bytes.
@@ -169,4 +201,28 @@ func EmbedImageAsPNGSrc(img image.Image) (string, error) {
 	}
 	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
 	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
+}
+
+// RequestInput from the Jupyter notebook.
+// It triggers the opening of a small text field in the cell output area where the user
+// can type something.
+// Whatever the user writes is written to the stdin of cell program -- and can be read,
+// for instance, with `fmt.Scanf`.
+//
+// Args:
+//   - prompt: string displayed in front of the field to be entered. Leave empty ("") if not needed.
+//   - password: if whatever the user is typing is not to be displayed.
+func RequestInput(prompt string, password bool) {
+	if !IsNotebook {
+		return
+	}
+	req := protocol.InputRequest{
+		Prompt:   prompt,
+		Password: password,
+	}
+	sendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{
+			protocol.MIMEJupyterInput: &req,
+		},
+	})
 }

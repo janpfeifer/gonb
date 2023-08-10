@@ -2,6 +2,7 @@ package kernel
 
 import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
 	"os"
@@ -9,8 +10,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // PipeExecToJupyterBuilder holds the configuration to executing a command that is piped to Jupyter.
@@ -60,12 +59,12 @@ func (builder *PipeExecToJupyterBuilder) WithStdout(stdoutWriter io.Writer) *Pip
 	return builder
 }
 
-// WithInput configures the PipeExecToJupyterBuilder to also plumb
+// WithInputs configures the PipeExecToJupyterBuilder to also plumb
 // the input from Jupyter input prompt.
 //
 // The prompt is displayed after millisecondsWait: so if the program exits quickly, nothing
 // is displayed.
-func (builder *PipeExecToJupyterBuilder) WithInput(millisecondsWait int) *PipeExecToJupyterBuilder {
+func (builder *PipeExecToJupyterBuilder) WithInputs(millisecondsWait int) *PipeExecToJupyterBuilder {
 	builder.millisecondsToInput = millisecondsWait
 	builder.inputPassword = false
 	return builder
@@ -100,6 +99,10 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	if err != nil {
 		return errors.WithMessagef(err, "failed to create pipe for stderr")
 	}
+	cmdStdin, err := cmd.StdinPipe()
+	if err != nil {
+		return errors.WithMessagef(err, "failed to create pipe for stdin")
+	}
 
 	// Pipe all stdout and stderr to Jupyter.
 	if builder.stdoutWriter == nil {
@@ -130,15 +133,22 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 		done     bool
 		doneChan = make(chan struct{})
 		muDone   sync.Mutex
-		cmdStdin io.WriteCloser
 	)
-	cmdStdin, err = cmd.StdinPipe()
-	if err != nil {
-		return errors.WithMessagef(err, "failed to create pipe for stdin")
-	}
+
 	if builder.millisecondsToInput > 0 {
 		// Set function to handle incoming content.
 		var writeStdinFn OnInputFn
+		schedulePromptFn := func() {
+			// Wait for the given time, and if command still running, ask
+			// Jupyter for stdin input.
+			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
+			klog.V(2).Infof("%d milliseconds elapsed, prompt for input", builder.millisecondsToInput)
+			muDone.Lock()
+			if !done {
+				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
+			}
+			muDone.Unlock()
+		}
 		writeStdinFn = func(original, input *MessageImpl) error {
 			muDone.Lock()
 			defer muDone.Unlock()
@@ -159,26 +169,14 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 				}
 			}()
 			// Reschedule itself for the next message.
-			if !builder.inputPassword {
-				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
-			}
+			go schedulePromptFn()
 			return err
 		}
-		go func() {
-			// Wait for the given time, and if command still running, ask
-			// Jupyter for stdin input.
-			time.Sleep(time.Duration(builder.millisecondsToInput) * time.Millisecond)
-			klog.V(2).Infof("%d milliseconds elapsed, prompt for input", builder.millisecondsToInput)
-			muDone.Lock()
-			if !done {
-				_ = builder.msg.PromptInput(" ", builder.inputPassword, writeStdinFn)
-			}
-			muDone.Unlock()
-		}()
+		go schedulePromptFn()
 	}
 
 	// Prepare named-pipe to use for rich-data display.
-	if err = StartNamedPipe(builder.msg, builder.dir, doneChan); err != nil {
+	if err = StartNamedPipe(builder.msg, builder.dir, doneChan, cmdStdin); err != nil {
 		return errors.WithMessagef(err, "failed to create named pipe for display content")
 	}
 
@@ -226,7 +224,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 // remove it and quit.
 //
 // TODO: make this more secure, maybe with a secret key also passed by the environment.
-func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
+func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) error {
 	// Create a temporary file name.
 	f, err := os.CreateTemp(dir, "gonb_pipe_")
 	if err != nil {
@@ -283,7 +281,7 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}) error {
 		muFifo.Lock()
 		fifoOpenedForReading = true
 		muFifo.Unlock()
-		go PollDisplayRequests(msg, pipeReader)
+		go PollGonbPipe(msg, pipeReader, cmdStdin)
 
 		// Wait till channel is closed and then close reader.
 		<-doneChan

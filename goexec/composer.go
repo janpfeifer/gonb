@@ -187,9 +187,7 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine 
 		if funcDecl.HasCursor() {
 			cursor = w.CursorPlusDelta(funcDecl.Cursor)
 		}
-		if strings.HasPrefix(key, "init_") {
-			// TODO: this will not work if there is a comment before the function
-			//       which also has the string key. We need something more sophisticated.
+		if strings.HasPrefix(key, InitFunctionPrefix) {
 			def = strings.Replace(def, key, "init", 1)
 		}
 		w.Writef("%s\n\n", def)
@@ -421,7 +419,7 @@ func (s *State) createAlternativeFileFromDecls(decls *Declarations) (err error) 
 
 // createGoContentsFromDecls writes to the given file all the declarations.
 //
-// mainDecl is optional, and if not given no `main` function is created.
+// mainDecl is optional, and if not given, no `main` function is created.
 //
 // It returns the cursor position in the file as well as a mapping from the file lines to the original cell ids and lines.
 func (s *State) createGoContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {

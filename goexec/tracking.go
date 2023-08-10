@@ -520,7 +520,7 @@ func (s *State) GoWorkFix(msg kernel.Message) (err error) {
 			if replace.New.Path == p {
 				// The correct "replace" rule already exists.
 				err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
-					fmt.Sprintf("\t- replace rule for module %q to local directory %q already exists.",
+					fmt.Sprintf("\t- Replace rule for module %q to local directory %q already exists.\n",
 						mod, p))
 				if err != nil {
 					return
@@ -531,7 +531,7 @@ func (s *State) GoWorkFix(msg kernel.Message) (err error) {
 			// Update previous "replace" rule.
 			err = kernel.PublishWriteStream(msg, kernel.StreamStderr,
 				fmt.Sprintf(
-					"WARNING: replace rule for module %q mapping to %q, updated to `go.work` location %q",
+					"\t- WARNING: replace rule for module %q mapping to %q, updated to `go.work` location %q\n",
 					mod, replace.New.Path, p))
 			if err != nil {
 				return
@@ -543,7 +543,7 @@ func (s *State) GoWorkFix(msg kernel.Message) (err error) {
 			}
 		} else {
 			err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
-				fmt.Sprintf("\t- added replace rule for module %q to local directory %q.",
+				fmt.Sprintf("\t- Added replace rule for module %q to local directory %q.\n",
 					mod, p))
 		}
 		err = modFile.AddReplace(mod, "", p, "")

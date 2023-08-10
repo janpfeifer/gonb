@@ -8,12 +8,24 @@ import (
 	"fmt"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
+)
+
+const (
+	// GonbTempDirEnvName is the name of the environment variable that is set with
+	// the temporary directory used to compile user's Go code.
+	// It can be used by the executed Go code or by the bash scripts (started with `!`).
+	GonbTempDirEnvName = "GONB_TMP_DIR"
+
+	// InitFunctionPrefix -- functions named with this prefix will be rendered as
+	// a separate `func init()`.
+	InitFunctionPrefix = "init_"
 )
 
 // State holds information about Go code execution for this kernel. It's a singleton (for now).
@@ -81,14 +93,26 @@ func New(uniqueID string, rawError bool) (*State, error) {
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
 	}
 
-	// Exec go mod init on given directory.
-	cmd := exec.Command("go", "mod", "init", s.Package)
-	cmd.Dir = s.TempDir
-	var output []byte
-	output, err = cmd.CombinedOutput()
+	// Set environment variables with currently used GoNB directories.
+	pwd, err := os.Getwd()
 	if err != nil {
-		klog.Errorf("Failed to run `go mod init %s`:\n%s", s.Package, output)
-		return nil, errors.Wrapf(err, "failed to run %q", cmd.String())
+		klog.Exitf("Failed to get current directory with os.Getwd(): %+v", err)
+		err = nil
+	} else {
+		err = os.Setenv(protocol.GONB_DIR_ENV, pwd)
+		if err != nil {
+			klog.Errorf("Failed to set environment variable %q: %+v", protocol.GONB_DIR_ENV, err)
+			err = nil
+		}
+	}
+	err = os.Setenv(protocol.GONB_TMP_DIR_ENV, s.TempDir)
+	if err != nil {
+		klog.Errorf("Failed to set environment variable %q: %+v", protocol.GONB_TMP_DIR_ENV, err)
+		err = nil
+	}
+
+	if err = s.GoModInit(); err != nil {
+		return nil, err
 	}
 
 	if _, err = exec.LookPath("gopls"); err == nil {
@@ -113,6 +137,25 @@ with:
 
 	klog.Infof("Initialized goexec.State in %s", s.TempDir)
 	return s, nil
+}
+
+// GoModInit removes current `go.mod` if it already exists, and recreate it with `go mod init`.
+func (s *State) GoModInit() error {
+	err := os.Remove(path.Join(s.TempDir, "go.mod"))
+	if err != nil && !os.IsNotExist(err) {
+		klog.Errorf("Failed to remove go.mod: %+v", err)
+		return errors.Wrapf(err, "failed to remove go.mod")
+	}
+	// Exec `go mod init` on given directory.
+	cmd := exec.Command("go", "mod", "init", s.Package)
+	cmd.Dir = s.TempDir
+	var output []byte
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Failed to run `go mod init %s`:\n%s", s.Package, output)
+		return errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+	return nil
 }
 
 // Finalize stops gopls and removes temporary files and directories.
@@ -181,6 +224,14 @@ func (d *Declarations) ClearCursor() {
 func clearCursor[K comparable, V interface{ ClearCursor() }](data map[K]V) {
 	for _, v := range data {
 		v.ClearCursor()
+	}
+}
+
+// DropFuncInit drops declarations of `func init()`: the parser generates this for the `func init_*`,
+// and it shouldn't be considered new declarations if reading from generated code.
+func (d *Declarations) DropFuncInit() {
+	if _, found := d.Functions["init"]; found {
+		delete(d.Functions, "init")
 	}
 }
 

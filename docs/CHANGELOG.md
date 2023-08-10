@@ -1,5 +1,32 @@
 # GoNB Changelog
 
+## 0.7.7 -- 2023/08/08
+
+* Added `DisplayMarkdown` and `UpdateMarkdown`.
+* Changed `%help` to use markdown.
+* `init_*` functions: 
+  * Fixed duplicate rendering.
+  * Added section about it in `tutorial.ipynb`
+* Updated tutorial to use `%rm` to remove no longer wanted definitions.
+
+## 0.7.6 -- 2023/07/28
+
+* Issue #43:
+  * %reset now also resets `go.mod`.
+  * Added `%reset go.mod` which only resets `go.mod` but not the Go definitions memorized.
+
+## 0.7.5 -- 2023/07/28
+
+* Issue #30 (cont):
+  * Added GONB_DIR and GONB_TMP_DIR even with the directories being used by GONB.
+
+## 0.7.4 -- 2023/07/20
+
+* Issue #38:
+  * `%with_inputs` and `%with_password` now wait 200 milliseconds each time (a constant), before 
+    prompting user with an input in the Jupyter Notebook.
+  * Added `gonbui.RequestInput`, that will prompt the user with a text field in the notebook.
+
 ## 0.7.3 - 2023/07/14
 
 * Issue #35: Fixed installation (--install): it now uses the absolute path to the gonb binary

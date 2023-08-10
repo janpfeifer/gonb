@@ -374,7 +374,23 @@ func PublishDisplayDataWithHTML(msg Message, html string) error {
 		Transient: make(MIMEMap),
 	}
 	msgData.Data[string(protocol.MIMETextHTML)] = html
-	logDisplayData(msgData.Data)
+	if klog.V(1).Enabled() {
+		logDisplayData(msgData.Data)
+	}
+	return PublishDisplayData(msg, msgData)
+}
+
+// PublishDisplayDataWithMarkdown is a shortcut to PublishDisplayData for markdown content.
+func PublishDisplayDataWithMarkdown(msg Message, markdown string) error {
+	msgData := Data{
+		Data:      make(MIMEMap, 1),
+		Metadata:  make(MIMEMap),
+		Transient: make(MIMEMap),
+	}
+	msgData.Data[string(protocol.MIMETextMarkdown)] = markdown
+	if klog.V(1).Enabled() {
+		logDisplayData(msgData.Data)
+	}
 	return PublishDisplayData(msg, msgData)
 }
 
@@ -391,6 +407,10 @@ const (
 // PublishWriteStream prints the data string to a stream on the front-end. This is
 // either `StreamStdout` or `StreamStderr`.
 func PublishWriteStream(msg Message, stream string, data string) error {
+	if msg == nil {
+		klog.Infof("PublishWriteStream(nil, %s): %q", stream, data)
+		return nil
+	}
 	return msg.Publish("stream",
 		struct {
 			Stream string `json:"name"`

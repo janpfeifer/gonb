@@ -7,7 +7,7 @@ import (
 )
 
 func getError(t *testing.T, rawError bool) (string, error) {
-	s := newEmptyState(t, rawError)
+	s := newEmptyStateWithRawError(t, rawError)
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
 	errorMsg := "THIS_IS_ERROR"

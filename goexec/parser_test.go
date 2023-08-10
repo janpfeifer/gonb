@@ -3,16 +3,21 @@ package goexec
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/gofrs/uuid"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 // newEmptyState returns an empty state with a temporary directory created.
-func newEmptyState(t *testing.T, rawError bool) *State {
+func newEmptyState(t *testing.T) *State {
+	return newEmptyStateWithRawError(t, false)
+}
+
+func newEmptyStateWithRawError(t *testing.T, rawError bool) *State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
@@ -120,7 +125,7 @@ fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 )
 
 func TestState_Parse(t *testing.T) {
-	s := newEmptyState(t, false)
+	s := newEmptyState(t)
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fmt.Printf("Code:\t%s\n", s.MainPath())
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)

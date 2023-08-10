@@ -332,7 +332,7 @@ const (
 
 func TestCursorPositioning(t *testing.T) {
 	// Test cursor positioning in generated lines.
-	s := newEmptyState(t, false)
+	s := newEmptyState(t)
 	defer func() {
 		err := s.Finalize()
 		if err != nil {

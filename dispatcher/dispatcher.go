@@ -172,7 +172,9 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	hasMoreToRun := len(usedLines) < len(lines)
 	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
 		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
-	} // Final execution result.
+	}
+
+	// Final execution result.
 	if executionErr == nil {
 		// if the only non-nil value should be auto-rendered graphically, render it
 		replyContent["status"] = "ok"

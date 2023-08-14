@@ -2,11 +2,30 @@ package goexec
 
 import (
 	"fmt"
-	"github.com/fatih/color"
 	"html"
 	"strconv"
 	"strings"
+
+	"github.com/fatih/color"
+	"golang.org/x/exp/constraints"
 )
+func min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max[T constraints.Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func inBetween[T constraints.Ordered](x, from, to T) T {
+	return min(max(x, from), to)
+}
 
 type errorLine struct {
 	HasContext  bool   // Whether this line has a contextual mouse-over content.

@@ -1,13 +1,13 @@
 package goexec
 
 import (
-	"github.com/janpfeifer/gonb/kernel"
-	"github.com/pkg/errors"
-	"golang.org/x/exp/constraints"
 	"io"
 	"os"
 	"regexp"
 	"text/template"
+
+	"github.com/janpfeifer/gonb/kernel"
+	"github.com/pkg/errors"
 )
 
 // errorReport is the structure to feed templateErrorReport
@@ -99,23 +99,6 @@ var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)
 
 const LinesForErrorContext = 3
 
-func min[T constraints.Ordered](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max[T constraints.Ordered](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func inBetween[T constraints.Ordered](x, from, to T) T {
-	return min(max(x, from), to)
-}
 
 // readMainGo reads the contents of main.go file.
 func (s *State) readMainGo() (string, error) {

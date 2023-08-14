@@ -2,18 +2,20 @@ package goexec
 
 import (
 	"fmt"
-	. "github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/kernel"
-	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"k8s.io/klog/v2"
+	"io"
 	"math/rand"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	. "github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/kernel"
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 )
 
 // This file implements functions related to the parsing of the Go code.
@@ -474,4 +476,19 @@ func lineWithCursor(content string, cursor Cursor) string {
 		}
 	}
 	return modLine
+}
+// readMainGo reads the contents of main.go file.
+func (s *State) readMainGo() (string, error) {
+	f, err := os.Open(s.MainPath())
+	if err != nil {
+		return "", errors.Wrapf(err, "failed readMainGo()")
+	}
+	defer func() {
+		_ = f.Close() // Ignoring error on closing file for reading.
+	}()
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed readMainGo()")
+	}
+	return string(content), nil
 }

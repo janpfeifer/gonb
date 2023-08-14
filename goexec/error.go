@@ -1,11 +1,10 @@
 package goexec
 
 import (
-	"bytes"
-	"github.com/janpfeifer/gonb/kernel"
-	"k8s.io/klog/v2"
 	"strings"
 	"text/template"
+
+	"k8s.io/klog/v2"
 )
 
 type GonbError struct {
@@ -56,14 +55,7 @@ func (err *GonbError) Error() string {
 	return err.ErrorMsg()
 }
 
-// toReport creates an error report (for use in html reports)
-func (err *GonbError) toReport() *errorReport {
-	report := &errorReport{Lines: make([]errorLine, len(err.lines))}
-	for ii, line := range err.lines {
-		report.Lines[ii] = line
-	}
-	return report
-}
+
 
 // Traceback corresponds to traceback in jupyter
 func (err *GonbError) Traceback() []string {
@@ -84,28 +76,3 @@ func (err *GonbError) ErrorName() string {
 	return "ERROR"
 }
 
-// reportHtml reports the error as an HTML report in jupyter
-func (err *GonbError) reportHtml(msg kernel.Message) {
-	if msg == nil {
-		// Ignore, if there is no kernel.Message to reply to.
-		return
-	}
-	// Default report, and makes sure display is called at the end.
-	reportHTML := "<pre>" + err.errMsg + "</pre>" // If anything goes wrong, simply display the error message.
-	defer func() {
-		// Display HTML report on exit.
-		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
-		if err != nil {
-			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
-		}
-	}()
-
-	// Render error block.
-	buf := bytes.NewBuffer(make([]byte, 0, 512*len(err.lines)))
-	if err := templateErrorReport.Execute(buf, err.toReport()); err != nil {
-		klog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
-		return
-	}
-	reportHTML = buf.String()
-	// reportHTML will be displayed on the deferred function above.
-}

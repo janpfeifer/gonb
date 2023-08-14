@@ -1,6 +1,7 @@
 package goexec
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 )
 
 // errorReport is the structure to feed templateErrorReport
@@ -99,19 +101,37 @@ var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)
 
 const LinesForErrorContext = 3
 
-
-// readMainGo reads the contents of main.go file.
-func (s *State) readMainGo() (string, error) {
-	f, err := os.Open(s.MainPath())
-	if err != nil {
-		return "", errors.Wrapf(err, "failed readMainGo()")
+// toReport creates an error report (for use in html reports)
+func (err *GonbError) toReport() *errorReport {
+	report := &errorReport{Lines: make([]errorLine, len(err.lines))}
+	for ii, line := range err.lines {
+		report.Lines[ii] = line
 	}
-	defer func() {
-		_ = f.Close() // Ignoring error on closing file for reading.
-	}()
-	content, err := io.ReadAll(f)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed readMainGo()")
-	}
-	return string(content), nil
+	return report
 }
+// reportHtml reports the error as an HTML report in jupyter
+func (err *GonbError) reportHtml(msg kernel.Message) {
+	if msg == nil {
+		// Ignore, if there is no kernel.Message to reply to.
+		return
+	}
+	// Default report, and makes sure display is called at the end.
+	reportHTML := "<pre>" + err.errMsg + "</pre>" // If anything goes wrong, simply display the error message.
+	defer func() {
+		// Display HTML report on exit.
+		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
+		if err != nil {
+			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
+		}
+	}()
+
+	// Render error block.
+	buf := bytes.NewBuffer(make([]byte, 0, 512*len(err.lines)))
+	if err := templateErrorReport.Execute(buf, err.toReport()); err != nil {
+		klog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
+		return
+	}
+	reportHTML = buf.String()
+	// reportHTML will be displayed on the deferred function above.
+}
+

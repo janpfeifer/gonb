@@ -19,8 +19,8 @@ import (
 // from previous definitions, render a final main.go code with the whole content,
 // compiles and runs it.
 //
-// skipLines are lines that should not be considered as Go code. Typically, these are the special
-// commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
+// skipLines are Lines that should not be considered as Go code. Typically, these are the special
+// commands (like `%%`, `%args`, `%reset`, or bash Lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
 	err := s.AutoTrack()
@@ -138,7 +138,7 @@ can install it from the notebook with:
 	// Import original declarations -- they have the correct cell line numbers.
 	newDecls.MergeFrom(decls)
 
-	// Remove unused imports, to avoid the "imported and not used" error.
+	// Remove unused imports, to avoid the "imported and not used" err.
 	keys := SortedKeys(newDecls.Imports)
 	for _, key := range keys {
 		if !usedImports.Has(key) {
@@ -172,7 +172,7 @@ can install it from the notebook with:
 }
 
 // jupyterStackTraceMapperWriter implements an io.Writer that maps stack traces to their corresponding
-// cell lines, to facilitate debugging.
+// cell Lines, to facilitate debugging.
 type jupyterStackTraceMapperWriter struct {
 	jupyterWriter       io.Writer
 	mainPath            string
@@ -185,7 +185,7 @@ type jupyterStackTraceMapperWriter struct {
 func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPath string, fileToCellIdAndLine []CellIdAndLine) io.Writer {
 	r, err := regexp.Compile(fmt.Sprintf("%s:(\\d+)", regexp.QuoteMeta(mainPath)))
 	if err != nil {
-		klog.Errorf("Failed to compile expression to match %q: won't be able to map stack traces with cell lines", mainPath)
+		klog.Errorf("Failed to compile expression to match %q: won't be able to map stack traces with cell Lines", mainPath)
 	}
 
 	return &jupyterStackTraceMapperWriter{
@@ -196,7 +196,7 @@ func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPat
 	}
 }
 
-// Write implements io.Writer, and maps references to the `main.go` file to their corresponding lines in cells.
+// Write implements io.Writer, and maps references to the `main.go` file to their corresponding Lines in cells.
 func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 	n := len(p) // Save original number of bytes.
 	if w.regexpMainPath == nil {
@@ -207,7 +207,7 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 		lineNumStr := strings.Split(string(match), ":")[1]
 		lineNum, err := strconv.Atoi(lineNumStr)
 		if err != nil {
-			klog.Warningf("Can't parse line number in error output %q, skipping", match)
+			klog.Warningf("Can't parse line number in err output %q, skipping", match)
 			return match
 		}
 		lineNum -= 1 // Since line reporting starts with 1, but our indices start with 0.
@@ -237,7 +237,7 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 }
 
 const (
-	// GoGetWorkspaceIssue is an error output by `go get` due to it not interpreting correctly `go.work`.
+	// GoGetWorkspaceIssue is an err output by `go get` due to it not interpreting correctly `go.work`.
 	GoGetWorkspaceIssue = "cannot find module providing package"
 
 	// GoGetWorkspaceNote is the note that explains the issue with `go get` and `go work`.
@@ -249,7 +249,7 @@ Alternatively try '%goworkfix' that will do it automatically for you.
 `
 )
 
-// filterGoGetError parses the "go get" execution error, and adds a warning in case it's about the
+// filterGoGetError parses the "go get" execution err, and adds a warning in case it's about the
 // `go get` not supporting workspaces (`go.work`).
 func (s *State) filterGoGetError(output string) string {
 	if !s.hasGoWork {

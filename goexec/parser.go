@@ -29,7 +29,7 @@ type parseInfo struct {
 	filesContents map[string]string
 
 	// fileToCellIdAndLine holds for each line in the `main.go` file, the corresponding cell id and line number in the
-	// cell. This is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
+	// cell. This is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected Lines
 	// that have no correspondent value in the cell code.
 	fileToCellIdAndLine []CellIdAndLine
 }
@@ -42,7 +42,7 @@ func (pi *parseInfo) getCursor(node ast.Node) Cursor {
 	}
 	fromPos, toPos := pi.fileSet.Position(from), pi.fileSet.Position(to)
 	for lineNum := fromPos.Line; lineNum <= toPos.Line; lineNum++ {
-		// Notice that parser lines are 1-based, we keep them 0-based in the cursor.
+		// Notice that parser Lines are 1-based, we keep them 0-based in the cursor.
 		if lineNum-1 == pi.cursor.Line {
 			// Column is set either relative to the start of the definition, if in the
 			// same start lineNum, or the definition column.
@@ -113,9 +113,9 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 //   - cursor: where it is in the file. If set (that is, `cursor != NoCursor`), it will record the position
 //     of the cursor in the corresponding declaration.
 //   - fileToCellLine: for each line in the `main.go` file, the corresponding line number in the cell. This
-//     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected lines
+//     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected Lines
 //     that have no correspondent value in the cell code. It can be nil if there is no information mapping
-//     file lines to cell lines.
+//     file Lines to cell Lines.
 func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
 	decls = NewDeclarations()
 	pi := &parseInfo{
@@ -368,7 +368,7 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 	}
 }
 
-// parseLinesAndComposeMain parses the cell (given in lines and skipLines), merges with
+// parseLinesAndComposeMain parses the cell (given in Lines and skipLines), merges with
 // memorized declarations in the State (presumably from previous Cell runs) and compose a `main.go`.
 //
 // On return the `main.go` file (in `s.TempDir`) has been updated, and it returns the updated merged
@@ -376,10 +376,10 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 // `main.go` file.
 //
 // If cursorInCell defines a cursor (it can be set to NoCursor), but the cursor position
-// is not rendered in the resulting `main.go`, a CursorLost error is returned.
+// is not rendered in the resulting `main.go`, a CursorLost err is returned.
 //
-// skipLines are lines that should not be considered as Go code. Typically, these are the special
-// commands (like `%%`, `%args`, `%reset`, or bash lines starting with `!`).
+// skipLines are Lines that should not be considered as Go code. Typically, these are the special
+// commands (like `%%`, `%args`, `%reset`, or bash Lines starting with `!`).
 //
 // Note: `func init_*()` functions are rendered as `func init()`: that means if one is parsing an
 // already generated code, the original `func init_*()` will be missing (which is usually ok), but
@@ -477,6 +477,7 @@ func lineWithCursor(content string, cursor Cursor) string {
 	}
 	return modLine
 }
+
 // readMainGo reads the contents of main.go file.
 func (s *State) readMainGo() (string, error) {
 	f, err := os.Open(s.MainPath())
@@ -484,7 +485,7 @@ func (s *State) readMainGo() (string, error) {
 		return "", errors.Wrapf(err, "failed readMainGo()")
 	}
 	defer func() {
-		_ = f.Close() // Ignoring error on closing file for reading.
+		_ = f.Close() // Ignoring err on closing file for reading.
 	}()
 	content, err := io.ReadAll(f)
 	if err != nil {

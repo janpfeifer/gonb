@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Added support for --raw_errros, where errors are not reported using HTML. Useful for
+  running tests, for instance with `nbmake` (see #48, by @bagel897).
+
 ## 0.7.7 -- 2023/08/08
 
 * Added `DisplayMarkdown` and `UpdateMarkdown`.

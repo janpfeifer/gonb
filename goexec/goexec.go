@@ -283,7 +283,7 @@ func (c Cursor) String() string {
 	return "[NoCursor]"
 }
 
-// CellLines identifies a cell (by its execution id) and the lines
+// CellLines identifies a cell (by its execution id) and the Lines
 // corresponding to a declaration.
 type CellLines struct {
 	// Id of the cell where the definition comes from. It is set to -1 if the declaration was automatically
@@ -292,7 +292,7 @@ type CellLines struct {
 
 	// Lines has one value per line used in the declaration. The point to the cell line where it was declared.
 	// Some of these numbers may be NoCursorLine (-1) indicating that they are inserted automatically and don't.
-	// have corresponding lines in any cell.
+	// have corresponding Lines in any cell.
 	//
 	// If Id is -1, Lines will be nil, which indicates the content didn't come from any cell.
 	Lines []int

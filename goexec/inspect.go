@@ -40,7 +40,7 @@ func (s *State) notifyAboutStandardAndTrackedFiles(ctx context.Context) (err err
 }
 
 // InspectIdentifierInCell implements an `inspect_request` from Jupyter, using `gopls`.
-// It updates `main.go` with the cell contents (given as lines)
+// It updates `main.go` with the cell contents (given as Lines)
 func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct{}, cursorLine, cursorCol int) (mimeMap kernel.MIMEMap, err error) {
 	klog.V(2).Infof("InspectIdentifierInCell: ")
 	if s.gopls == nil {
@@ -67,7 +67,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	cellId := -1 // Inspect doesn't actually execute it, so parsed contents of cell are not kept.
 	updatedDecls, mainDecl, cursorInFile, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(nil, cellId, lines, skipLines, cursorInCell)
 	if err != nil {
-		klog.V(2).Infof("Ignoring parse error for InspectRequest: %+v", err)
+		klog.V(2).Infof("Ignoring parse err for InspectRequest: %+v", err)
 		err = nil
 		// Render memorized definitions on a side file, so `gopls` can pick those definitions if needed for
 		// auto-complete.
@@ -124,7 +124,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 }
 
 // AutoCompleteOptionsInCell implements a `complete_request` from Jupyter, using `gopls`.
-// It updates `main.go` with the cell contents (given as lines)
+// It updates `main.go` with the cell contents (given as Lines)
 func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]struct{},
 	cursorLine, cursorCol int, reply *kernel.CompleteReply) (err error) {
 	if s.gopls == nil {

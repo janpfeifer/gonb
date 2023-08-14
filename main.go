@@ -19,7 +19,7 @@ var (
 	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
 	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
-	flagRawError = flag.Bool("raw_error", false, "Force raw text errors instead of HTML errors")
+	flagRawError = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks")
 )
 
 var (

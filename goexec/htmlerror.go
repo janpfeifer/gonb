@@ -2,13 +2,10 @@ package goexec
 
 import (
 	"bytes"
-	"io"
-	"os"
 	"regexp"
 	"text/template"
 
 	"github.com/janpfeifer/gonb/kernel"
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 )
 

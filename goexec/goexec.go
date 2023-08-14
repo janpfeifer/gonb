@@ -57,6 +57,7 @@ type State struct {
 	//
 	// This is set by State.autoTrackGoWork.
 	hasGoWork bool
+	rawError  bool
 
 	// goWorkUsePaths contains the paths that are marked as `use` in the `go.work` file for the kernel.
 	// It is only valid if hasGoWork is true.
@@ -75,13 +76,14 @@ type Declarations struct {
 }
 
 // New returns an empty State object, that can be used to execute Cells.
-func New(uniqueID string) (*State, error) {
+func New(uniqueID string, rawError bool) (*State, error) {
 	s := &State{
 		UniqueID:     uniqueID,
 		Package:      "gonb_" + uniqueID,
 		Definitions:  NewDeclarations(),
 		AutoGet:      true,
 		trackingInfo: newTrackingInfo(),
+		rawError:     rawError,
 	}
 
 	// Create directory.

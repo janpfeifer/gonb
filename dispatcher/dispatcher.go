@@ -180,13 +180,14 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		replyContent["status"] = "ok"
 		replyContent["user_expressions"] = make(map[string]string)
 	} else {
+		name, value, traceback := goexec.Unwrap(executionErr)
 		replyContent["status"] = "error"
-		replyContent["ename"] = "ERROR"
-		replyContent["evalue"] = executionErr.Error()
-		replyContent["traceback"] = nil
+		replyContent["ename"] = name
+		replyContent["evalue"] = value
+		replyContent["traceback"] = traceback
 
 		// Publish an execution_error message.
-		if err := kernel.PublishExecutionError(msg, executionErr.Error(), []string{executionErr.Error()}); err != nil {
+		if err := kernel.PublishExecutionError(msg, value, traceback, name); err != nil {
 			return errors.WithMessagef(err, "publishing back execution error")
 		}
 	}

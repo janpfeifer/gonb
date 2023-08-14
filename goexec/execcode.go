@@ -36,6 +36,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	// Exec `goimports` (or the code that implements it) -- it updates `updatedDecls` with
 	// the new imports, if there are any.
 	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
 	}
@@ -84,7 +85,7 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 	var output []byte
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output))
+		err := s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output), err)
 		return errors.Wrapf(err, "failed to run %q", cmd.String())
 	}
 	return nil
@@ -115,7 +116,7 @@ can install it from the notebook with:
 	var output []byte
 	output, err = cmd.CombinedOutput()
 	if err != nil {
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error())
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error(), err)
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		return
 	}
@@ -164,7 +165,7 @@ can install it from the notebook with:
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())
 		strOutput := fmt.Sprintf("%v\n\n%s", err, output)
 		strOutput = s.filterGoGetError(strOutput)
-		s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput)
+		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, strOutput, err)
 		return
 	}
 	return

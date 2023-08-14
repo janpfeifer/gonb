@@ -3,20 +3,25 @@ package goexec
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/gofrs/uuid"
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"strings"
-	"testing"
 )
 
 // newEmptyState returns an empty state with a temporary directory created.
 func newEmptyState(t *testing.T) *State {
+	return newEmptyStateWithRawError(t, false)
+}
+
+func newEmptyStateWithRawError(t *testing.T, rawError bool) *State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
-	s, err := New(uniqueID)
+	s, err := New(uniqueID, rawError)
 	if err != nil {
 		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}

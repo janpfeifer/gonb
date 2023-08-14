@@ -319,14 +319,14 @@ func PublishExecutionResult(msg Message, execCount int, data Data) error {
 }
 
 // PublishExecutionError publishes a serialized error that was encountered during execution.
-func PublishExecutionError(msg Message, err string, trace []string) error {
+func PublishExecutionError(msg Message, err string, trace []string, name string) error {
 	return msg.Publish("error",
 		struct {
 			Name  string   `json:"ename"`
 			Value string   `json:"evalue"`
 			Trace []string `json:"traceback"`
 		}{
-			Name:  "ERROR",
+			Name:  name,
 			Value: err,
 			Trace: trace,
 		},

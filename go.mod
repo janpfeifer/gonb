@@ -3,6 +3,7 @@ module github.com/janpfeifer/gonb
 go 1.20
 
 require (
+	github.com/fatih/color v1.15.0
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-language-server/jsonrpc2 v0.4.2
 	github.com/go-language-server/protocol v0.7.0
@@ -23,6 +24,8 @@ require (
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/atomic v1.5.0 // indirect
 	go.uber.org/multierr v1.3.0 // indirect
@@ -31,7 +34,7 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20221031165847-c99f073a8326 // indirect
 	golang.org/x/lint v0.0.0-20190930215403-16217165b5de // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.2.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/tools v0.3.1-0.20221213193459-ca17b2c27ca8 // indirect
 	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect

@@ -2,18 +2,20 @@ package goexec
 
 import (
 	"fmt"
-	. "github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/kernel"
-	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"k8s.io/klog/v2"
+	"io"
 	"math/rand"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	. "github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/kernel"
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 )
 
 // This file implements functions related to the parsing of the Go code.
@@ -127,7 +129,7 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
-			s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error())
+			err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error(), err)
 		}
 		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 		return
@@ -396,6 +398,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
 	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInFile, fileToCellIdAndLine)
+
 	if err != nil {
 		return
 	}
@@ -473,4 +476,19 @@ func lineWithCursor(content string, cursor Cursor) string {
 		}
 	}
 	return modLine
+}
+// readMainGo reads the contents of main.go file.
+func (s *State) readMainGo() (string, error) {
+	f, err := os.Open(s.MainPath())
+	if err != nil {
+		return "", errors.Wrapf(err, "failed readMainGo()")
+	}
+	defer func() {
+		_ = f.Close() // Ignoring error on closing file for reading.
+	}()
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed readMainGo()")
+	}
+	return string(content), nil
 }

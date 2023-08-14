@@ -142,7 +142,7 @@ func (s *State) lockedTrack(root, fileOrDirPath string, visited common.Set[strin
 					ti.updated.Insert(event.Name)
 					ti.mu.Unlock()
 				case err, ok := <-ti.watcher.Errors:
-					klog.V(2).Infof("goexec.Track: async error received %+v", err)
+					klog.V(2).Infof("goexec.Track: async err received %+v", err)
 					if !ok {
 						return
 					}
@@ -258,8 +258,8 @@ func isGoRelated(fileOrDirPath string) bool {
 }
 
 // EnumerateUpdatedFiles calls fn for each file that has been updated since
-// the last call. If `fn` returns an error, then the enumerations is interrupted and
-// the error is returned.
+// the last call. If `fn` returns an err, then the enumerations is interrupted and
+// the err is returned.
 func (s *State) EnumerateUpdatedFiles(fn func(filePath string) error) (err error) {
 	s.trackingInfo.mu.Lock()
 	defer s.trackingInfo.mu.Unlock()

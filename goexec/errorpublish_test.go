@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func TestUnwrap(t *testing.T) {
+func TestJupyterErrorSplit(t *testing.T) {
 	errorMsg, gonbError := getGonbError(t)
 	assert.NotNil(t, gonbError)
-	name, msg, traceback := Unwrap(gonbError)
+	name, msg, traceback := JupyterErrorSplit(gonbError)
 	assert.Equal(t, name, "ERROR")
 	assert.Equal(t, msg, errorMsg)
 	assert.NotEmpty(t, traceback, []string{errorMsg})

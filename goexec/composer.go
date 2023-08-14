@@ -71,7 +71,7 @@ func (w *WriterWithCursor) FillLinesGap(fileToCellIdAndLine []CellIdAndLine) []C
 	return fileToCellIdAndLine
 }
 
-// Error returns first error that happened during writing.
+// Error returns first err that happened during writing.
 func (w *WriterWithCursor) Error() error { return w.err }
 
 // Writef write with formatted text. Errors can be retrieved with Error.
@@ -294,19 +294,19 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLi
 //
 // Parameters:
 //   - filePath is the path where to write the Go code.
-//   - lines are the lines in the cell.
-//   - skipLines are lines in the cell that are not Go code: lines starting with "!" or "%" special characters.
+//   - Lines are the Lines in the cell.
+//   - skipLines are Lines in the cell that are not Go code: Lines starting with "!" or "%" special characters.
 //   - cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
 //
 // Return:
 //   - cursorInFile: the equivalent cursor position in the final file, considering the given cursorInCell.
-//   - fileToCellLines: a map from the file lines to original cell lines. It is set to NoCursorLine (-1) for lines
+//   - fileToCellLines: a map from the file Lines to original cell Lines. It is set to NoCursorLine (-1) for Lines
 //     that don't have an equivalent in the cell (e.g: the `package main` line that inserted here).
 func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	cursorInFile Cursor, fileToCellLines []int, err error) {
 	cursorInFile = NoCursor
 
-	// Maximum number of extra lines created is 5, so we create a map with that amount of line. Later we trim it
+	// Maximum number of extra Lines created is 5, so we create a map with that amount of line. Later we trim it
 	// to the correct number.
 	fileToCellLines = make([]int, len(lines)+5)
 	for ii := 0; ii < len(fileToCellLines); ii++ {
@@ -358,7 +358,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 		err = w.Error()
 		return
 	}
-	fileToCellLines = fileToCellLines[:w.Line] // Truncate to lines actually used.
+	fileToCellLines = fileToCellLines[:w.Line] // Truncate to Lines actually used.
 
 	// Close file.
 	err = f.Close()
@@ -372,7 +372,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 
 // createMainFileFromDecls creates `main.go` and writes all declarations.
 //
-// It returns the cursor position in the file as well as a mapping from the file lines to to the original cell ids and lines.
+// It returns the cursor position in the file as well as a mapping from the file Lines to to the original cell ids and Lines.
 func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	var f *os.File
 	f, err = os.Create(s.MainPath())
@@ -421,7 +421,7 @@ func (s *State) createAlternativeFileFromDecls(decls *Declarations) (err error) 
 //
 // mainDecl is optional, and if not given, no `main` function is created.
 //
-// It returns the cursor position in the file as well as a mapping from the file lines to the original cell ids and lines.
+// It returns the cursor position in the file as well as a mapping from the file Lines to the original cell ids and Lines.
 func (s *State) createGoContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursor = NoCursor
 	w := NewWriterWithCursor(writer)

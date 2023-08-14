@@ -2,41 +2,34 @@ package goexec
 
 import (
 	"bytes"
-	"io"
-	"os"
+	"github.com/pkg/errors"
 	"regexp"
 	"text/template"
 
 	"github.com/janpfeifer/gonb/kernel"
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 )
-
-// errorReport is the structure to feed templateErrorReport
-type errorReport struct {
-	Lines []errorLine
-}
 
 // To check the standard Jupyter colors to choose from, see:
 // https://github.com/jupyterlab/jupyterlab/blob/master/packages/theme-light-extension/style/variables.css
 var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <style>
-.gonb-error-location {
-	background: var(--jp-error-color2);  
+.gonb-err-location {
+	background: var(--jp-err-color2);  
 	border-radius: 3px;
 	border-style: dotted;
 	border-width: 1px;
 	border-color: var(--jp-border-color2);
 }
-.gonb-error-location:hover {
+.gonb-err-location:hover {
 	border-width: 2px;
 	border-style: solid;
 	border-color: var(--jp-border-color2);
 }
-.gonb-error-context {
+.gonb-err-context {
 	display: none;
 }
-.gonb-error-location:hover + .gonb-error-context {
+.gonb-err-location:hover + .gonb-err-context {
 	background: var(--jp-dialog-background);  
 	border-radius: 3px;
 	border-style: solid;
@@ -46,12 +39,12 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	white-space: pre;
 	font-family: monospace;
 }
-.gonb-error-line {
+.gonb-err-line {
 	border-radius: 3px;
 	border-style: dotted;
 	border-width: 1px;	
 	border-color: var(--jp-border-color2);
-	background-color: var(--jp-rendermime-error-background);
+	background-color: var(--jp-rendermime-err-background);
 	font-weight: bold;
 }
 .gonb-cell-line-info {
@@ -67,8 +60,8 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
 {{if .HasContext}}{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span>
-{{end}}<span class="gonb-error-location">{{.Location}}</span> {{.Message}}
-<div class="gonb-error-context">
+{{end}}<span class="gonb-err-location">{{.Location}}</span> {{.Message}}
+<div class="gonb-err-context">
 {{.HtmlContext}}
 </div>
 {{else}}
@@ -79,59 +72,68 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 </div>
 `))
 
-// Example type of error message:
+// Example type of err message:
 // /tmp/gonb_4e5ea2e7/main.go:3:1: expected declaration, found fmt
 
 // DisplayErrorWithContext in an HTML div, with a mouse-over pop-up window
-// listing the lines with the error, and highlighting the exact position.
+// listing the Lines with the error, and highlighting the exact position.
+//
+// Except if `rawError` is set to true (see `New() *State`): in which case the enriched GonbError is returned
+// instead, for a textual report back.
 //
 // Any errors within here are logged and simply ignored, since this is already
-// used to report errors
-func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string, error error) error {
-	nbErr := newError(s, fileToCellIdAndLine, errorMsg, error)
+// used to report errors.
+func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine, errorMsg string, err error) error {
+	nbErr := newGonbErrors(s, fileToCellIdAndLine, errorMsg, err)
 	if s.rawError {
 		return nbErr
 	} else {
-		nbErr.reportHtml(msg)
-		return error
+		nbErr.PublishWithHTML(msg)
+		return err
 	}
 }
 
 var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)
 
+// LinesForErrorContext indicates how many lines to display in the error context, before and after the offending line.
+// Hard-coded for now, but it could be made configurable.
 const LinesForErrorContext = 3
 
-// toReport creates an error report (for use in html reports)
-func (err *GonbError) toReport() *errorReport {
-	report := &errorReport{Lines: make([]errorLine, len(err.lines))}
-	for ii, line := range err.lines {
-		report.Lines[ii] = line
-	}
-	return report
-}
-// reportHtml reports the error as an HTML report in jupyter
-func (err *GonbError) reportHtml(msg kernel.Message) {
+// PublishWithHTML reports the GonbError as an HTML report in Jupyter.
+func (nbErr *GonbError) PublishWithHTML(msg kernel.Message) {
 	if msg == nil {
 		// Ignore, if there is no kernel.Message to reply to.
 		return
 	}
 	// Default report, and makes sure display is called at the end.
-	reportHTML := "<pre>" + err.errMsg + "</pre>" // If anything goes wrong, simply display the error message.
+	htmlReport := "<pre>" + nbErr.errMsg + "</pre>" // If anything goes wrong, simply display the err message.
 	defer func() {
 		// Display HTML report on exit.
-		err := kernel.PublishDisplayDataWithHTML(msg, reportHTML)
+		err := kernel.PublishDisplayDataWithHTML(msg, htmlReport)
 		if err != nil {
 			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
 		}
 	}()
 
-	// Render error block.
-	buf := bytes.NewBuffer(make([]byte, 0, 512*len(err.lines)))
-	if err := templateErrorReport.Execute(buf, err.toReport()); err != nil {
+	// Render err block.
+	buf := bytes.NewBuffer(make([]byte, 0, 512*len(nbErr.Lines)))
+	if err := templateErrorReport.Execute(buf, nbErr); err != nil {
 		klog.Errorf("Failed to execute template in DisplayErrorWithContext: %+v", err)
 		return
 	}
-	reportHTML = buf.String()
-	// reportHTML will be displayed on the deferred function above.
+	htmlReport = buf.String()
+	// htmlReport will be displayed on the deferred function above.
 }
 
+// JupyterErrorSplit takes an error and formats it into the components Jupyter
+// protocol uses for it.
+//
+// It special cases the GonbError, where it adds each sub-error in the "traceback" repeated field.
+func JupyterErrorSplit(err error) (string, string, []string) {
+	var nbErr *GonbError
+	if errors.As(err, &nbErr) {
+		return nbErr.Name(), nbErr.Error(), nbErr.Traceback()
+	} else {
+		return "ERROR", err.Error(), []string{err.Error()}
+	}
+}

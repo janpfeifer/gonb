@@ -44,7 +44,7 @@ func TestCreateGoFileFromLines(t *testing.T) {
 	numCellLines := len(cellLines)
 	fileLines := strings.Split(content, "\n")
 	numFileLines := len(fileLines)
-	require.Equal(t, numCellLines+5, numFileLines, "Number of lines of generated main.go")
+	require.Equal(t, numCellLines+5, numFileLines, "Number of Lines of generated main.go")
 	require.Equal(t, cursorLine, fileLines[cursorInFile.Line], "Cursor line remains the same.")
 
 	for ii, newLine := range fileLines {

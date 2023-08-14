@@ -331,7 +331,7 @@ const (
 }
 
 func TestCursorPositioning(t *testing.T) {
-	// Test cursor positioning in generated lines.
+	// Test cursor positioning in generated Lines.
 	s := newEmptyState(t)
 	defer func() {
 		err := s.Finalize()
@@ -346,25 +346,25 @@ func TestCursorPositioning(t *testing.T) {
 		cursor Cursor
 		Line   string
 	}{
-		// Imports lines.
+		// Imports Lines.
 		{Cursor{Line: 2, Col: 7}, `	‸"fmt"`},
 		{Cursor{Line: 8, Col: 3}, `	f‸mtOther "fmt"`},
 		{Cursor{Line: 8, Col: 16}, `	fmtOther "f‸mt"`},
 
-		// Variables lines:
+		// Variables Lines:
 		{Cursor{Line: 18, Col: 3}, `	To‸Be = "Or Not To Be"`},
 		{Cursor{Line: 24, Col: 3}, `		3‸4.0)`},
 
-		// Constants lines:
+		// Constants Lines:
 		{Cursor{Line: 47, Col: 15}, `	K0 Kg = 1 << i‸ota`},
 		{Cursor{Line: 47, Col: 4}, `	K0 ‸Kg = 1 << iota`},
 		{Cursor{Line: 48, Col: 1}, `	‸K1`},
 
-		// Types lines:
+		// Types Lines:
 		{Cursor{Line: 29, Col: 6}, `type X‸Y struct { x, y float64 }`},
 		{Cursor{Line: 29, Col: 23}, `type XY struct { x, y f‸loat64 }`},
 
-		// Functions lines:
+		// Functions Lines:
 		{Cursor{Line: 59, Col: 12}, `func sum[T i‸nterface{int | float32 | float64}](a, b T) T {`},
 	}
 	for _, testLine := range testLines {

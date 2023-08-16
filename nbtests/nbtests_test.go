@@ -29,6 +29,10 @@ func mustRemoveAll(dir string) {
 }
 
 func TestNotebooks(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping testing in short mode")
+		return
+	}
 	tmpJupyterDir, err := InstallTmpGonbKernel(runArgs, extraInstallArgs)
 	fmt.Printf("%s=%s\n", kernel.JupyterDataDirEnv, tmpJupyterDir)
 	require.NoError(t, err)

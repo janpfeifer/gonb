@@ -56,6 +56,9 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 	})
 	poll(k.Shell(), handleMsg)
 	poll(k.Control(), func(msg kernel.Message, goExec *goexec.State) error {
+		if msg == nil {
+			return nil
+		}
 		if !msg.Ok() {
 			return errors.WithMessagef(msg.Error(), "control message error")
 		}

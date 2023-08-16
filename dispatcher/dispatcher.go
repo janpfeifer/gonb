@@ -29,15 +29,18 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			kernelStop := k.StoppedChan()
 			for {
 				select {
-				case <-k.StoppedChan():
+				case <-kernelStop:
 					return
 				case msg := <-ch:
 					err := fn(msg, goExec)
 					if err != nil {
-						klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
-						k.Stop()
+						if !k.IsStopped() {
+							klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
+							k.Stop()
+						}
 						return
 					}
 				}
@@ -53,7 +56,9 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 	})
 	poll(k.Shell(), handleMsg)
 	poll(k.Control(), func(msg kernel.Message, goExec *goexec.State) error {
-		klog.V(2).Infof("Control MessageImpl: %+v", msg.ComposedMsg())
+		if !msg.Ok() {
+			return errors.WithMessagef(msg.Error(), "control message error")
+		}
 		return handleMsg(msg, goExec)
 	})
 	wg.Wait()

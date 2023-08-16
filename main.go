@@ -78,6 +78,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	gocoverdir := os.Getenv("GOCOVERDIR")
+	if gocoverdir != "" {
+		klog.Infof("GOCOVERDIR=%s", gocoverdir)
+	}
+
 	_, err := exec.LookPath("go")
 	if err != nil {
 		klog.Exitf("Failed to find path for the `go` program: %+v\n\nCurrent PATH=%q", err, os.Getenv("PATH"))
@@ -99,6 +104,9 @@ func main() {
 
 	// Orchestrate dispatching of messages.
 	dispatcher.RunKernel(k, goExec)
+
+	// Stop gopls.
+	goExec.Stop()
 
 	// Wait for all polling goroutines.
 	k.ExitWait()

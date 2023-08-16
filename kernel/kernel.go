@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/pkg/errors"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"os/signal"
 	"sync"
@@ -125,7 +125,20 @@ func (k *Kernel) StoppedChan() <-chan struct{} {
 
 // Stop the Kernel, indicating to all polling processes to quit.
 func (k *Kernel) Stop() {
+	k.Interrupted.Store(true) // Also mark as interrupted.
 	close(k.stop)
+	err := k.sockets.ShellSocket.Socket.Close()
+	if err != nil {
+		klog.Errorf("Failed to close socket: %v", err)
+	}
+	err = k.sockets.StdinSocket.Socket.Close()
+	if err != nil {
+		klog.Errorf("Failed to close socket: %v", err)
+	}
+	err = k.sockets.ControlSocket.Socket.Close()
+	if err != nil {
+		klog.Errorf("Failed to close socket: %v", err)
+	}
 }
 
 // HandleInterrupt will configure the kernel to listen to the system SIGINT,
@@ -148,8 +161,9 @@ func (k *Kernel) HandleInterrupt() {
 				select {
 				case <-k.sigintC:
 					k.Interrupted.Store(true)
-					log.Printf("INTERRUPT received")
+					klog.Infof("INTERRUPT received.")
 				case <-k.stop:
+					klog.Infof("Kernel stopped.")
 					return // kernel stopped.
 				}
 			}
@@ -236,10 +250,14 @@ func NewKernel(connectionFile string) (*Kernel, error) {
 
 	// Set polling functions that will listen to the sockets and forward
 	// messages (or errors) to the corresponding channels.
-	poll := func(msgChan chan Message, sck zmq4.Socket) {
+	poll := func(msgChan chan Message, sck zmq4.Socket, socketName string) {
 		k.pollingWait.Add(1)
 		go func() {
-			defer close(msgChan)
+			defer func() {
+				klog.V(1).Infof("Polling of socket %q finished.", socketName)
+				k.pollingWait.Done()
+				close(msgChan)
+			}()
 			for {
 				zmqMsg, err := sck.Recv()
 				var msg Message
@@ -258,9 +276,9 @@ func NewKernel(connectionFile string) (*Kernel, error) {
 	}
 
 	k.pollHeartbeat()
-	poll(k.shell, k.sockets.ShellSocket.Socket)
-	poll(k.stdin, k.sockets.StdinSocket.Socket)
-	poll(k.control, k.sockets.ControlSocket.Socket)
+	poll(k.shell, k.sockets.ShellSocket.Socket, "shell")
+	poll(k.stdin, k.sockets.StdinSocket.Socket, "stdin")
+	poll(k.control, k.sockets.ControlSocket.Socket, "control")
 	return k, nil
 }
 
@@ -270,12 +288,15 @@ func (k *Kernel) pollHeartbeat() {
 	// Start the handler that will echo any received messages back to the sender.
 	k.pollingWait.Add(1)
 	go func() {
-		defer k.pollingWait.Done()
+		defer func() {
+			klog.Infof("Heartbeat done.")
+			k.pollingWait.Done()
+		}()
 		var err error
 		var msg zmq4.Msg
 		for err == nil {
 			msg, err = k.sockets.HBSocket.Socket.Recv()
-			log.Printf("\tHeartbeat received.")
+			klog.V(1).Infof("Heartbeat received.")
 			if k.IsStopped() {
 				return
 			}
@@ -291,8 +312,8 @@ func (k *Kernel) pollHeartbeat() {
 			})
 		}
 		// Only breaks for loop if err != nil:
-		log.Printf("*** kernel heartbeat failed: %+v", err)
-		log.Printf("*** Stopping kernel")
+		klog.Errorf("*** kernel heartbeat failed: %+v", err)
+		klog.Errorf("*** Stopping kernel")
 		k.Stop()
 	}()
 }

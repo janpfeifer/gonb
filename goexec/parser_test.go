@@ -334,7 +334,7 @@ func TestCursorPositioning(t *testing.T) {
 	// Test cursor positioning in generated Lines.
 	s := newEmptyState(t)
 	defer func() {
-		err := s.Finalize()
+		err := s.Stop()
 		if err != nil {
 			t.Fatalf("Failed to finalized state: %+v", err)
 		}

@@ -49,6 +49,7 @@ type Client struct {
 
 	// gopls execution
 	goplsExec      *exec.Cmd
+	stop           chan struct{}
 	waitConnecting bool
 
 	// File cache.
@@ -72,6 +73,8 @@ func New(dir string) *Client {
 		address:      path.Join(dir, "gopls_socket"),
 		fileVersions: make(map[string]int),
 		fileCache:    make(map[string]*FileData),
+
+		stop: nil, // gopls starts stopped.
 	}
 	return c
 }

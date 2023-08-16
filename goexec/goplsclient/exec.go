@@ -26,10 +26,13 @@ func (c *Client) Start() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if c.goplsExec != nil {
-		// Already running.
+	klog.Infof("gopls.Client.Start()")
+	if !c.IsStopped() {
+		klog.Errorf("attempting to start gopls, but it is still running")
 		return nil
 	}
+
+	c.stop = make(chan struct{})
 	c.removeUnixSocketFile()
 	goplsPath, err := exec.LookPath("gopls")
 	if err != nil {
@@ -48,11 +51,11 @@ func (c *Client) Start() error {
 	// https://stackoverflow.com/questions/43364958/start-command-with-new-process-group-id-golang
 	c.goplsExec.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
 	c.goplsExec.Dir = c.dir
-	klog.Infof("Starting %q", c.goplsExec)
+	klog.Infof("Executing %q", c.goplsExec)
 	err = c.goplsExec.Start()
 	if err != nil {
 		err = errors.Wrapf(err, "failed to start %s", c.goplsExec)
-		c.goplsExec = nil
+		close(c.stop)
 		return err
 	}
 
@@ -94,7 +97,7 @@ func (c *Client) Start() error {
 		}
 		c.mu.Lock()
 		defer c.mu.Unlock()
-		c.goplsExec = nil
+		close(c.stop)
 		c.removeUnixSocketFile()
 		c.stopLocked()
 	}()
@@ -129,11 +132,24 @@ func (c *Client) WaitConnection(ctx context.Context) bool {
 	}
 }
 
+func (c *Client) IsStopped() bool {
+	if c.stop == nil {
+		return true
+	}
+	select {
+	case <-c.stop:
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *Client) stopLocked() {
-	if c.goplsExec != nil {
+	if !c.IsStopped() {
+		klog.Infof("killing gopls")
 		c.goplsExec.Process.Kill()
-		c.goplsExec = nil
 		c.removeUnixSocketFile()
+		// Client will be marked as stopped once the gopls process exits.
 	}
 	c.waitConnecting = false
 	return

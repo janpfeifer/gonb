@@ -62,8 +62,9 @@ func removeDefinitionImpl[T any](msg kernel.Message, mapName string, m *map[stri
 	return true
 }
 
-// removeDefinitions form memorized list. It implements the "%remove" (or "%rm") command.
+// removeDefinitions from memorized list. It implements the "%remove" (or "%rm") command.
 func removeDefinitions(msg kernel.Message, goExec *goexec.State, keys []string) {
+	klog.V(1).Infof("removing definitions %v", keys)
 	for _, key := range keys {
 		var found bool
 		found = found || removeDefinitionImpl(msg, "import", &goExec.Definitions.Imports, key)

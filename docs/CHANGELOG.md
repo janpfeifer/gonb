@@ -4,6 +4,10 @@
 
 * Added support for --raw_errros, where errors are not reported using HTML. Useful for
   running tests, for instance with `nbmake` (see #48, by @bagel897).
+* Added functional tests by instrumenting `nbconvert`.
+* Installation uses `$JUPYTER_DATA_DIR`, if it is set.
+* Fixed proper shutdown.
+* Fixed gopls dying when a cell is interrupted.
 
 ## 0.7.7 -- 2023/08/08
 

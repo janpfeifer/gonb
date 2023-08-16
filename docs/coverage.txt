@@ -15,7 +15,7 @@ github.com/janpfeifer/gonb/common/common.go:54:				SortedKeys					100.0%
 github.com/janpfeifer/gonb/common/common.go:64:				WalkDirWithSymbolicLinks			0.0%
 github.com/janpfeifer/gonb/common/common.go:69:				walkDirWithSymbolicLinksImpl			0.0%
 github.com/janpfeifer/gonb/common/common.go:98:				ReplaceTildeInDir				0.0%
-github.com/janpfeifer/gonb/dispatcher/dispatcher.go:26:			RunKernel					70.4%
+github.com/janpfeifer/gonb/dispatcher/dispatcher.go:26:			RunKernel					81.5%
 github.com/janpfeifer/gonb/dispatcher/dispatcher.go:74:			handleMsg					48.0%
 github.com/janpfeifer/gonb/dispatcher/dispatcher.go:127:		handleShutdownRequest				88.9%
 github.com/janpfeifer/gonb/dispatcher/dispatcher.go:151:		handleExecuteRequest				69.7%
@@ -179,7 +179,7 @@ github.com/janpfeifer/gonb/kernel/kernel.go:322:			bindSockets					82.4%
 github.com/janpfeifer/gonb/kernel/kernel.go:383:			*Kernel.FromWireMsg				67.6%
 github.com/janpfeifer/gonb/kernel/kernel.go:439:			*Kernel.ToWireMsg				85.2%
 github.com/janpfeifer/gonb/kernel/messages.go:97:			*InvalidSignatureError.Error			0.0%
-github.com/janpfeifer/gonb/kernel/messages.go:150:			*MessageImpl.Error				0.0%
+github.com/janpfeifer/gonb/kernel/messages.go:150:			*MessageImpl.Error				100.0%
 github.com/janpfeifer/gonb/kernel/messages.go:153:			*MessageImpl.Ok					100.0%
 github.com/janpfeifer/gonb/kernel/messages.go:156:			*MessageImpl.ComposedMsg			100.0%
 github.com/janpfeifer/gonb/kernel/messages.go:159:			*MessageImpl.Kernel				100.0%
@@ -211,8 +211,11 @@ github.com/janpfeifer/gonb/kernel/pipeexec.go:67:			*PipeExecToJupyterBuilder.Wi
 github.com/janpfeifer/gonb/kernel/pipeexec.go:78:			*PipeExecToJupyterBuilder.WithPassword		0.0%
 github.com/janpfeifer/gonb/kernel/pipeexec.go:88:			*PipeExecToJupyterBuilder.Exec			48.7%
 github.com/janpfeifer/gonb/kernel/pipeexec.go:227:			StartNamedPipe					82.9%
-github.com/janpfeifer/gonb/nbtests/nbtests.go:19:			GoNBRootDir					100.0%
-github.com/janpfeifer/gonb/nbtests/nbtests.go:39:			InstallTmpGonbKernel				73.9%
+github.com/janpfeifer/gonb/nbtests/nbtests.go:23:			GoNBRootDir					100.0%
+github.com/janpfeifer/gonb/nbtests/nbtests.go:43:			InstallTmpGonbKernel				73.9%
+github.com/janpfeifer/gonb/nbtests/nbtests.go:93:			Check						52.9%
+github.com/janpfeifer/gonb/nbtests/nbtests.go:122:			Match						75.0%
+github.com/janpfeifer/gonb/nbtests/nbtests.go:134:			Sequence					63.2%
 github.com/janpfeifer/gonb/specialcmd/definitions.go:16:		resetDefinitions				0.0%
 github.com/janpfeifer/gonb/specialcmd/definitions.go:24:		displayEnumeration				0.0%
 github.com/janpfeifer/gonb/specialcmd/definitions.go:42:		listDefinitions					0.0%
@@ -226,4 +229,4 @@ github.com/janpfeifer/gonb/specialcmd/specialcmd.go:247:		splitCmd					63.6%
 github.com/janpfeifer/gonb/specialcmd/track.go:13:			execTrack					0.0%
 github.com/janpfeifer/gonb/specialcmd/track.go:35:			execUntrack					0.0%
 github.com/janpfeifer/gonb/specialcmd/track.go:56:			showTrackedList					0.0%
-total									(statements)					34.7%
+total									(statements)					35.2%

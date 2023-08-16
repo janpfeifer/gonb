@@ -158,8 +158,8 @@ func (s *State) GoModInit() error {
 	return nil
 }
 
-// Finalize stops gopls and removes temporary files and directories.
-func (s *State) Finalize() error {
+// Stop stops gopls and removes temporary files and directories.
+func (s *State) Stop() error {
 	if s.gopls != nil {
 		s.gopls.Shutdown()
 		s.gopls = nil

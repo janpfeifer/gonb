@@ -3,13 +3,17 @@ package kernel
 import (
 	"encoding/json"
 	"github.com/pkg/errors"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
 	"strings"
 )
+
+// JupyterDataDirEnv is the name of the environment variable pointing to
+// the data files for Jupyter, including kernel configuration.
+const JupyterDataDirEnv = "JUPYTER_DATA_DIR"
 
 // jupyterKernelConfig is the Jupyter configuration to be
 // converted to a `kernel.json` file under `~/.local/share/jupyter/kernels/gonb`
@@ -41,24 +45,27 @@ func Install(extraArgs []string, force bool) error {
 
 	// Jupyter configuration directory for gonb.
 	home := os.Getenv("HOME")
-	var configDir string
-	switch runtime.GOOS {
-	case "linux":
-		configDir = path.Join(home, ".local/share/jupyter/kernels/gonb")
-	case "darwin":
-		configDir = path.Join(home, "Library/Jupyter/kernels/gonb")
-	default:
-		return errors.Errorf("Unknown OS %q: not sure how to install GoNB.", runtime.GOOS)
+	jupyterDataDir := os.Getenv(JupyterDataDirEnv)
+	if jupyterDataDir == "" {
+		switch runtime.GOOS {
+		case "linux":
+			jupyterDataDir = path.Join(home, ".local/share/jupyter")
+		case "darwin":
+			jupyterDataDir = path.Join(home, "Library/Jupyter")
+		default:
+			return errors.Errorf("Unknown OS %q: not sure where to install GoNB kernel -- set the environment %q to force a location.", runtime.GOOS, JupyterDataDirEnv)
+		}
 	}
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return errors.WithMessagef(err, "failed to create configuration directory %q", configDir)
+	kernelDir := path.Join(jupyterDataDir, "/kernels/gonb")
+	if err := os.MkdirAll(kernelDir, 0755); err != nil {
+		return errors.WithMessagef(err, "failed to create configuration directory %q", kernelDir)
 	}
 
 	// If binary is in /tmp, presumably temporary compilation of Go binary,
 	// make a copy of the binary (since it will be deleted) to the configuration
 	// directory.
 	if strings.HasPrefix(os.Args[0], "/tmp/") {
-		newBinary := path.Join(configDir, "gonb")
+		newBinary := path.Join(kernelDir, "gonb")
 		// Move previous version out of the way.
 		if _, err := os.Stat(newBinary); err == nil {
 			err = os.Rename(newBinary, newBinary+"~")
@@ -75,7 +82,7 @@ func Install(extraArgs []string, force bool) error {
 	}
 
 	// Create kernel.json.
-	configPath := path.Join(configDir, "kernel.json")
+	configPath := path.Join(kernelDir, "kernel.json")
 	f, err := os.Create(configPath)
 	if err != nil {
 		return errors.WithMessagef(err, "failed to create configuration file %q", configPath)
@@ -92,6 +99,7 @@ func Install(extraArgs []string, force bool) error {
 			return errors.WithMessagef(err, "failed to write configuration file %q", configPath)
 		}
 	}
+	klog.Infof("Go (gonb) kernel configuration installed in %q.\n", configPath)
 
 	_, err = exec.LookPath("goimports")
 	if err == nil {
@@ -106,13 +114,12 @@ go install golang.org/x/tools/cmd/goimports@latest
 go install golang.org/x/tools/gopls@latest
 
 `
-		if force {
-			log.Fatal(msg)
+		if !force {
+			klog.Fatalf(msg)
 		}
-		log.Printf(msg)
+		klog.Infof(msg)
+		err = nil
 	}
-
-	log.Printf("Go (gonb) kernel configuration installed in %q.\n", configPath)
 	return nil
 }
 

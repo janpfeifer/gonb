@@ -150,7 +150,7 @@ type MessageImpl struct {
 func (m *MessageImpl) Error() error { return m.err }
 
 // Ok returns whether there were no errors receiving the message.
-func (m *MessageImpl) Ok() bool { return m.err == nil }
+func (m *MessageImpl) Ok() bool { return m == nil || m.err == nil }
 
 // ComposedMsg that started the current Message -- it's contained by Message.
 func (m *MessageImpl) ComposedMsg() ComposedMsg { return m.Composed }

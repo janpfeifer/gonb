@@ -40,15 +40,13 @@ jobs:
       run: go install
 
     - name: Test
-      run: |
-        go test -v -cover ./... -coverprofile coverage.out -coverpkg ./...
-        go tool cover -func coverage.out -o coverage.out  # Replaces coverage.out with the analysis of coverage.out
+      run: go test --short ./...
 
     - name: Go Coverage Badge
       uses: tj-actions/coverage-badge-go@v2
       with:
         green: 80
-        filename: coverage.out
+        filename: docs/coverage.txt  # Manually generated.
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       id: auto-commit-action

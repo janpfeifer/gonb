@@ -7,13 +7,17 @@
 package nbtests
 
 import (
+	"bufio"
+	"fmt"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"io"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
+	"strings"
 )
 
 func GoNBRootDir() string {
@@ -66,4 +70,100 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 		return
 	}
 	return
+}
+
+// ExpectFn is a function that checks for expectations of a line of input.
+// It should return true, if the expectation was matched, false if not yet, or
+// return an error if there was something wrong with the line and it the testing
+// should fail immediately.
+//
+// When the input is finished, ExpectFn is called with `eof=true`, in which case
+// it should either return true or an error.
+//
+// See the following functions that return `ExpectFn` that can be used:
+//
+// Match()
+// Sequence()
+type ExpectFn func(line string, eof bool) (done bool, err error)
+
+// Check that the input given in reader matches the `want` expectation.
+// Returns nil is expectation was matched, or an error with the failed match description.
+//
+// If `print` is set, it also prints the lines read from `r`.
+func Check(r io.Reader, expectation ExpectFn, print bool) error {
+	byLine := bufio.NewScanner(r)
+	for byLine.Scan() {
+		line := byLine.Text()
+		if print {
+			fmt.Println(line)
+		}
+		done, err := expectation(line, false)
+		if err != nil {
+			return err
+		}
+		if done {
+			if print {
+				// Drain rest of input.
+				for byLine.Scan() {
+					fmt.Println(byLine.Text())
+				}
+			}
+			return nil
+		}
+	}
+	if err := byLine.Err(); err != nil {
+		return errors.Wrapf(err, "failed to read contents for Check()")
+	}
+	_, err := expectation("", true)
+	return err
+}
+
+// Match returns an ExpectFn that checks if the input has the given string.
+func Match(search string) ExpectFn {
+	return func(line string, eof bool) (done bool, err error) {
+		if eof {
+			return false, errors.Errorf("Match(%q): search string never matched", search)
+		}
+		return strings.Contains(line, search), nil
+	}
+}
+
+// Sequence returns an ExpectFn that checks whether each of the given expectations
+// are matched in order. They don't need to be consecutive, that is, there can
+// be unrelated lines in-between.
+func Sequence(expectations ...ExpectFn) ExpectFn {
+	current := 0
+	if len(expectations) == 0 {
+		panic("Sequence() requires at least one expectation.")
+	}
+	return func(line string, eof bool) (done bool, err error) {
+		done, err = expectations[current](line, eof)
+		if err != nil {
+			return false, errors.WithMessagef(err, "Sequence(): at element #%d of %d", current, len(expectations))
+		}
+		if !done {
+			return false, nil
+		}
+		// Bump to next expectation.
+		current++
+		if current < len(expectations) {
+			if eof {
+				// Check for EOF for all remaining expectations.
+				for ii, e := range expectations[current:] {
+					done, err = e(line, eof)
+					if err != nil {
+						return false, errors.WithMessagef(err, "Sequence(): at element #%d of %d", ii, len(expectations))
+					}
+				}
+				// EOF is fine with all remaining expectations.
+				return true, nil
+			}
+			// Current expectation matched, but not yet the full sequence, keep moving.
+			return false, nil
+		}
+
+		// All expectations matched.
+		return true, nil
+	}
+
 }

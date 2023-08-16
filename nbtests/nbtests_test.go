@@ -1,7 +1,7 @@
 package nbtests
 
 import (
-	"bufio"
+	"flag"
 	"fmt"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/stretchr/testify/require"
@@ -14,8 +14,9 @@ import (
 )
 
 var (
-	runArgs          = []string{}
-	extraInstallArgs = []string{"--logtostderr"}
+	flagPrintNotebook = flag.Bool("print_notebook", false, "print tested notebooks, useful if debugging unexpected results.")
+	runArgs           = []string{}
+	extraInstallArgs  = []string{"--logtostderr"}
 )
 
 func mustRemoveAll(dir string) {
@@ -53,8 +54,8 @@ func TestNotebooks(t *testing.T) {
 		testFn func(t *testing.T, r io.Reader)
 	}{
 		{"hello", testHello},
-		{"functions", testHello},
-		{"init", testHello},
+		{"functions", testFunctions},
+		{"init", testInit},
 	} {
 		nbconvert := exec.Command(
 			"jupyter", "nbconvert", "--to", "asciidoc", "--execute",
@@ -75,11 +76,58 @@ func TestNotebooks(t *testing.T) {
 // testHello is called by TestNotebooks, and it takes as input the output of `nbconvert`
 // to check for the expected results
 func testHello(t *testing.T, r io.Reader) {
-	byLine := bufio.NewScanner(r)
-	for byLine.Scan() {
-		line := byLine.Text()
-		_ = line
-		//fmt.Println(line)
-	}
+	err := Check(r,
+		Sequence(
+			Match("+*Out[1]:*+"),
+			Match("Hello World!")),
+		*flagPrintNotebook)
+	require.NoError(t, err)
+	return
+}
+
+// testFunctions is called by TestNotebooks, and it takes as input the output of `nbconvert`
+// to check for the expected results
+func testFunctions(t *testing.T, r io.Reader) {
+	err := Check(r,
+		Sequence(
+			Match("+*Out[2]:*+"),
+			Match("incr: x=2, y=4.14")),
+		*flagPrintNotebook)
+	require.NoError(t, err)
+	return
+}
+
+// testInit is called by TestNotebooks, and it takes as input the output of `nbconvert`
+// to check for the expected results
+func testInit(t *testing.T, r io.Reader) {
+	err := Check(r,
+		Sequence(
+			Match("+*Out[1]:*+"),
+			Match("init_a"),
+
+			Match("+*Out[2]:*+"),
+			Match("init_a"),
+			Match("init_b"),
+
+			Match("+*Out[3]:*+"),
+			Match("init: v0"),
+			Match("init_a"),
+			Match("init_b"),
+
+			Match("+*Out[4]:*+"),
+			Match("init: v1"),
+			Match("init_a"),
+			Match("init_b"),
+
+			Match("+*Out[5]:*+"),
+			Match("removed func init_a"),
+			Match("removed func init_b"),
+
+			Match("+*Out[6]:*+"),
+			Match("init: v1"),
+			Match("Done"),
+		),
+		*flagPrintNotebook)
+	require.NoError(t, err)
 	return
 }

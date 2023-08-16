@@ -26,4 +26,3 @@ The static file with coverage will be in `docs/coverage.out` and if this file is
 coverage badge is updated.
 
 Hopefully this will get better. For now see more in [this thread in GoNuts](https://groups.google.com/g/golang-nuts/c/tg0ZrfpRMSg)
-

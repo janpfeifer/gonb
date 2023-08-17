@@ -4,7 +4,7 @@
 
 * Added support for --raw_errros, where errors are not reported using HTML. Useful for
   running tests, for instance with `nbmake` (see #48, by @bagel897).
-* Added functional/integration tests by instrumenting `nbconvert`.
+* Added functional/integration tests by instrumenting `nbconvert` (bringing coverage from ~25% to ~55%).
 * Added `run_coverage.sh` to include integration tests in coverage report.
 * Coverage configured to be generated manually (and not automatically in GitHub actions) -- coverage
   badge still generated in GitHub actions.

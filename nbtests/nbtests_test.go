@@ -48,6 +48,13 @@ func TestNotebooks(t *testing.T) {
 	outputName := tmpName + ".asciidoc" // nbconvert adds this suffix.
 	rootDir := GoNBRootDir()
 
+	// Overwrite GOCOVERDIR if $REAL_GOCOVERDIR is given, because
+	// -test.gocoverdir value is not propagated.
+	// See: https://groups.google.com/g/golang-nuts/c/tg0ZrfpRMSg
+	if goCoverDir := os.Getenv("REAL_GOCOVERDIR"); goCoverDir != "" {
+		os.Setenv("GOCOVERDIR", goCoverDir)
+	}
+
 	// Loop over the notebooks to be tested.
 	for _, notebook := range []struct {
 		name   string

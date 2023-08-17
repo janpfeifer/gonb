@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.7.8 -- 2023/08/17
 
 * Added support for --raw_errros, where errors are not reported using HTML. Useful for
   running tests, for instance with `nbmake` (see #48, by @bagel897).

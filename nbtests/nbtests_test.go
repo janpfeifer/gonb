@@ -95,6 +95,10 @@ func executedNotebook(t *testing.T, notebook string) *os.File {
 }
 
 func TestHello(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
 	f := executedNotebook(t, "hello")
 	err := Check(f,
 		Match("+*Out[1]:*+",
@@ -109,6 +113,10 @@ func TestHello(t *testing.T) {
 }
 
 func TestFunctions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
 	f := executedNotebook(t, "functions")
 	err := Check(f,
 		Match(
@@ -124,6 +132,10 @@ func TestFunctions(t *testing.T) {
 }
 
 func TestInit(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
 	f := executedNotebook(t, "init")
 	err := Check(f,
 		Sequence(
@@ -180,6 +192,10 @@ func TestInit(t *testing.T) {
 // TestGoWork tests support for `go.work` and `%goworkfix` as well as management
 // of tracked directories.
 func TestGoWork(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
 	f := executedNotebook(t, "gowork")
 	err := Check(f,
 		Sequence(

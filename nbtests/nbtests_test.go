@@ -45,7 +45,12 @@ var (
 //	. Build a gonb binary with --cover (and set GOCOVERDIR).
 //	. Set up a temporary jupyter kernel configuration, so that `nbconvert` will use it.
 func setup() {
+	flag.Parse()
 	rootDir = GoNBRootDir()
+	if testing.Short() {
+		fmt.Println("Test running with --short(), not setting up Jupyter.")
+		return
+	}
 
 	// Overwrite GOCOVERDIR if $REAL_GOCOVERDIR is given, because
 	// -test.gocoverdir value is not propagated.
@@ -67,7 +72,9 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Clean up.
-	mustRemoveAll(jupyterDir)
+	if !testing.Short() {
+		mustRemoveAll(jupyterDir)
+	}
 	os.Exit(code)
 }
 

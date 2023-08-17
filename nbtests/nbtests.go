@@ -20,6 +20,8 @@ import (
 	"strings"
 )
 
+const Separator = "----" // String used as separator by `nbconvert` in text mode.
+
 func GoNBRootDir() string {
 	_, rootDir, _, _ := runtime.Caller(0)
 	rootDir = path.Dir(path.Dir(rootDir))
@@ -119,12 +121,32 @@ func Check(r io.Reader, expectation ExpectFn, print bool) error {
 }
 
 // Match returns an ExpectFn that checks if the input has the given string.
-func Match(search string) ExpectFn {
+// If more than one string is given, they are expected to match consecutively,
+// exactly one line after another.
+func Match(search ...string) ExpectFn {
+	current := 0
+	if len(search) == 0 {
+		panic("Match() requires at least one string.")
+	}
 	return func(line string, eof bool) (done bool, err error) {
 		if eof {
-			return false, errors.Errorf("Match(%q): search string never matched", search)
+			return false, errors.Errorf("Match(%q): search string #%d never matched", search, current)
 		}
-		return strings.Contains(line, search), nil
+		found := strings.Contains(line, search[current])
+		if !found {
+			if current != 0 {
+				return false, errors.Errorf("Match(%q): search string #%d not matched in sequence", search, current)
+			}
+			return false, nil
+		}
+
+		// Search string matched, move to next.
+		current++
+		if current < len(search) {
+			// Still need to match following strings consecutively.
+			return false, nil
+		}
+		return true, nil
 	}
 }
 
@@ -165,5 +187,4 @@ func Sequence(expectations ...ExpectFn) ExpectFn {
 		// All expectations matched.
 		return true, nil
 	}
-
 }

@@ -129,11 +129,6 @@ details.
   * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
     There are many other special commands, see `%help` for the complete list, 
     or check out the [**tutorial**](examples/tutorial.ipynb).
-* Why is the test coverage so low? 
-  * Orchestrating the tests from front-end and Jupyter is not trivial — I didn't find a tool to easily do
-    that.
-    Same with `gopls`.
-    Help, or pointers are wanted here (see TODO below).
 
 # TODOs
 
@@ -149,7 +144,6 @@ Contributions are welcome!
   * https://jupyter-notebook.readthedocs.io/en/4.x/comms.html
   * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
   * https://discourse.jupyter.org/c/jupyterlab/extensions/43
-* Integration testing with `JupyterLab` (or `Jupyter`) and with `gopls`.
 
 # Implementation
 

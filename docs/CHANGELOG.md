@@ -11,6 +11,7 @@
 * Installation uses `$JUPYTER_DATA_DIR`, if it is set.
 * Fixed proper shutdown.
 * Fixed gopls dying when a cell is interrupted.
+* Updated `go.mod` parser dependency for go 1.21 -- since the format changes slightly (see #53).
 
 ## 0.7.7 -- 2023/08/08
 

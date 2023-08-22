@@ -1,5 +1,14 @@
 package nbtests
 
+// This files has "integration tests": tests that execute notebooks using `nbconvert` which in turn executes
+// GoNB as its kernel.
+//
+// It's a very convenient and easy way to run the tests: it conveniently compiles GoNB binary with --cover (to
+// include coverage information) and installs it in a temporary Jupyter configuration location, and includes
+// some trivial matching functionality to check for the required output strings, see examples below.
+//
+// The notebooks used for testing are all in `.../gonb/examples/tests` directory.
+
 import (
 	"flag"
 	"fmt"
@@ -108,7 +117,7 @@ func TestHello(t *testing.T) {
 	}
 	f := executedNotebook(t, "hello")
 	err := Check(f,
-		Match("+*Out[1]:*+",
+		Match(OutputLine(1),
 			Separator,
 			"Hello World!",
 			Separator),
@@ -127,7 +136,7 @@ func TestFunctions(t *testing.T) {
 	f := executedNotebook(t, "functions")
 	err := Check(f,
 		Match(
-			"+*Out[2]:*+",
+			OutputLine(2),
 			Separator,
 			"incr: x=2, y=4.14",
 			Separator,
@@ -147,20 +156,20 @@ func TestInit(t *testing.T) {
 	err := Check(f,
 		Sequence(
 			Match(
-				"+*Out[1]:*+",
+				OutputLine(1),
 				Separator,
 				"init_a",
 				Separator,
 			),
 			Match(
-				"+*Out[2]:*+",
+				OutputLine(2),
 				Separator,
 				"init_a",
 				"init_b",
 				Separator,
 			),
 			Match(
-				"+*Out[3]:*+",
+				OutputLine(3),
 				Separator,
 				"init: v0",
 				"init_a",
@@ -168,7 +177,7 @@ func TestInit(t *testing.T) {
 				Separator,
 			),
 			Match(
-				"+*Out[4]:*+",
+				OutputLine(4),
 				Separator,
 				"init: v1",
 				"init_a",
@@ -176,13 +185,13 @@ func TestInit(t *testing.T) {
 				Separator,
 			),
 			Match(
-				"+*Out[5]:*+",
+				OutputLine(5),
 				Separator,
 				"removed func init_a",
 				"removed func init_b",
 				Separator),
 			Match(
-				"+*Out[6]:*+",
+				OutputLine(6),
 				Separator,
 				"init: v1",
 				"Done",
@@ -207,13 +216,13 @@ func TestGoWork(t *testing.T) {
 	err := Check(f,
 		Sequence(
 			Match(
-				"+*Out[4]:*+",
+				OutputLine(4),
 				Separator,
 				`Added replace rule for module "a.com/a/pkg" to local directory`,
 				Separator,
 			),
 			Match(
-				"+*Out[5]:*+",
+				OutputLine(5),
 				Separator,
 				"module gonb_",
 				"",
@@ -223,7 +232,7 @@ func TestGoWork(t *testing.T) {
 				Separator,
 			),
 			Match(
-				"+*Out[6]:*+",
+				OutputLine(6),
 				Separator,
 				"List of files/directories being tracked",
 				"",
@@ -231,13 +240,72 @@ func TestGoWork(t *testing.T) {
 				Separator,
 			),
 			Match(
-				"+*Out[8]:*+",
+				OutputLine(8),
 				Separator,
 				`Untracked "/tmp/gonb_tests_gowork_..."`,
 				"",
 				"No files or directory being tracked yet",
 				Separator,
 			),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}
+
+// TestGoFlags tests `%goflags` special command support.
+func TestGoFlags(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executedNotebook(t, "goflags")
+	err := Check(f,
+		Sequence(
+			// Check `%goflags` is correctly keeping/erasing state.
+			Match(
+				OutputLine(1),
+				Separator,
+				"%goflags=[\"-cover\"]",
+				Separator,
+			),
+			Match(
+				OutputLine(2),
+				Separator,
+				"%goflags=[\"-cover\"]",
+				Separator,
+			),
+			Match(
+				OutputLine(3),
+				Separator,
+				"%goflags=[]",
+				Separator,
+			),
+
+			// Check that `-cover` actually had an effect: this it tied to the how go coverage works, and will break
+			// the the Go tools change -- probably ok, if it doesn't happen to often.
+			// If it does change, just manually run the notebook, see what is the updated output, and if correct,
+			// copy over here.
+			Match(
+				OutputLine(7),
+				Separator,
+				"A\t\t100.0%",
+				"B\t\t0.0%",
+			),
+
+			// Check full reset.
+			Match(
+				OutputLine(8),
+				Separator,
+				"State reset: all memorized declarations discarded",
+				Separator,
+			),
+
+			// Check manual running of `go build -gcflags=-m`.
+			Match(OutputLine(10), Separator),
+			Match("can inline (*Point).ManhattanLen"),
+			Match("p does not escape"),
 		), *flagPrintNotebook)
 
 	require.NoError(t, err)

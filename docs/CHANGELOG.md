@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Added `%gcflags` to allow arbitrary compilation flags to be set for GoNB, see #58.
+
 ## 0.7.8 -- 2023/08/17
 
 * Added support for --raw_errros, where errors are not reported using HTML. Useful for

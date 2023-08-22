@@ -1,6 +1,6 @@
 # Development of GoNB
 
-## Integration tests in nbtests
+## Integration tests in `/nbtests`
 
 They require the following to run: `jupyter-lab`, `nbconvert`, `pandoc`.
 
@@ -8,7 +8,7 @@ In my setup I was Conda and install `pandoc` and `pip` in conda, and then `jupyt
 with pip. I know it's painful :( ... another reason I keep to Go as much as I can.
 
 **New test notebooks** can be created in `examples/tests`, and there should be a counter-part entry
-in `nbtests_test.go`, in the function `TestNotebooks()`, with a new function describing the
+in `nbtests/nbtests_test.go`, in the function `TestNotebooks()`, with a new function describing the
 expected output of the execution of the new notebook.
 
 ## Generating Coverage Report

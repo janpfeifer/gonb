@@ -50,7 +50,12 @@ This way each cell can create its own `init_...()` and have it called at every c
 - `%cd [<directory>]`: Change current directory of the Go kernel, and the directory from where
   the cells are executed. If no directory is given it reports the current directory.
 - `%env VAR value`: Sets the environment variable VAR to the given value. These variables
-  will be available both for Go code as well as for shell scripts.
+  will be available both for Go code and for shell scripts.
+- `%goflags <values...>`: Configures list of extra arguments to pass to `go build` when compiling the
+  code for execution of a cell.
+  If no values are given, it simply shows the current setting.
+  To reset its value, use `%goflags """`.
+  See example on how to use this in the [tutorial](https://github.com/janpfeifer/gonb/blob/main/examples/tutorial.ipynb). 
 - `%with_inputs`: will prompt for inputs for the next shell command. Use this if
   the next shell command (`!`) you execute reads the stdin. Jupyter will require
   you to enter one last value after the shell script executes.
@@ -117,8 +122,9 @@ scripts (`!` and `!*`) and for the Go cells:
 - `%goworkfix`: work around 'go get' inability to handle 'go.work' files. If you are
   using 'go.work' file to point to locally modified modules, consider using this. It creates
   'go mod edit --replace' rules to point to the modules pointed to the 'use' rules in 'go.work'
-  file. It overwrites/updates 'replace' rules for those modules, if they already exist. See tutorial
-  for an example.
+  file.
+  It overwrites/updates 'replace' rules for those modules, if they already exist. See 
+  [tutorial](https://github.com/janpfeifer/gonb/blob/main/examples/tutorial.ipynb) for an example.
 
 ### Links
 

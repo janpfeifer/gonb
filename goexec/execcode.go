@@ -80,7 +80,9 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
 func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) error {
-	cmd := exec.Command("go", "build", "-o", s.BinaryPath())
+	args := []string{"build", "-o", s.BinaryPath()}
+	args = append(args, s.GoBuildFlags...)
+	cmd := exec.Command("go", args...)
 	cmd.Dir = s.TempDir
 	var output []byte
 	output, err := cmd.CombinedOutput()

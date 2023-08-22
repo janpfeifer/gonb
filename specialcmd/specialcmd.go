@@ -10,6 +10,7 @@ package specialcmd
 import (
 	_ "embed"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"os"
 
 	. "github.com/janpfeifer/gonb/common"
@@ -159,6 +160,20 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			}
 		}
 
+		// Flags for `go build`:
+	case "goflags":
+		if len(parts) > 1 {
+			nonEmptyArgs := slices.DeleteFunc(parts[1:], func(s string) bool { return s == "" })
+			goExec.GoBuildFlags = nonEmptyArgs
+		}
+
+		err := kernel.PublishDisplayDataWithMarkdown(msg,
+			fmt.Sprintf("* `%%goflags=%q`", goExec.GoBuildFlags))
+		if err != nil {
+			klog.Errorf("Failed publishing contents: %+v", err)
+		}
+
+		// Automatic `go get` control:
 	case "autoget":
 		goExec.AutoGet = true
 	case "noautoget":

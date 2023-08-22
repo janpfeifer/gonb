@@ -15,7 +15,9 @@
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, images, javascript, svg, videos, etc.
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
-* Faster execution than intepreted Go, used in other notebooks -- at the cost of imperceptible increased start up, since each cell is compiled.
+  It also supports arbitrary Go compilation flags to be used when executing the cells.
+* Faster execution than interpreted Go, used in other similar kernels -- the cost of imperceptible increased 
+  start up, since each cell is compiled.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Several handy special commands, see `%help`.
 * Shell command executions with `!` -- handy at times, for instance to install packages.

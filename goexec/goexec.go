@@ -39,8 +39,9 @@ type State struct {
 	UniqueID, Package, TempDir string
 
 	// Building and executing go code configuration:
-	Args    []string // Args to be passed to the program, after being executed.
-	AutoGet bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
+	Args         []string // Args to be passed to the program, after being executed.
+	GoBuildFlags []string // Flags to be passed to `go build`, in State.Compile.
+	AutoGet      bool     // Whether to do a "go get" before compiling, to fetch missing external modules.
 
 	// Global elements defined mapped by their keys.
 	Definitions *Declarations

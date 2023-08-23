@@ -113,14 +113,14 @@ Install there as if it were in a linux machine.
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
 
-# Rich display: HTML, Images, SVG, Videos, manipulating javascript, etc.
+# Rich display: HTML, Images, Markdown, SVG, Videos, manipulating javascript, etc.
 
 **GoNB** opens a named pipe (set in environment variable `GONB_PIPE`) that a program can use to directly
 display any type of HTML content. 
 
-For the most cases, one can simply import 
+For most cases though, one can simply use the 
 [`github.com/janpfeifer/gonb/gonbui`](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui):
-the library offers a convenient API to everything available. Examples of use in the
+library, it offers a convenient API to everything available. Examples of use in the
 [tutorial](examples/tutorial.ipynb). 
 
 If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol

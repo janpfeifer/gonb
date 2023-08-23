@@ -172,14 +172,14 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Dispatch to various executors.
 	msg.Kernel().Interrupted.Store(false)
 	lines := strings.Split(code, "\n")
-	usedLines := MakeSet[int]()
+	specialLines := MakeSet[int]() // lines that are special commands and not Go.
 	var executionErr error
-	if err := specialcmd.Parse(msg, goExec, true, lines, usedLines); err != nil {
+	if err := specialcmd.Parse(msg, goExec, true, lines, specialLines); err != nil {
 		executionErr = errors.WithMessagef(err, "executing special commands in cell")
 	}
-	hasMoreToRun := len(usedLines) < len(lines)
+	hasMoreToRun := len(specialLines) < len(lines) || goExec.CellIsTest
 	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
-		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, usedLines)
+		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, specialLines)
 	}
 
 	// Final execution result.

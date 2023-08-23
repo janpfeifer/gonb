@@ -38,7 +38,7 @@ func newEmptyState(t *testing.T) *goexec.State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
-	s, err := goexec.New(uniqueID, false)
+	s, err := goexec.New(uniqueID, false, false)
 	if err != nil {
 		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}

@@ -33,7 +33,7 @@ func GoNBRootDir() string {
 // GoNB to that directory, so it will be used by `nbconvert`.
 //
 // Parameters:
-//   - `runArgs` are passed to `go run --cover <runArgs> .` command, executed from GoNB's
+//   - `gonbRunArgs` are passed to `go run --cover <gonbRunArgs> .` command, executed from GoNB's
 //     root directory.
 //   - `extraInstallArgs` are passed to the `gonb --install` execution.
 //     Typical values here include `--logtostderr`, and `--vmodule=...` for verbose output.
@@ -94,6 +94,15 @@ type ExpectFn func(line string, eof bool) (done bool, err error)
 // If `print` is set, it also prints the lines read from `r`.
 func Check(r io.Reader, expectation ExpectFn, print bool) error {
 	byLine := bufio.NewScanner(r)
+	drainFn := func() {
+		if print {
+			// Drain the rest of input.
+			for byLine.Scan() {
+				fmt.Println(byLine.Text())
+			}
+		}
+	}
+
 	for byLine.Scan() {
 		line := byLine.Text()
 		if print {
@@ -101,15 +110,11 @@ func Check(r io.Reader, expectation ExpectFn, print bool) error {
 		}
 		done, err := expectation(line, false)
 		if err != nil {
+			drainFn()
 			return err
 		}
 		if done {
-			if print {
-				// Drain rest of input.
-				for byLine.Scan() {
-					fmt.Println(byLine.Text())
-				}
-			}
+			drainFn()
 			return nil
 		}
 	}
@@ -193,4 +198,10 @@ func Sequence(expectations ...ExpectFn) ExpectFn {
 // This is a convenience to add to the testing of notebooks.
 func OutputLine(cell int) string {
 	return fmt.Sprintf("+*Out[%d]:*+", cell)
+}
+
+// InputLine returns the line that precedes the cell input as written by `nbconvert -to asciidoc`.
+// This is a convenience to add to the testing of notebooks.
+func InputLine(cell int) string {
+	return fmt.Sprintf("+*In[%d]:*+", cell)
 }

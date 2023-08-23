@@ -21,7 +21,7 @@ func newEmptyStateWithRawError(t *testing.T, rawError bool) *State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
-	s, err := New(uniqueID, rawError)
+	s, err := New(uniqueID, false, rawError)
 	if err != nil {
 		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}
@@ -40,8 +40,8 @@ func createTestGoMain(t *testing.T, s *State, cellContent string) (fileToCellLin
 	}
 
 	var err error
-	_, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, NoCursor)
-	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.MainPath())
+	_, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), lines, skipLines, NoCursor)
+	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.CodePath())
 	return
 }
 
@@ -127,13 +127,13 @@ fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 func TestState_Parse(t *testing.T) {
 	s := newEmptyState(t)
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
-	fmt.Printf("Code:\t%s\n", s.MainPath())
+	fmt.Printf("Code:\t%s\n", s.CodePath())
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
 
 	var err error
 	cellId := NoCursorLine // Transient cellId.
-	s.Definitions, err = s.parseFromMainGo(nil, cellId, NoCursor, fileToCellIdAndLine)
-	require.NoErrorf(t, err, "Failed to parse %q", s.MainPath())
+	s.Definitions, err = s.parseFromGoCode(nil, cellId, NoCursor, fileToCellIdAndLine)
+	require.NoErrorf(t, err, "Failed to parse %q", s.CodePath())
 
 	fmt.Printf("\ttest imports: %+v\n", s.Definitions.Imports)
 	assert.Lenf(t, s.Definitions.Imports, 5, "Expected 5 imports, got %+v", s.Definitions.Imports)
@@ -369,12 +369,12 @@ func TestCursorPositioning(t *testing.T) {
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))
-		s.Definitions, err = s.parseFromMainGo(nil, -1, testLine.cursor, fileToCellIdAndLine)
+		s.Definitions, err = s.parseFromGoCode(nil, -1, testLine.cursor, fileToCellIdAndLine)
 		if err != nil {
 			t.Fatalf("Failed to parse imports from main.go: %+v", err)
 		}
 
-		cursorInFile, fileToCellIdAndLine, err := s.createGoContentsFromDecls(buf, s.Definitions, nil)
+		cursorInFile, fileToCellIdAndLine, err := s.createCodeFromDecls(buf, s.Definitions, nil)
 		_ = fileToCellIdAndLine
 		require.NoError(t, err)
 		content := buf.String()

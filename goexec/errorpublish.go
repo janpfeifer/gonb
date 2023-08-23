@@ -3,7 +3,6 @@ package goexec
 import (
 	"bytes"
 	"github.com/pkg/errors"
-	"regexp"
 	"text/template"
 
 	"github.com/janpfeifer/gonb/kernel"
@@ -92,8 +91,6 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine 
 		return err
 	}
 }
-
-var reFileLinePrefix = regexp.MustCompile(`(^.*main\.go:(\d+):(\d+): )(.+)$`)
 
 // LinesForErrorContext indicates how many lines to display in the error context, before and after the offending line.
 // Hard-coded for now, but it could be made configurable.

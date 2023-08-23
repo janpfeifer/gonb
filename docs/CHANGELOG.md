@@ -2,7 +2,8 @@
 
 ## Next
 
-* Added `%gcflags` to allow arbitrary compilation flags to be set for GoNB, see #58.
+* Added `%gcflags` to allow arbitrary compilation flags to be set for GoNB, see #58
+* Added support for tests and benchmarks (`go test`) with `%test`, see #58 
 
 ## 0.7.8 -- 2023/08/17
 

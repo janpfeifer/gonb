@@ -18,6 +18,8 @@
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- the cost of imperceptible increased 
   start up, since each cell is compiled.
+* Optionally (`%test`) run cells with `go test`, to experiment with test functions.
+  * Including support to run benchmark functions!
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Several handy special commands, see `%help`.
 * Shell command executions with `!` -- handy at times, for instance to install packages.
@@ -25,6 +27,7 @@
 * Very well documented and supported.
 * Great for data-science, testing, writing reports, live demos, etc.
 * Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out.
+* Online help with `%help`.
 
 <img src="docs/GoNB-Demo.png" alt="Demo1" width="50%" height="50%"/>
 

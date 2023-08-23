@@ -286,7 +286,8 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLi
 	return fileToCellIdAndLine
 }
 
-// createGoFileFromLines creates a main.go file from the cell contents. It doesn't yet include previous declarations.
+// createGoFileFromLines creates a Go file from the cell contents.
+// It doesn't yet include previous declarations.
 //
 // Among the things it handles:
 // * Adding an initial `package main` line.
@@ -370,25 +371,29 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 	return
 }
 
-// createMainFileFromDecls creates `main.go` and writes all declarations.
+// createCodeFileFromDecls creates `main.go` (or `main_test.go`) and writes all declarations.
 //
-// It returns the cursor position in the file as well as a mapping from the file Lines to to the original cell ids and Lines.
-func (s *State) createMainFileFromDecls(decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
-	var f *os.File
-	f, err = os.Create(s.MainPath())
-	if err != nil {
-		err = errors.Wrapf(err, "Failed to create %q", s.MainPath())
+// It returns the cursor position in the file as well as a mapping from the file Lines to the original cell ids and Lines.
+func (s *State) createCodeFileFromDecls(decls *Declarations, mainDecl *Function) (
+	cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
+	if err = s.RemoveCode(); err != nil {
 		return
 	}
-	cursor, fileToCellIdAndLine, err = s.createGoContentsFromDecls(f, decls, mainDecl)
+	var f *os.File
+	f, err = os.Create(s.CodePath())
+	if err != nil {
+		err = errors.Wrapf(err, "Failed to create %q", s.CodePath())
+		return
+	}
+	cursor, fileToCellIdAndLine, err = s.createCodeFromDecls(f, decls, mainDecl)
 	err2 := f.Close()
 	if err != nil {
-		err = errors.Wrapf(err, "creating main.go")
+		err = errors.Wrapf(err, "creating %q", s.CodePath())
 		return
 	}
 	err = err2
 	if err != nil {
-		err = errors.Wrapf(err, "closing main.go")
+		err = errors.Wrapf(err, "closing %q", s.CodePath())
 		return
 	}
 	return
@@ -403,7 +408,7 @@ func (s *State) createAlternativeFileFromDecls(decls *Declarations) (err error) 
 		err = errors.Wrapf(err, "Failed to create %q", fPath)
 		return
 	}
-	_, _, err = s.createGoContentsFromDecls(f, decls, nil)
+	_, _, err = s.createCodeFromDecls(f, decls, nil)
 	err2 := f.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "creating %q", fPath)
@@ -417,12 +422,12 @@ func (s *State) createAlternativeFileFromDecls(decls *Declarations) (err error) 
 	return
 }
 
-// createGoContentsFromDecls writes to the given file all the declarations.
+// createCodeFromDecls writes to the given file all the declarations.
 //
 // mainDecl is optional, and if not given, no `main` function is created.
 //
 // It returns the cursor position in the file as well as a mapping from the file Lines to the original cell ids and Lines.
-func (s *State) createGoContentsFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
+func (s *State) createCodeFromDecls(writer io.Writer, decls *Declarations, mainDecl *Function) (cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursor = NoCursor
 	w := NewWriterWithCursor(writer)
 	w.Writef("package main\n\n")

@@ -18,13 +18,18 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"testing"
 )
 
 var (
-	flagPrintNotebook = flag.Bool("print_notebook", false, "print tested notebooks, useful if debugging unexpected results.")
-	runArgs           = []string{}
-	extraInstallArgs  = []string{"--logtostderr"}
+	flagPrintNotebook = flag.Bool("print_notebook", false, "Print tested notebooks, useful if debugging unexpected results.")
+	flagExtraFlags    = flag.String("kernel_args", "--logtostderr",
+		"extra arguments passed to `gonb --install` that eventually gets passed to the kernel. "+
+			"Commonly for debugging one will want to set \"--logtostderr --vmodule=...\"")
+
+	// gonbRunArgs is passed to `go run` when building the gonb kernel to be tested.
+	gonbRunArgs []string
 )
 
 func must(err error) {
@@ -68,8 +73,11 @@ func setup() {
 		must(os.Setenv("GOCOVERDIR", goCoverDir))
 	}
 
+	// Parse extraInstallArgs.
+	extraInstallArgs := strings.Split(*flagExtraFlags, " ")
+
 	// Compile and install gonb binary as a local jupyter kernel.
-	jupyterDir = mustValue(InstallTmpGonbKernel(runArgs, extraInstallArgs))
+	jupyterDir = mustValue(InstallTmpGonbKernel(gonbRunArgs, extraInstallArgs))
 	fmt.Printf("%s=%s\n", kernel.JupyterDataDirEnv, jupyterDir)
 }
 
@@ -89,7 +97,7 @@ func TestMain(m *testing.M) {
 
 // executeNotebook (in `examples/tests`) and returns a reader to the output of the execution.
 // It executes using `nbconvert` set to `asciidoc` (text) output.
-func executedNotebook(t *testing.T, notebook string) *os.File {
+func executeNotebook(t *testing.T, notebook string) *os.File {
 	// Prepare output file for nbconvert.
 	tmpOutput := mustValue(os.CreateTemp("", "gonb_nbtests_output"))
 	nbconvertOutputName := tmpOutput.Name()
@@ -115,7 +123,7 @@ func TestHello(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executedNotebook(t, "hello")
+	f := executeNotebook(t, "hello")
 	err := Check(f,
 		Match(OutputLine(1),
 			Separator,
@@ -133,7 +141,7 @@ func TestFunctions(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executedNotebook(t, "functions")
+	f := executeNotebook(t, "functions")
 	err := Check(f,
 		Match(
 			OutputLine(2),
@@ -152,7 +160,7 @@ func TestInit(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executedNotebook(t, "init")
+	f := executeNotebook(t, "init")
 	err := Check(f,
 		Sequence(
 			Match(
@@ -212,7 +220,7 @@ func TestGoWork(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executedNotebook(t, "gowork")
+	f := executeNotebook(t, "gowork")
 	err := Check(f,
 		Sequence(
 			Match(
@@ -260,7 +268,7 @@ func TestGoFlags(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executedNotebook(t, "goflags")
+	f := executeNotebook(t, "goflags")
 	err := Check(f,
 		Sequence(
 			// Check `%goflags` is correctly keeping/erasing state.
@@ -306,6 +314,90 @@ func TestGoFlags(t *testing.T) {
 			Match(OutputLine(10), Separator),
 			Match("can inline (*Point).ManhattanLen"),
 			Match("p does not escape"),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}
+
+// TestGoTest tests support for `%test` to run cells with `go test`.
+func TestGoTest(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "gotest")
+	err := Check(f,
+		Sequence(
+			// Trivial Incr function defined.
+			Match(
+				OutputLine(1),
+				Separator,
+				"55",
+				"2178309",
+				"2178309",
+				Separator,
+			),
+
+			// TestA checks Incr.
+			Match(
+				OutputLine(2),
+				Separator,
+				"RUN   TestA",
+				"Testing A",
+				"PASS: TestA",
+				"PASS",
+				Separator,
+			),
+
+			// Checks TestA declaration is memorized.
+			Match(OutputLine(3), Separator),
+			Match("TestA"),
+			Match(InputLine(4)),
+
+			// If no test is defined in cell, all tests are run (TestA in this case).
+			Match(
+				OutputLine(4),
+				Separator,
+				"RUN   TestA",
+				"Testing A",
+				"PASS: TestA",
+				"PASS",
+				Separator,
+			),
+
+			// If cells are defined in cell, only tests of cell are run, TestA
+			// should be excluded.
+			Match(
+				OutputLine(5),
+				Separator,
+				"RUN   TestAB",
+				"Testing AB",
+				"PASS: TestAB",
+				"RUN   TestB",
+				"Testing B",
+				"PASS: TestB",
+				"PASS",
+				Separator,
+			),
+
+			// Passed args to `go test`, so `--test.v` is disabled.
+			Match(
+				OutputLine(6),
+				Separator,
+				"Testing A",
+				"Testing AB",
+				"Testing B",
+				"PASS",
+				Separator,
+			),
+
+			// Check that both benchmarks run.
+			Match(OutputLine(7), Separator),
+			Match("BenchmarkFibonacciA32"),
+			Match("BenchmarkFibonacciB32"),
+			Match("PASS", Separator),
 		), *flagPrintNotebook)
 
 	require.NoError(t, err)

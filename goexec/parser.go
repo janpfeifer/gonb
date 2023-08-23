@@ -6,9 +6,9 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"io/fs"
 	"math/rand"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -102,21 +102,23 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 	return contents[from:to]
 }
 
-// parseFromMainGo reads main.go and parses its declarations -- see object Declarations.
+// parseFromGoCode reads the Go code written in `s.TempDir` and parses its declarations.
+// See object Declarations.
 //
-// This will be called by parseLinesAndComposeMain, after `main.go` is written.
+// This is called by parseLinesAndComposeMain, after the Go code is written.
 //
 // Parameters:
-//   - msg: connection to notebook, to report errors. If nil, errors are not reported.
-//   - cellId: execution id of the cell being processed. Set to -1 if later this cell will be discarded (for
-//     instance when parsing for auto-complete).
-//   - cursor: where it is in the file. If set (that is, `cursor != NoCursor`), it will record the position
+//   - `msg`: connection to notebook, to report errors. If nil, errors are not reported.
+//   - `cellId`: execution id of the cell being processed. Set to -1 if later this cell will be discarded (for
+//     instance, when parsing for auto-complete).
+//   - `Cursor`: where it is in the file. If set (that is, `cursor != NoCursor`), it will record the position
 //     of the cursor in the corresponding declaration.
-//   - fileToCellLine: for each line in the `main.go` file, the corresponding line number in the cell. This
+//   - `fileToCellLine`: for each line in the `main.go` file, the corresponding line number in the cell. This
 //     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected Lines
 //     that have no correspondent value in the cell code. It can be nil if there is no information mapping
 //     file Lines to cell Lines.
-func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
+func (s *State) parseFromGoCode(msg kernel.Message,
+	cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
 	decls = NewDeclarations()
 	pi := &parseInfo{
 		cursor:  cursor,
@@ -126,7 +128,11 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 		fileToCellIdAndLine: fileToCellIdAndLine,
 	}
 	var packages map[string]*ast.Package
-	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, nil, parser.SkipObjectResolution) // |parser.AllErrors
+
+	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, func(info fs.FileInfo) bool {
+		klog.Infof("parser.ParseDir().filter(%q)?", info.Name())
+		return true
+	}, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
 			err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error(), err)
@@ -134,27 +140,23 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 		err = errors.Wrapf(err, "parsing go files in TempDir %q", s.TempDir)
 		return
 	}
+
 	pi.filesContents = make(map[string]string)
-
-	// Debugging new types of parsing:
-	//  fmt.Printf("Parsing results:\n")
-	//  _ = ast.Print(fileSet, packages)
-
 	for name, pkgAst := range packages {
+		klog.V(2).Infof("Parsed package %q:\n", pkgAst.Name)
 		if name != "main" {
 			err = errors.New("Invalid package %q declared: there should be no `package` declaration, " +
 				"GoNB will automatically create `package main` when combining cell code.")
 			return
 		}
-		for _, fileObj := range pkgAst.Files {
-			// Currently, there is only `main.go` file.
-			//fmt.Printf("File: %q\n", fileObj.Name.Name)
-			filePath := path.Join(s.TempDir, fileObj.Name.Name) + ".go"
-			content, err := os.ReadFile(filePath)
+		for fileName, fileObj := range pkgAst.Files {
+			// Currently, there is only `main.go`, and potentially `main_test.go` files.
+			klog.V(2).Infof("> Parsed file %q: %d declarations\n", fileName, len(fileObj.Decls))
+			content, err := os.ReadFile(fileName)
 			if err != nil {
 				return nil, errors.Wrapf(err, "Failed to read %q", fileObj.Name)
 			}
-			pi.filesContents[filePath] = string(content)
+			pi.filesContents[fileName] = string(content)
 			// Incorporate Imports
 			for _, entry := range fileObj.Imports {
 				pi.ParseImportEntry(decls, entry)
@@ -164,8 +166,10 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 			for _, decl := range fileObj.Decls {
 				switch typedDecl := decl.(type) {
 				case *ast.FuncDecl:
+					klog.V(2).Infof("> Declaration %T: %+v", typedDecl, typedDecl.Name)
 					pi.ParseFuncEntry(decls, typedDecl)
 				case *ast.GenDecl:
+					klog.V(2).Infof("> Declaration %T: %s", typedDecl, typedDecl.Tok)
 					if typedDecl.Tok == token.IMPORT {
 						// Imports are handled above.
 						continue
@@ -176,10 +180,10 @@ func (s *State) parseFromMainGo(msg kernel.Message, cellId int, cursor Cursor, f
 					} else if typedDecl.Tok == token.TYPE {
 						pi.ParseTypeEntry(decls, typedDecl)
 					} else {
-						fmt.Printf("Dropped unknown generic declaration of type %s\n", typedDecl.Tok)
+						klog.Warningf("Dropped unknown generic declaration of type %s\n", typedDecl.Tok)
 					}
 				default:
-					fmt.Printf("Dropped unknown declaration type\n")
+					klog.Warningf("Dropped unknown declaration type\n")
 				}
 			}
 		}
@@ -205,7 +209,7 @@ func NewImport(importPath, alias string) *Import {
 	return &Import{Key: key, Path: importPath, Alias: alias}
 }
 
-// ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.parseFromMainGo
+// ParseImportEntry registers a new Import declaration based on the ast.ImportSpec. See State.parseFromGoCode
 func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec) {
 	var alias string
 	if entry.Name != nil {
@@ -229,7 +233,7 @@ func (pi *parseInfo) ParseImportEntry(decls *Declarations, entry *ast.ImportSpec
 	decls.Imports[importEntry.Key] = importEntry
 }
 
-// ParseFuncEntry registers a new `func` declaration based on the ast.FuncDecl. See State.parseFromMainGo
+// ParseFuncEntry registers a new `func` declaration based on the ast.FuncDecl. See State.parseFromGoCode
 func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl) {
 	// Incorporate functions.
 	key := funcDecl.Name.Name
@@ -249,7 +253,7 @@ func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl)
 	decls.Functions[f.Key] = f
 }
 
-// ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.parseFromMainGo
+// ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.parseFromGoCode
 func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 	// Multiple declarations in the same line may share the cursor (e.g: `var a, b int` if the cursor
 	// is in the `int` token). Only the first definition ('a' in the example) takes the cursor.
@@ -300,7 +304,7 @@ func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 	}
 }
 
-// ParseConstEntry registers a new `const` declaration based on the ast.GenDecl. See State.parseFromMainGo
+// ParseConstEntry registers a new `const` declaration based on the ast.GenDecl. See State.parseFromGoCode
 func (pi *parseInfo) ParseConstEntry(decls *Declarations, typedDecl *ast.GenDecl) {
 	var prevConstDecl *Constant
 	// Multiple declarations in the same line may share the cursor (e.g: `var a, b int` if the cursor
@@ -384,20 +388,31 @@ func (pi *parseInfo) ParseTypeEntry(decls *Declarations, typedDecl *ast.GenDecl)
 // Note: `func init_*()` functions are rendered as `func init()`: that means if one is parsing an
 // already generated code, the original `func init_*()` will be missing (which is usually ok), but
 // there will be a newly generated `func init()` that shouldn't be memorized. See
-func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
+func (s *State) parseLinesAndComposeMain(
+	msg kernel.Message,
+	cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	updatedDecls *Declarations, mainDecl *Function, cursorInFile Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
 	cursorInFile = NoCursor
 
 	var fileToCellLine []int
-	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.MainPath(), lines, skipLines, cursorInCell)
+	if err = s.RemoveCode(); err != nil {
+		return
+	}
+	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), lines, skipLines, cursorInCell)
 	if err != nil {
 		return
 	}
 	fileToCellIdAndLine = MakeFileToCellIdAndLine(cellId, fileToCellLine)
 
+	data, _ := os.ReadFile(s.CodePath())
+	klog.Infof("File: %s\n%s", s.CodePath(), string(data))
+
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err = s.parseFromMainGo(msg, cellId, cursorInFile, fileToCellIdAndLine)
+	newDecls, err = s.parseFromGoCode(msg, cellId, cursorInFile, fileToCellIdAndLine)
+	if s.CellIsTest {
+		s.SetCellTests(newDecls)
+	}
 
 	if err != nil {
 		return
@@ -428,7 +443,7 @@ func (s *State) parseLinesAndComposeMain(msg kernel.Message, cellId int, lines [
 	updatedDecls.MergeFrom(newDecls)
 
 	// Render declarations to main.go.
-	cursorInFile, fileToCellIdAndLine, err = s.createMainFileFromDecls(updatedDecls, mainDecl)
+	cursorInFile, fileToCellIdAndLine, err = s.createCodeFileFromDecls(updatedDecls, mainDecl)
 	if err != nil {
 		err = errors.WithMessagef(err, "while composing main.go with all declarations")
 		return
@@ -480,7 +495,7 @@ func lineWithCursor(content string, cursor Cursor) string {
 
 // readMainGo reads the contents of main.go file.
 func (s *State) readMainGo() (string, error) {
-	f, err := os.Open(s.MainPath())
+	f, err := os.Open(s.CodePath())
 	if err != nil {
 		return "", errors.Wrapf(err, "failed readMainGo()")
 	}
@@ -492,4 +507,41 @@ func (s *State) readMainGo() (string, error) {
 		return "", errors.Wrapf(err, "failed readMainGo()")
 	}
 	return string(content), nil
+}
+
+// SetCellTests sets the test functions (Test...) defined in this cell.
+// The default for `%test` is to run only the current tests, this is the
+// function that given the new declarations created in this cells, figures
+// out which are those tests.
+func (s *State) SetCellTests(decls *Declarations) {
+	s.CellTests = nil
+	for fName := range decls.Functions {
+		if strings.HasPrefix(fName, "Test") && fName != "TestMain" && !strings.Contains(fName, "~") {
+			s.CellTests = append(s.CellTests, fName)
+		} else if strings.HasPrefix(fName, "Benchmark") && !strings.Contains(fName, "~") {
+			s.CellTests = append(s.CellTests, fName)
+			s.CellHasBenchmarks = true
+		}
+	}
+	klog.V(2).Infof("SetCellTests: %v", s.CellTests)
+}
+
+// DefaultCellTestArgs generate the default `go test` arguments, if none is
+// given.
+// It includes `-test.v` and `-test.run` matching the tests defined in the
+// current cell.
+func (s *State) DefaultCellTestArgs() (args []string) {
+	args = append(args, "-test.v")
+	if s.CellHasBenchmarks {
+		args = append(args, "-test.bench=.")
+	}
+	if len(s.CellTests) > 0 {
+		parts := make([]string, 0, len(s.CellTests))
+		for _, testName := range s.CellTests {
+			parts = append(parts, fmt.Sprintf("^%s$", testName))
+		}
+		args = append(args, "-test.run="+strings.Join(parts, "|"))
+	}
+	klog.V(2).Infof("DefaultCellTestArgs: %v", args)
+	return
 }

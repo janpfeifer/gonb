@@ -19,7 +19,8 @@ var (
 	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
 	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
-	flagRawError = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks")
+	flagRawError = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
+	flagWork     = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
 )
 
 var (
@@ -65,6 +66,9 @@ func main() {
 		if glogFlag := flag.Lookup("raw_error"); glogFlag != nil && glogFlag.Value.String() != "false" {
 			extraArgs = append(extraArgs, "--raw_error")
 		}
+		if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
+			extraArgs = append(extraArgs, "--work")
+		}
 		err := kernel.Install(extraArgs, *flagForce)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)
@@ -97,7 +101,7 @@ func main() {
 	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
 
 	// Create a Go executor.
-	goExec, err := goexec.New(UniqueID, *flagRawError)
+	goExec, err := goexec.New(UniqueID, *flagWork, *flagRawError)
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}

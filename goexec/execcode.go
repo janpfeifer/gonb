@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
+	"os"
 	"os/exec"
 	"path"
 	"regexp"
@@ -22,20 +23,29 @@ import (
 // skipLines are Lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash Lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+	defer s.PostExecuteCell()
+	klog.V(2).Infof("ExecuteCell(): CellIsTest=%v", s.CellIsTest)
+
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
 	err := s.AutoTrack()
 	if err != nil {
 		return err
 	}
 
+	klog.Infof("ExecuteCell: after AutoTrack")
+
 	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
 
+	klog.V(2).Infof("ExecuteCell: after s.parseLinesAndComposeMain()")
+
 	// Exec `goimports` (or the code that implements it) -- it updates `updatedDecls` with
 	// the new imports, if there are any.
 	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
+
+	klog.V(2).Infof("ExecuteCell: after s.GoImports()")
 
 	if err != nil {
 		return errors.WithMessagef(err, "goimports failed")
@@ -46,6 +56,8 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return err
 	}
 
+	klog.Infof("ExecuteCell: after s.Compile()")
+
 	// Compilation successful: save merged declarations into current State.
 	s.Definitions = updatedDecls
 
@@ -53,14 +65,46 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	return s.Execute(msg, fileToCellIdAndLine)
 }
 
+// PostExecuteCell reset state that is valid only for the duration of a cell.
+// This includes s.CellIsTest and s.Args.
+func (s *State) PostExecuteCell() {
+	klog.V(2).Infof("PostExecuteCell(): CellIsTest=%v", s.CellIsTest)
+	s.Args = nil
+	s.CellIsTest = false
+	s.CellTests = nil
+	s.CellHasBenchmarks = false
+}
+
 // BinaryPath is the path to the generated binary file.
 func (s *State) BinaryPath() string {
 	return path.Join(s.TempDir, s.Package)
 }
 
-// MainPath is the path to the main.go file.
-func (s *State) MainPath() string {
-	return path.Join(s.TempDir, "main.go")
+const (
+	MainGo     = "main.go"
+	MainTestGo = "main_test.go"
+)
+
+// CodePath is the path to where the code is going to be saved. Either `main.go` or `main_test.go` file.
+func (s *State) CodePath() string {
+	name := MainGo
+	if s.CellIsTest {
+		name = MainTestGo
+	}
+	return path.Join(s.TempDir, name)
+}
+
+// RemoveCode removes the code files (`main.go` or `main_test.go`).
+// Usually used just before creating creating a new version.
+func (s *State) RemoveCode() error {
+	for _, name := range [2]string{MainGo, MainTestGo} {
+		p := path.Join(s.TempDir, name)
+		err := os.Remove(p)
+		if err != nil && !os.IsNotExist(err) {
+			return errors.Wrapf(err, "can't remove previously generated code in %q", p)
+		}
+	}
+	return nil
 }
 
 // AlternativeDefinitionsPath is the path to a temporary file that holds the memorize definitions,
@@ -70,8 +114,12 @@ func (s *State) AlternativeDefinitionsPath() string {
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
-	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), s.Args...).
-		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.MainPath(), fileToCellIdAndLine)).
+	args := s.Args
+	if len(args) == 0 && s.CellIsTest {
+		args = s.DefaultCellTestArgs()
+	}
+	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), args...).
+		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
 		Exec()
 }
 
@@ -80,15 +128,22 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 // If errors in compilation happen, linesPos is used to adjust line numbers to their content in the
 // current cell.
 func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine) error {
-	args := []string{"build", "-o", s.BinaryPath()}
+	var args []string
+	if s.CellIsTest {
+		args = []string{"test", "-c", "-o", s.BinaryPath()}
+	} else {
+		args = []string{"build", "-o", s.BinaryPath()}
+	}
 	args = append(args, s.GoBuildFlags...)
 	cmd := exec.Command("go", args...)
 	cmd.Dir = s.TempDir
 	var output []byte
+	klog.V(2).Infof("Executing %s", cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		klog.Errorf("Failed %q:\n%s\n", cmd, output)
 		err := s.DisplayErrorWithContext(msg, fileToCellIdAndLines, string(output), err)
-		return errors.Wrapf(err, "failed to run %q", cmd.String())
+		return errors.Wrapf(err, "failed to run %q", cmd)
 	}
 	return nil
 }
@@ -113,9 +168,10 @@ can install it from the notebook with:
 		err = errors.WithMessagef(err, "while trying to run goimports\n")
 		return
 	}
-	cmd := exec.Command(goimportsPath, "-w", s.MainPath())
+	cmd := exec.Command(goimportsPath, "-w", s.CodePath())
 	cmd.Dir = s.TempDir
 	var output []byte
+	klog.V(2).Infof("Executing %s", cmd)
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, string(output)+"\n"+err.Error(), err)
@@ -125,7 +181,7 @@ can install it from the notebook with:
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations
-	newDecls, err = s.parseFromMainGo(msg, -1, NoCursor, nil)
+	newDecls, err = s.parseFromGoCode(msg, -1, NoCursor, nil)
 	newDecls.DropFuncInit() // These may be generated, we don't want to memorize these.
 	if err != nil {
 		return
@@ -149,7 +205,7 @@ can install it from the notebook with:
 	}
 
 	delete(newDecls.Functions, "main")
-	cursorInFile, updatedFileToCellIdAndLine, err = s.createMainFileFromDecls(newDecls, mainDecl)
+	cursorInFile, updatedFileToCellIdAndLine, err = s.createCodeFileFromDecls(newDecls, mainDecl)
 	if err != nil {
 		err = errors.WithMessagef(err, "while composing main.go with all declarations")
 		return
@@ -160,8 +216,14 @@ can install it from the notebook with:
 	if !s.AutoGet {
 		return
 	}
-	cmd = exec.Command("go", "get")
+
+	args := []string{"get"}
+	if s.CellIsTest {
+		args = append(args, "-t")
+	}
+	cmd = exec.Command("go", args...)
 	cmd.Dir = s.TempDir
+	klog.V(2).Infof("Executing %s", cmd)
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		err = errors.Wrapf(err, "failed to run %q", cmd.String())

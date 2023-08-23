@@ -101,14 +101,14 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 	ctx := context.Background()
 	var desc string
 	klog.V(2).Infof("InspectIdentifierInCell: gopls.Definition(ctx, %s, %d, %d)",
-		s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+		s.CodePath(), cursorInFile.Line, cursorInFile.Col)
 
 	// Notify about standard files updates:
 	err = s.notifyAboutStandardAndTrackedFiles(ctx)
 	if err != nil {
 		return
 	}
-	desc, err = s.gopls.Definition(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	desc, err = s.gopls.Definition(ctx, s.CodePath(), cursorInFile.Line, cursorInFile.Col)
 	messages := s.gopls.ConsumeMessages()
 	if err != nil {
 		parts := []string{errors.Cause(err).Error()}
@@ -187,7 +187,7 @@ func (s *State) AutoCompleteOptionsInCell(cellLines []string, skipLines map[int]
 	_ = cursorInFile
 	var matches []string
 	var replaceLength int
-	matches, replaceLength, err = s.gopls.Complete(ctx, s.MainPath(), cursorInFile.Line, cursorInFile.Col)
+	matches, replaceLength, err = s.gopls.Complete(ctx, s.CodePath(), cursorInFile.Line, cursorInFile.Col)
 	if err != nil {
 		err = errors.Cause(err)
 		return

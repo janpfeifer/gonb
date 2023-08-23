@@ -18,7 +18,7 @@ func TestCreateGoFileFromLines(t *testing.T) {
 		err := s.Stop()
 		require.NoError(t, err, "Failed to finalized state")
 	}()
-	fmt.Println(s.MainPath())
+	fmt.Println(s.CodePath())
 
 	content := sampleCellCode
 	cellLines := strings.Split(content, "\n")
@@ -31,12 +31,12 @@ func TestCreateGoFileFromLines(t *testing.T) {
 
 	cursorInCell := Cursor{38, 27} // "func (k *Kg) Gain(lasagna K_g) {"
 	cursorLine := cellLines[cursorInCell.Line]
-	cursorInFile, fileToCellLines, err := s.createGoFileFromLines(s.MainPath(), cellLines, skipLines, cursorInCell)
-	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.MainPath())
+	cursorInFile, fileToCellLines, err := s.createGoFileFromLines(s.CodePath(), cellLines, skipLines, cursorInCell)
+	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.CodePath())
 
 	// Read generated contents:
-	contentBytes, err := os.ReadFile(s.MainPath())
-	require.NoErrorf(t, err, "Failed os.ReadFile(%q)", s.MainPath())
+	contentBytes, err := os.ReadFile(s.CodePath())
+	require.NoErrorf(t, err, "Failed os.ReadFile(%q)", s.CodePath())
 	content = string(contentBytes)
 	require.Contains(t, content, "func main() {")
 	require.NotContains(t, content, "echo nonono", "Line should have been filtered out, since it is in skipLine.")

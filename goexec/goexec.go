@@ -58,13 +58,26 @@ type State struct {
 	//
 	// This is set by State.autoTrackGoWork.
 	hasGoWork bool
-	rawError  bool
 
 	// goWorkUsePaths contains the paths that are marked as `use` in the `go.work` file for the kernel.
 	// It is only valid if hasGoWork is true.
 	//
 	// This is set by State.autoTrackGoWork.
 	goWorkUsePaths common.Set[string]
+
+	// preserveTempDir indicates the temporary directory should be logged and
+	// preserved for debugging.
+	preserveTempDir bool
+
+	// rawError indicates no HTML context to compilation errors should be added.
+	rawError bool
+
+	// CellIsTest indicates whether the current cell is to be compiled with `go test` (as opposed to `go build`).
+	// This also triggers writing the code to `main_test.go` as opposed to `main.go`.
+	// Usually this is set and reset after the execution -- the default being the normal build.
+	CellIsTest        bool
+	CellTests         []string // Tests defined in this cell. Only used if CellIsTest==true.
+	CellHasBenchmarks bool
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.
@@ -77,14 +90,21 @@ type Declarations struct {
 }
 
 // New returns an empty State object, that can be used to execute Cells.
-func New(uniqueID string, rawError bool) (*State, error) {
+//
+// If preserveTempDir is set to true, the temporary directory is logged,
+// and it's preserved when the kernel exits -- helpful for debugging.
+//
+// If rawError is true, the parsing of compiler errors doesn't generate HTML, instead it
+// uses only text.
+func New(uniqueID string, preserveTempDir, rawError bool) (*State, error) {
 	s := &State{
-		UniqueID:     uniqueID,
-		Package:      "gonb_" + uniqueID,
-		Definitions:  NewDeclarations(),
-		AutoGet:      true,
-		trackingInfo: newTrackingInfo(),
-		rawError:     rawError,
+		UniqueID:        uniqueID,
+		Package:         "gonb_" + uniqueID,
+		Definitions:     NewDeclarations(),
+		AutoGet:         true,
+		trackingInfo:    newTrackingInfo(),
+		preserveTempDir: preserveTempDir,
+		rawError:        rawError,
 	}
 
 	// Create directory.
@@ -92,6 +112,9 @@ func New(uniqueID string, rawError bool) (*State, error) {
 	err := os.Mkdir(s.TempDir, 0700)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
+	}
+	if s.preserveTempDir {
+		klog.Info("Temporary work directory: %s", s.TempDir)
 	}
 
 	// Set environment variables with currently used GoNB directories.
@@ -165,7 +188,7 @@ func (s *State) Stop() error {
 		s.gopls.Shutdown()
 		s.gopls = nil
 	}
-	if s.TempDir != "" {
+	if s.TempDir != "" && !s.preserveTempDir {
 		err := os.RemoveAll(s.TempDir)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to remove goexec.State temporary directory %s", s.TempDir)
@@ -341,7 +364,7 @@ type TypeDecl struct {
 
 // Constant represents the declaration of a constant. Because when appearing in block
 // they inherit its definition form the previous line, we need to preserve the blocks.
-// For this we use Next/Prev links.
+// For this, we use Next/Prev links.
 type Constant struct {
 	Cursor
 	CellLines

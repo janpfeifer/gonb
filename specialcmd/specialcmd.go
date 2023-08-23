@@ -115,10 +115,14 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	}
 	parts := splitCmd(cmdStr)
 	switch parts[0] {
-	case "%", "main", "args":
+	case "%", "main", "args", "test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
-		klog.V(2).Infof("Program args to use (%%): %+q", parts)
+		//klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
+		klog.Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
+		if parts[0] == "test" {
+			goExec.CellIsTest = true
+		}
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
 
 	case "env":

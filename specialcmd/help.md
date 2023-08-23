@@ -117,6 +117,25 @@ scripts (`!` and `!*`) and for the Go cells:
   to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
   This is used by the `**GoNB**ui`` functions described above, and doesn't need to be accessed directly.
 
+### Writing Tests and Benchmarks
+
+If a cell includes the `%test` command (anywhere in cell), it is compiled with `go test`
+(as opposed to `go build`).
+This can be very useful both to demonstrate tests, or simply help develop/debug them in a notebook.
+
+If `%test` is given without any flags, it uses by default the flags `-test.v` (verbose) and `-test.run` defined
+with the list of the tests defined in the current cell. 
+That is, it will run only the tests in the current cell. 
+Also, if there are any benchmarks in the current cell, it appends the flag `-test.bench=.` and runs the benchmarks
+defined in the current cell.
+
+Alternatively one can use `%test <flags>`, and the `flags` are passed to the binary compiled with `go test`. 
+Remember that test flags require to be prefixed with `test.`. 
+So for a verbose output, use `%test -test.v`. 
+For benchmarks, run `%test -test.bench=. -test.run=Benchmark`. 
+
+See examples in the [`gotest.ipynb` notebook here](https://github.com/janpfeifer/gonb/blob/main/examples/tests/gotest.ipynb).
+
 ### Other
 
 - `%goworkfix`: work around 'go get' inability to handle 'go.work' files. If you are

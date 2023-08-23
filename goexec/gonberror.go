@@ -6,6 +6,7 @@ import (
 	"golang.org/x/exp/constraints"
 	"html"
 	"k8s.io/klog/v2"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -138,24 +139,26 @@ func (e *errorLine) getColLine() string {
 	return line + "\n"
 }
 
+var reFileLinePrefix = regexp.MustCompile(`(^.*main(_test)?\.go:(\d+):(\d+): )(.+)$`)
+
 // parseErrorLine parses an err line, and given current line to cell mapping, creates context for the err
 // if available.
 func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdAndLine []CellIdAndLine) (l errorLine) {
 	l.HasContext = false
 	matches := reFileLinePrefix.FindStringSubmatch(lineStr)
-	if len(codeLines) == 0 || len(matches) != 5 {
+	if len(codeLines) == 0 || len(matches) != 6 {
 		l.HasContext = false
 		l.Message = lineStr
 		return
 	}
 
 	l.HasContext = true
-	l.Message = matches[4]
+	l.Message = matches[5]
 	l.Location = matches[1]
 
-	lineNum, _ := strconv.Atoi(matches[2])
+	lineNum, _ := strconv.Atoi(matches[3])
 	lineNum -= 1 // Error messages start at line 1 (as opposed to 0)
-	//colNum, _ := strconv.Atoi(matches[3])
+	//colNum, _ := strconv.Atoi(matches[4])
 	fromLines := lineNum - LinesForErrorContext
 	fromLines = inBetween(fromLines, 0, len(codeLines)-1)
 	toLines := lineNum + LinesForErrorContext

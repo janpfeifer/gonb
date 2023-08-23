@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/janpfeifer/gonb)](https://goreportcard.com/report/github.com/janpfeifer/gonb)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/janpfeifer/gonb/HEAD?labpath=examples%2Ftutorial.ipynb)
 [![TestStatus](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml/badge.svg)](https://github.com/janpfeifer/gonb/actions/workflows/go.yaml)
-![Coverage](https://img.shields.io/badge/Coverage-55.7%25-yellow)
+![Coverage](https://img.shields.io/badge/Coverage-58.8%25-yellow)
 
 
 ## For a quick start, see the [**tutorial**](examples/tutorial.ipynb)!

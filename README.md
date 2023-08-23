@@ -16,7 +16,7 @@
 * Rich content display: HTML, images, javascript, svg, videos, etc.
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
   It also supports arbitrary Go compilation flags to be used when executing the cells.
-* Faster execution than interpreted Go, used in other similar kernels -- the cost of imperceptible increased 
+* Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
   start up, since each cell is compiled.
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.

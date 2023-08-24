@@ -13,7 +13,7 @@
 ## Highlights:
 
 * Auto-complete and contextual help while coding.
-* Rich content display: HTML, images, javascript, svg, videos, etc.
+* Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 

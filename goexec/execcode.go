@@ -24,7 +24,10 @@ import (
 // commands (like `%%`, `%args`, `%reset`, or bash Lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
 	defer s.PostExecuteCell()
-	klog.V(2).Infof("ExecuteCell(): CellIsTest=%v", s.CellIsTest)
+	klog.V(2).Infof("ExecuteCell(): CellIsTest=%v, CellIsWasm=%v", s.CellIsTest, s.CellIsWasm)
+	if s.CellIsTest && s.CellIsWasm {
+		return errors.Errorf("Cannot execute test in a %%wasm cell. Please, choose either `%%wasm` or `%%test`.")
+	}
 
 	// Runs AutoTrack: makes sure redirects in go.mod and use clauses in go.work are tracked.
 	err := s.AutoTrack()
@@ -73,6 +76,7 @@ func (s *State) PostExecuteCell() {
 	s.CellIsTest = false
 	s.CellTests = nil
 	s.CellHasBenchmarks = false
+	s.CellIsWasm = false
 }
 
 // BinaryPath is the path to the generated binary file.

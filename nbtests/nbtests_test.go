@@ -404,3 +404,70 @@ func TestGoTest(t *testing.T) {
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
 }
+
+func TestBashScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "bash_script")
+	err := Check(f,
+		Sequence(
+
+			// Trivial "echo hello" .
+			Match(
+				OutputLine(1),
+				Separator,
+				"hello",
+				Separator,
+			),
+
+			// Trivial "echo hello" .
+			Match(
+				OutputLine(2),
+				Separator,
+				"/gonb_", // gonb_??? directory created in a temporary subdirectory, usually "/tmp".
+				Separator,
+			),
+
+			// GoNB environment variables:
+			Match(
+				OutputLine(3),
+				Separator,
+				"/examples/tests", // subdirectory where it is executed.
+				"/gonb_pipe_",     // pipe file within a tmp directory.
+				"/gonb_",          // within a temporary directory.
+				"/nbtests",        // root directory where jupyter (nbconvert) was executed.
+				Separator,
+			),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}
+
+func TestWasm(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "wasm")
+	err := Check(f,
+		Sequence(
+
+			// GONB_JUPYTER_ROOT, GONB_WASM_SUBDIR and GONB_WASM_URL
+			Match(
+				OutputLine(1),
+				Separator,
+				"/nbtests",
+				"/nbtests/.jupyter_files/",
+				"/files/.jupyter_files/",
+				Separator,
+			),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}

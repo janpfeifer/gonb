@@ -125,6 +125,7 @@ func (k *Kernel) StoppedChan() <-chan struct{} {
 
 // Stop the Kernel, indicating to all polling processes to quit.
 func (k *Kernel) Stop() {
+	klog.V(1).Infof("Kernel.Stop()")
 	k.Interrupted.Store(true) // Also mark as interrupted.
 	close(k.stop)
 	err := k.sockets.ShellSocket.Socket.Close()

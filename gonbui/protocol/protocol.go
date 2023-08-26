@@ -27,6 +27,28 @@ const (
 	// This value is visible for both, Go cells, and shell script (started with the `!` or
 	// `!*` special commands.
 	GONB_TMP_DIR_ENV = "GONB_TMP_DIR"
+
+	// GONB_JUPYTER_ROOT_ENV is the path to the Jupyter root directory, if GONB managed
+	// to read it (depends on the architecture).
+	//
+	// This can be used to construct URLs to static file contents (images, javascript, etc.)
+	// served by Jupyter: one can use `src="/file/...<path under GONB_JUPYTER_ROOT>..."`.
+	GONB_JUPYTER_ROOT_ENV = "GONB_JUPYTER_ROOT"
+
+	// GONB_WASM_SUBDIR_ENV is the temporary directory created in
+	// "${GONB_JUPYTER_ROOT}/.jupyter_files/<session_id>/wasm/"
+	// where the generated `.wasm` file is stored when using `%wasm`.
+	// It is set and the directory created when `%wasm` is first used.
+	// It can be used to store/serve other static files if needed.
+	// See GONB_WASM_URL_ENV.
+	GONB_WASM_SUBDIR_ENV = "GONB_WASM_SUBDIR"
+
+	// GONB_WASM_URL_ENV is the url used to fetch the generated `.wasm` file generated
+	// when using `%wasm`.
+	// It is set when `%wasm` is used.
+	// It can also be fetch other static files if needed.
+	// See GONB_WASM_SUBDIR_ENV.
+	GONB_WASM_URL_ENV = "GONB_WASM_URL"
 )
 
 type MIMEType string

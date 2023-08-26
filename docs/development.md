@@ -1,5 +1,18 @@
 # Development of GoNB
 
+## Jupyter Kernel Protocol
+
+Related documentation:
+
+* [Jupyter Kernal Architecture](https://www.romaglushko.com/blog/jupyter-kernel-architecture/) blog post by Roman Glushko
+* [Messaging Protocol](https://jupyter-client.readthedocs.io/en/latest/messaging.html)
+* [Jupyter Server](): backend of Jupyter applications, the one that talks to the kernels.
+
+Tips:
+
+* When running JupyterLab use `--Session.debug=true` to see all messages back-and-forth exchanged 
+  between JupyterLab and **GoNB** (the kernel). 
+
 ## Integration tests in `/nbtests`
 
 They require the following to run: `jupyter-lab`, `nbconvert`, `pandoc`.

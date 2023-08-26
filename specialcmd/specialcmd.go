@@ -10,6 +10,7 @@ package specialcmd
 import (
 	_ "embed"
 	"fmt"
+	"github.com/janpfeifer/gonb/gonbui"
 	"golang.org/x/exp/slices"
 	"os"
 
@@ -115,6 +116,8 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	}
 	parts := splitCmd(cmdStr)
 	switch parts[0] {
+
+	// Configures how cell will be executed.
 	case "%", "main", "args", "test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
@@ -124,6 +127,17 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			goExec.CellIsTest = true
 		}
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
+	case "wasm":
+		if len(parts) > 1 {
+			return errors.Errorf("`%%wasm` takes no extra parameters.")
+		}
+		goExec.CellIsWasm = true
+		var err error
+		err = goExec.MakeWasmSubdir()
+		if err != nil {
+			return errors.WithMessagef(err, "failed to prepare `%%wasm`")
+		}
+		goExec.WasmDivId = gonbui.UniqueID() // Create a unique ID for this cell.
 
 	case "env":
 		// Set environment variables.

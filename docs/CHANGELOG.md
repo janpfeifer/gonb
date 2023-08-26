@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## Next
+
+* Added bare-bones "%wasm": allows compiling cell to WASM and running that in the notebook. One
+  can write widgets like this. Experimental: there are some use cases are not 100% clear. See
+  "%help" for details on how this works.
+
 ## 0.8.0 -- Tests and Benchmarks, 2023/08/24
 
 * Added support for tests and benchmarks (`go test`) with `%test`, see #58

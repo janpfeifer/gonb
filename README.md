@@ -19,6 +19,7 @@
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
   start up, since each cell is compiled.
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
+* Compile and execute the Go code as WASM: allows one to do interactive widgets in notebooks. See `%wasm` (EXPERIMENTAL).
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Shell command executions with `!` -- handy at times, for instance to install packages.
 * Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.

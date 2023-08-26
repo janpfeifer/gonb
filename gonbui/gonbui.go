@@ -87,7 +87,11 @@ func DisplayHTML(html string) {
 	})
 }
 
-// DisplayMarkdown will display the given markdown content in the notebook, as the output of the cell being executed.
+// DisplayMarkdown will display the given markdown content in the notebook, as the output of
+// the cell being executed.
+// This also renders math formulas using latex, use `$x^2$` for formulas inlined in text, or
+// double "$" for formulas in a separate line -- e.g.:
+// `$$f(x) = \int_{-\infty}^{\infty} e^{-x^2} dx$$`.
 func DisplayMarkdown(markdown string) {
 	if !IsNotebook {
 		return
@@ -180,8 +184,8 @@ func DisplaySVG(svg string) {
 		return
 	}
 	// This should be the implementation, but the Jupyter doesn't handle well SVG data
-	// when the notebook is converted to HTML. So we try a simple work around of embedding
-	// the SVG as HTML.
+	// when the notebook is converted to HTML.
+	// So we try a simple workaround of embedding the SVG as HTML.
 	// (Question in Jupyter forum:
 	// https://discourse.jupyter.org/t/svg-either-not-loading-right-or-not-exporting-to-html/17824)
 	//sendData(&protocol.DisplayData{

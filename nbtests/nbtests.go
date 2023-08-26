@@ -155,6 +155,15 @@ func Match(search ...string) ExpectFn {
 	}
 }
 
+// Capture accepts the next line and stores its value in the `capturedLine` variable.
+// This can be used for later processing.
+func Capture(capturedLine *string) ExpectFn {
+	return func(line string, eof bool) (done bool, err error) {
+		*capturedLine = line
+		return true, nil
+	}
+}
+
 // Sequence returns an ExpectFn that checks whether each of the given expectations
 // are matched in order. They don't need to be consecutive, that is, there can
 // be unrelated lines in-between.

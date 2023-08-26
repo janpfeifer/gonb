@@ -12,6 +12,7 @@ package nbtests
 import (
 	"flag"
 	"fmt"
+	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
@@ -399,6 +400,91 @@ func TestGoTest(t *testing.T) {
 			Match("BenchmarkFibonacciB32"),
 			Match("PASS", Separator),
 		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}
+
+func TestBashScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "bash_script")
+	err := Check(f,
+		Sequence(
+
+			// Trivial "echo hello" .
+			Match(
+				OutputLine(1),
+				Separator,
+				"hello",
+				Separator,
+			),
+
+			// Trivial "echo hello" .
+			Match(
+				OutputLine(2),
+				Separator,
+				"/gonb_", // gonb_??? directory created in a temporary subdirectory, usually "/tmp".
+				Separator,
+			),
+
+			// GoNB environment variables:
+			Match(
+				OutputLine(3),
+				Separator,
+				"/examples/tests", // subdirectory where it is executed.
+				"/gonb_pipe_",     // pipe file within a tmp directory.
+				"/gonb_",          // within a temporary directory.
+				"/nbtests",        // root directory where jupyter (nbconvert) was executed.
+				Separator,
+			),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}
+
+func TestWasm(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "wasm")
+	var wasmPath string
+	err := Check(f,
+		Sequence(
+
+			// GONB_JUPYTER_ROOT, GONB_WASM_SUBDIR and GONB_WASM_URL
+			Match(
+				OutputLine(1),
+				Separator,
+				"/nbtests",
+				"/nbtests/jupyter_files/",
+				"/files/jupyter_files/",
+				Separator,
+			),
+
+			Match(OutputLine(2), Separator),
+			Capture(&wasmPath),
+
+			// Execution of dummy WASM: we don't expect nbconvert to run anything,
+			// but we expect the compiled .wasm file to be generated.
+			Match(
+				OutputLine(3),
+				Separator,
+				"",
+				Separator,
+			),
+		), *flagPrintNotebook)
+
+	fmt.Printf(". WASM files path: %s\n", wasmPath)
+	require.DirExists(t, wasmPath)
+	require.FileExists(t, path.Join(wasmPath, "wasm_exec.js"))
+	require.FileExists(t, path.Join(wasmPath, goexec.CompiledWasmName))
 
 	require.NoError(t, err)
 	require.NoError(t, f.Close())

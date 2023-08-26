@@ -6,6 +6,7 @@ go.work
 
 # Spurious test notebook files and temporary checkpoints.
 .ipynb_checkpoints/
+jupyter_files/
 Untitled*.ipynb
 experimental.ipynb
 

@@ -78,6 +78,10 @@ type State struct {
 	CellIsTest        bool
 	CellTests         []string // Tests defined in this cell. Only used if CellIsTest==true.
 	CellHasBenchmarks bool
+
+	// CellIsWasm indicates whether the current cell is to be compiled for WebAssembly (wasm).
+	CellIsWasm                  bool
+	WasmDir, WasmUrl, WasmDivId string
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.
@@ -159,7 +163,19 @@ with:
 		klog.Errorf(msg)
 	}
 
-	klog.Infof("Initialized goexec.State in %s", s.TempDir)
+	// Try to find out Jupyter root's directory.
+	jupyterRoot, err := JupyterRootDirectory()
+	if err != nil {
+		klog.Errorf("Could not find Jupyter root directory, %%wasm will not work: %+v", err)
+	} else {
+		err = os.Setenv(protocol.GONB_JUPYTER_ROOT_ENV, jupyterRoot)
+		if err != nil {
+			klog.Errorf("Failed to set environment variable %q: %v", protocol.GONB_JUPYTER_ROOT_ENV, err)
+			err = nil
+		}
+	}
+
+	klog.Infof("GoNB: jupyter root in %q, tmp Go code in %q", jupyterRoot, s.TempDir)
 	return s, nil
 }
 

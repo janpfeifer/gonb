@@ -80,7 +80,8 @@ type State struct {
 	CellHasBenchmarks bool
 
 	// CellIsWasm indicates whether the current cell is to be compiled for WebAssembly (wasm).
-	CellIsWasm bool
+	CellIsWasm                  bool
+	WasmDir, WasmUrl, WasmDivId string
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.

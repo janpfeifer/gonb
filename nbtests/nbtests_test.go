@@ -12,6 +12,7 @@ package nbtests
 import (
 	"flag"
 	"fmt"
+	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
@@ -453,6 +454,7 @@ func TestWasm(t *testing.T) {
 		return
 	}
 	f := executeNotebook(t, "wasm")
+	var wasmPath string
 	err := Check(f,
 		Sequence(
 
@@ -461,11 +463,28 @@ func TestWasm(t *testing.T) {
 				OutputLine(1),
 				Separator,
 				"/nbtests",
-				"/nbtests/.jupyter_files/",
-				"/files/.jupyter_files/",
+				"/nbtests/jupyter_files/",
+				"/files/jupyter_files/",
+				Separator,
+			),
+
+			Match(OutputLine(2), Separator),
+			Capture(&wasmPath),
+
+			// Execution of dummy WASM: we don't expect nbconvert to run anything,
+			// but we expect the compiled .wasm file to be generated.
+			Match(
+				OutputLine(3),
+				Separator,
+				"",
 				Separator,
 			),
 		), *flagPrintNotebook)
+
+	fmt.Printf(". WASM files path: %s\n", wasmPath)
+	require.DirExists(t, wasmPath)
+	require.FileExists(t, path.Join(wasmPath, "wasm_exec.js"))
+	require.FileExists(t, path.Join(wasmPath, goexec.CompiledWasmName))
 
 	require.NoError(t, err)
 	require.NoError(t, f.Close())

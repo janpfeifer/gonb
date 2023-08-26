@@ -1,11 +1,18 @@
 package goexec
 
 import (
+	"bytes"
+	"fmt"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
+	"strings"
+	"text/template"
 )
 
 // This file handles the compilation and execution of wasm.
@@ -14,53 +21,68 @@ const (
 	JupyterSessionNameEnv = "JPY_SESSION_NAME"
 	JupyterPidEnv         = "JPY_PARENT_PID"
 
-	JupyterFilesSubdir = ".jupyter_files"
+	JupyterFilesSubdir = "jupyter_files"
+	CompiledWasmName   = "gonb_cell.wasm"
 )
 
-// Cached values for current kernel's WASM subdirectory and URL.
-var wasmSubdir, wasmUrl string
-
 // MakeWasmSubdir creates a subdirectory named `.wasm/<notebook name>/` in the
-// same directory as the notebook.
+// same directory as the notebook, if it is not yet created.
 //
 // It also copies current Go compiler `wasm_exec.js` file to this directory, if
 // it's not there already.
 //
-// It returns the full path to the subdir and the url to be used to refer to these
-// files in the notebook HTML.
-func (s *State) MakeWasmSubdir() (subdir, subdirUrl string, err error) {
+// Path and URL to access it are stored in s.WasmDir and s.WasmUrl.
+func (s *State) MakeWasmSubdir() (err error) {
 	// Check if value already cached.
-	if wasmSubdir != "" && wasmUrl != "" {
-		return wasmSubdir, wasmUrl, nil
+	if s.WasmDir != "" && s.WasmUrl != "" {
+		return nil
 	}
 
-	// Set and create `subdir`.
+	// Set and create `WasmDir`.
 	var jupyterRoot string
 	jupyterRoot, err = JupyterRootDirectory()
 	if err != nil {
 		return
 	}
-	subdir = path.Join(jupyterRoot, JupyterFilesSubdir, s.UniqueID)
-	err = os.MkdirAll(subdir, 0777)
+	s.WasmDir = path.Join(jupyterRoot, JupyterFilesSubdir, s.UniqueID)
+	err = os.MkdirAll(s.WasmDir, 0777)
 	if err != nil {
-		err = errors.Wrapf(err, "failed to created subdirectory %q required to install WASM files", subdir)
+		err = errors.Wrapf(err, "failed to created subdirectory %q required to install WASM files", s.WasmDir)
 		return
 	}
 
-	// Set `subdirUrl`.
-	subdirUrl = path.Join("/files", JupyterFilesSubdir, s.UniqueID)
+	// Set `WasmUrl`.
+	s.WasmUrl = path.Join("/files", JupyterFilesSubdir, s.UniqueID)
 
 	// Copy over `wasm_exec.js` if needed.
-	//if _, err := os.Stat()
+	var wasmExecSrc string
+	wasmExecSrc, err = GoRoot()
+	if err != nil {
+		err = errors.WithMessage(err, "failed to find GOROOT, needed to copy wasm_exec.js for WASM programs")
+		return
+	}
+	klog.Infof("GOROOT=%q", goRoot)
+	wasmExecSrc = path.Join(wasmExecSrc, "misc", "wasm", "wasm_exec.js")
+	wasmExecDst := path.Join(s.WasmDir, "wasm_exec.js")
 
-	// Cache subdir and subdirUrl and set environment variables before returning.
-	wasmSubdir = subdir
-	wasmUrl = subdirUrl
-	if err = os.Setenv(protocol.GONB_WASM_SUBDIR_ENV, subdir); err != nil {
+	var data []byte
+	data, err = os.ReadFile(wasmExecSrc)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to read '$GOROOT/misc/wasm/wasm_exec.js'")
+		return
+	}
+	err = os.WriteFile(wasmExecDst, data, 0775)
+	if err != nil {
+		err = errors.Wrapf(err, "failed to write 'wasm_exec.js' to %q", wasmExecDst)
+		return
+	}
+
+	// Set the environment variables with the directory/url.
+	if err = os.Setenv(protocol.GONB_WASM_SUBDIR_ENV, s.WasmDir); err != nil {
 		err = errors.Wrapf(err, "failed to set environment variable %q", protocol.GONB_WASM_SUBDIR_ENV)
 		return
 	}
-	if err = os.Setenv(protocol.GONB_WASM_URL_ENV, subdirUrl); err != nil {
+	if err = os.Setenv(protocol.GONB_WASM_URL_ENV, s.WasmUrl); err != nil {
 		err = errors.Wrapf(err, "failed to set environment variable %q", protocol.GONB_WASM_URL_ENV)
 		return
 	}
@@ -102,4 +124,77 @@ func JupyterRootDirectory() (string, error) {
 
 	jupyterRootDirectory = cwd
 	return jupyterRootDirectory, nil
+}
+
+var goRoot string
+
+func GoRoot() (string, error) {
+	if goRoot != "" {
+		return goRoot, nil
+	}
+
+	cmd := exec.Command("go", "env", "GOROOT")
+	klog.Infof("Executing %q", cmd)
+	cmd.Stderr = os.Stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to find GOROOT")
+	}
+	goRoot = string(output)
+	goRoot = strings.TrimSuffix(goRoot, "\n")
+	return goRoot, nil
+}
+
+var runWasmTemplate = template.Must(template.New("wasm_exec").Parse(
+	`<script src="{{.WasmExecJsUrl}}"></script>
+<script>
+var go_{{.Id}} = new Go();
+ 
+WebAssembly.instantiateStreaming(fetch("{{.CompiledWasmUrl}}"), go_{{.Id}}.importObject).
+	then((result) => { go_{{.Id}}.run(result.instance); });
+</script>
+<div id="{{.WasmDivId}}"></div>
+`))
+
+// ExecuteWasm expects `wasm_exec.js` and CompiledWasmName to be in the directory
+// pointed to `s.WasmDir` already.
+func (s *State) ExecuteWasm(msg kernel.Message) error {
+	data := struct {
+		Id, WasmExecJsUrl, CompiledWasmUrl, WasmDivId string
+	}{
+		Id:              s.UniqueID,
+		WasmExecJsUrl:   path.Join(s.WasmUrl, "wasm_exec.js"),
+		CompiledWasmUrl: path.Join(s.WasmUrl, CompiledWasmName),
+		WasmDivId:       s.WasmDivId,
+	}
+	var buf bytes.Buffer
+	err := runWasmTemplate.Execute(&buf, &data)
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate javascript to bootstrap WASM")
+	}
+	js := buf.String()
+	klog.V(2).Infof("WASM bootstrap code served:\n%s\n", js)
+	return kernel.PublishDisplayDataWithHTML(msg, js)
+}
+
+// DeclareStringConst creates a const definition in `decls` for a string value.
+func DeclareStringConst(decls *Declarations, name, value string) {
+	decls.Constants[name] = &Constant{
+		Cursor:          NoCursor,
+		CellLines:       CellLines{},
+		Key:             name,
+		TypeDefinition:  "",
+		ValueDefinition: fmt.Sprintf("%q", value),
+		CursorInKey:     false,
+		CursorInType:    false,
+		CursorInValue:   false,
+		Next:            nil,
+		Prev:            nil,
+	}
+}
+
+func (s *State) ExportWasmConstants(decls *Declarations) {
+	DeclareStringConst(decls, protocol.GONB_WASM_SUBDIR_ENV, s.WasmDir)
+	DeclareStringConst(decls, protocol.GONB_WASM_URL_ENV, s.WasmUrl)
+	DeclareStringConst(decls, "GONB_WASM_DIV_ID", s.WasmDivId)
 }

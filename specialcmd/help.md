@@ -117,6 +117,29 @@ scripts (`!` and `!*`) and for the Go cells:
   to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
   This is used by the `**GoNB**ui`` functions described above, and doesn't need to be accessed directly.
 
+### Writing for WASM (WebAssembly)
+
+**GoNB** can also compile to WASM and run in the notebook. This is experimental, and likely to change
+(feedback is very welcome), and can be used to write interactive widgets in Go, in the notebook.
+
+When a cell with `%wasm` is executed, a temporary directory is created under the Jupyter root directory
+called `jupyter_files/<kernel unique id>/` and the cell is compiled to a wasm file and put in that 
+directory.
+
+Then **GONB** outputs the javascript needed to run the compiled wam.
+
+The following environment variables are set:
+
+- `GONB_WASM_SUBDIR`: the directory where the wasm files are put.
+- `GONB_WASM_URL`: the URL (just a path) in which Jupyter serves those files (including the .wasm).
+  One can put more static files there.
+
+In the Go code, the following string constants are created, and can be used in the Go code:
+
+- `GONB_WASM_SUBDIR`, `GONB_WASM_URL`: same as above.
+- `GONB_WASM_DIV_ID`: When a `%wasm` cell is executed, an empty `<div id="$GONB_WASM_DIV_ID"></div>`
+  is created, where the Wasm code can dynamically create content.
+
 ### Writing Tests and Benchmarks
 
 If a cell includes the `%test` command (anywhere in cell), it is compiled with `go test`

@@ -6,6 +6,7 @@ import (
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	"io"
 	"k8s.io/klog/v2"
 	"os"
@@ -41,7 +42,6 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	if err != nil {
 		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
 	}
-
 	klog.V(2).Infof("ExecuteCell: after s.parseLinesAndComposeMain()")
 
 	// Exec `goimports` (or the code that implements it) -- it updates `updatedDecls` with
@@ -77,6 +77,7 @@ func (s *State) PostExecuteCell() {
 	s.CellTests = nil
 	s.CellHasBenchmarks = false
 	s.CellIsWasm = false
+	s.WasmDivId = ""
 }
 
 // BinaryPath is the path to the generated binary file.
@@ -118,6 +119,9 @@ func (s *State) AlternativeDefinitionsPath() string {
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
+	if s.CellIsWasm {
+		return s.ExecuteWasm(msg)
+	}
 	args := s.Args
 	if len(args) == 0 && s.CellIsTest {
 		args = s.DefaultCellTestArgs()
@@ -135,12 +139,26 @@ func (s *State) Compile(msg kernel.Message, fileToCellIdAndLines []CellIdAndLine
 	var args []string
 	if s.CellIsTest {
 		args = []string{"test", "-c", "-o", s.BinaryPath()}
+	} else if s.CellIsWasm {
+		args = []string{"build", "-o", path.Join(s.WasmDir, CompiledWasmName)}
 	} else {
 		args = []string{"build", "-o", s.BinaryPath()}
 	}
 	args = append(args, s.GoBuildFlags...)
 	cmd := exec.Command("go", args...)
 	cmd.Dir = s.TempDir
+	if s.CellIsWasm {
+		// Set GOARCH and GOOS in cmd.Env.
+		cmd.Env = append(
+			slices.DeleteFunc(cmd.Environ(), func(s string) bool {
+				return strings.HasPrefix(s, "GOARCH=") ||
+					strings.HasPrefix(s, "GOOS=")
+			}),
+			"GOARCH=wasm",
+			"GOOS=js",
+		)
+	}
+
 	var output []byte
 	klog.V(2).Infof("Executing %s", cmd)
 	output, err := cmd.CombinedOutput()

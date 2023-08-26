@@ -441,6 +441,9 @@ func (s *State) parseLinesAndComposeMain(
 	updatedDecls = s.Definitions.Copy()
 	updatedDecls.ClearCursor()
 	updatedDecls.MergeFrom(newDecls)
+	if s.CellIsWasm {
+		s.ExportWasmConstants(updatedDecls)
+	}
 
 	// Render declarations to main.go.
 	cursorInFile, fileToCellIdAndLine, err = s.createCodeFileFromDecls(updatedDecls, mainDecl)

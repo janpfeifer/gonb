@@ -9,7 +9,7 @@ github.com/janpfeifer/gonb/main.go:170:					SetUpKlog					100.0%
 github.com/janpfeifer/gonb/cache/cache.go:82:				New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go:96:				AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go:103:				MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go:113:				NewInTmp					68.2%
+github.com/janpfeifer/gonb/cache/cache.go:113:				NewInTmp					72.7%
 github.com/janpfeifer/gonb/cache/cache.go:151:				MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go:161:				NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go:171:				MustNewHidden					100.0%
@@ -131,7 +131,7 @@ github.com/janpfeifer/gonb/goexec/tracking.go:73:			*State.lockedTrack				54.8%
 github.com/janpfeifer/gonb/goexec/tracking.go:183:			*State.Untrack					85.7%
 github.com/janpfeifer/gonb/goexec/tracking.go:207:			*State.lockedUntrackEntry			66.7%
 github.com/janpfeifer/gonb/goexec/tracking.go:234:			*State.ListTracked				80.0%
-github.com/janpfeifer/gonb/goexec/tracking.go:244:			isGoRelated					87.5%
+github.com/janpfeifer/gonb/goexec/tracking.go:244:			isGoRelated					100.0%
 github.com/janpfeifer/gonb/goexec/tracking.go:263:			*State.EnumerateUpdatedFiles			0.0%
 github.com/janpfeifer/gonb/goexec/tracking.go:280:			*State.AutoTrack				83.3%
 github.com/janpfeifer/gonb/goexec/tracking.go:291:			*State.autoTrackGoMod				47.4%
@@ -200,10 +200,10 @@ github.com/janpfeifer/gonb/gonbui/gonbui.go:182:			DisplaySVG					0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go:200:			EmbedImageAsPNGSrc				0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go:219:			RequestInput					0.0%
 github.com/janpfeifer/gonb/gonbui/protocol/protocol.go:95:		init						100.0%
-github.com/janpfeifer/gonb/kernel/display.go:18:			PollGonbPipe					36.8%
+github.com/janpfeifer/gonb/kernel/display.go:18:			PollGonbPipe					52.6%
 github.com/janpfeifer/gonb/kernel/display.go:46:			reportCellError					0.0%
 github.com/janpfeifer/gonb/kernel/display.go:55:			logDisplayData					0.0%
-github.com/janpfeifer/gonb/kernel/display.go:73:			processDisplayData				0.0%
+github.com/janpfeifer/gonb/kernel/display.go:73:			processDisplayData				57.9%
 github.com/janpfeifer/gonb/kernel/display.go:108:			processInputRequest				0.0%
 github.com/janpfeifer/gonb/kernel/encoding.go:15:			JupyterCursorPosToBytePos			0.0%
 github.com/janpfeifer/gonb/kernel/encoding.go:30:			JupyterToLinesAndCursor				0.0%
@@ -277,4 +277,4 @@ github.com/janpfeifer/gonb/specialcmd/specialcmd.go:280:		splitCmd					97.0%
 github.com/janpfeifer/gonb/specialcmd/track.go:13:			execTrack					27.3%
 github.com/janpfeifer/gonb/specialcmd/track.go:35:			execUntrack					54.5%
 github.com/janpfeifer/gonb/specialcmd/track.go:56:			showTrackedList					91.7%
-total									(statements)					58.5%
+total									(statements)					59.1%

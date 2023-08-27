@@ -490,3 +490,52 @@ func TestWasm(t *testing.T) {
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
 }
+
+// TestGonbui tests that `Gonbui` library is able to reach the kernel.
+func TestGonbui(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+
+	require.NoError(t, os.Setenv("GONB_GIT_ROOT", rootDir))
+	f := executeNotebook(t, "gonbui")
+	err := Check(f,
+		Sequence(
+			// Check GONB_GIT_ROOT was recognized.
+			Match(
+				OutputLine(1),
+				Separator,
+				"ok",
+				Separator,
+			),
+
+			// Check replace rule was created.
+			Match(
+				OutputLine(2),
+				Separator,
+				"Added replace rule for module",
+				Separator,
+			),
+
+			// Check DisplayHTML.
+			Match(
+				OutputLine(3),
+				Separator,
+				"html displayed",
+				Separator,
+			),
+
+			// Check DisplayMarkdown.
+			Match(
+				OutputLine(4),
+				Separator,
+				"markdown displayed",
+				Separator,
+			),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+}

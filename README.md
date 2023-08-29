@@ -133,6 +133,9 @@ details.
   * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
     There are many other special commands, see `%help` for the complete list, 
     or check out the [**tutorial**](examples/tutorial.ipynb).
+* Go error handling is verbose and annoying for things interactive as a notebook. Can we do something ?
+  * Yes! Error handling for small scripts in a notebook can get in the way at times. There are various
+    solutions to this, one simple one is to use [this simple package ("must")](https://github.com/janpfeifer/must)
 
 # TODOs
 

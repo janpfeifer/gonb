@@ -105,6 +105,9 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 // parseFromGoCode reads the Go code written in `s.TempDir` and parses its declarations.
 // See object Declarations.
 //
+// Only the files "main.go" or "main_test.go" are parsed. If the user created separate Go files
+// in `s.TempDir`, those are left as is.
+//
 // This is called by parseLinesAndComposeMain, after the Go code is written.
 //
 // Parameters:
@@ -117,6 +120,7 @@ func (pi *parseInfo) extractContentOfNode(node ast.Node) string {
 //     is used when reporting back errors with a file number. Values of -1 (NoCursorLine) are injected Lines
 //     that have no correspondent value in the cell code. It can be nil if there is no information mapping
 //     file Lines to cell Lines.
+//   - `noPkg`: when parsing contents directly from the user, no `package ` line
 func (s *State) parseFromGoCode(msg kernel.Message,
 	cellId int, cursor Cursor, fileToCellIdAndLine []CellIdAndLine) (decls *Declarations, err error) {
 	decls = NewDeclarations()
@@ -128,10 +132,12 @@ func (s *State) parseFromGoCode(msg kernel.Message,
 		fileToCellIdAndLine: fileToCellIdAndLine,
 	}
 	var packages map[string]*ast.Package
-
+	// Parse "main.go" or "main_test.go".
 	packages, err = parser.ParseDir(pi.fileSet, s.TempDir, func(info fs.FileInfo) bool {
-		klog.Infof("parser.ParseDir().filter(%q)?", info.Name())
-		return true
+		name := info.Name()
+		keep := name == "main.go" || name == "main_test.go"
+		klog.V(2).Infof("parser.ParseDir().filter(%q) -> keep=%v", name, keep)
+		return keep
 	}, parser.SkipObjectResolution) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
@@ -398,14 +404,14 @@ func (s *State) parseLinesAndComposeMain(
 	if err = s.RemoveCode(); err != nil {
 		return
 	}
-	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), lines, skipLines, cursorInCell)
+	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), cellId, lines, skipLines, cursorInCell)
 	if err != nil {
 		return
 	}
 	fileToCellIdAndLine = MakeFileToCellIdAndLine(cellId, fileToCellLine)
 
 	data, _ := os.ReadFile(s.CodePath())
-	klog.Infof("File: %s\n%s", s.CodePath(), string(data))
+	klog.V(2).Infof("File: %s\n%s", s.CodePath(), string(data))
 
 	// Parse declarations in created `main.go` file.
 	var newDecls *Declarations

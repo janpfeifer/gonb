@@ -290,11 +290,12 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLi
 // It doesn't yet include previous declarations.
 //
 // Among the things it handles:
-// * Adding an initial `package main` line.
-// * Handle the special `%%` line, a shortcut to create a `func main()`.
+//   - Adding an initial `package main` line.
+//   - Handle the special `%%` line, a shortcut to create a `func main()`.
 //
 // Parameters:
 //   - filePath is the path where to write the Go code.
+//   - cellId is the id of the cell being executed.
 //   - Lines are the Lines in the cell.
 //   - skipLines are Lines in the cell that are not Go code: Lines starting with "!" or "%" special characters.
 //   - cursorInCell optionally specifies the cursor position in the cell. It can be set to NoCursor.
@@ -303,7 +304,7 @@ func (c *Constant) Render(w *WriterWithCursor, cursor *Cursor, fileToCellIdAndLi
 //   - cursorInFile: the equivalent cursor position in the final file, considering the given cursorInCell.
 //   - fileToCellLines: a map from the file Lines to original cell Lines. It is set to NoCursorLine (-1) for Lines
 //     that don't have an equivalent in the cell (e.g: the `package main` line that inserted here).
-func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines Set[int], cursorInCell Cursor) (
+func (s *State) createGoFileFromLines(filePath string, cellId int, lines []string, skipLines Set[int], cursorInCell Cursor) (
 	cursorInFile Cursor, fileToCellLines []int, err error) {
 	cursorInFile = NoCursor
 
@@ -329,6 +330,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 
 	w.Write("package main\n\n")
 	var createdFuncMain bool
+	isFirstLine := true
 	for ii, line := range lines {
 		if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
 			// Write preamble of func main() and associate to the "%%" line:
@@ -336,6 +338,7 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			fileToCellLines[w.Line+1] = ii
 			w.Write("func main() {\n\tflag.Parse()\n")
 			createdFuncMain = true
+			isFirstLine = false
 			continue
 		}
 		if _, found := skipLines[ii]; found {
@@ -348,9 +351,15 @@ func (s *State) createGoFileFromLines(filePath string, lines []string, skipLines
 			// Use current line for cursor, but add column.
 			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})
 		}
+		if isFirstLine && strings.HasPrefix(line, "package") {
+			err = errors.Errorf("Please don't set a `package` in any of your cells: GoNB will set a `package main` automatically for you when compiling your cells. Cell #%d Line %d: %q",
+				cellId, ii+1, line)
+			return
+		}
 		fileToCellLines[w.Line] = ii // Registers line mapping.
 		w.Write(line)
 		w.Write("\n")
+		isFirstLine = false
 	}
 	if createdFuncMain {
 		w.Write("\n}\n")

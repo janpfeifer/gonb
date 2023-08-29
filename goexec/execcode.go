@@ -36,11 +36,12 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 		return err
 	}
 
-	klog.Infof("ExecuteCell: after AutoTrack")
+	klog.V(2).Infof("ExecuteCell: after AutoTrack")
 
 	updatedDecls, mainDecl, _, fileToCellIdAndLine, err := s.parseLinesAndComposeMain(msg, cellId, lines, skipLines, NoCursor)
 	if err != nil {
-		return errors.WithMessagef(err, "in goexec.ExecuteCell()")
+		klog.Infof("goexec.ExecuteCell() failed to parse the cell: %+v", err)
+		return err
 	}
 	klog.V(2).Infof("ExecuteCell: after s.parseLinesAndComposeMain()")
 
@@ -51,15 +52,17 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	klog.V(2).Infof("ExecuteCell: after s.GoImports()")
 
 	if err != nil {
-		return errors.WithMessagef(err, "goimports failed")
+		klog.Infof("goexec.ExecuteCell() failed to run `go imports` and `go get`: %+v", err)
+		return err
 	}
 
 	// And then compile it.
 	if err := s.Compile(msg, fileToCellIdAndLine); err != nil {
+		klog.Infof("goexec.ExecuteCell() failed to compile cell: %+v", err)
 		return err
 	}
 
-	klog.Infof("ExecuteCell: after s.Compile()")
+	klog.V(2).Infof("ExecuteCell: after s.Compile()")
 
 	// Compilation successful: save merged declarations into current State.
 	s.Definitions = updatedDecls
@@ -126,9 +129,13 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 	if len(args) == 0 && s.CellIsTest {
 		args = s.DefaultCellTestArgs()
 	}
-	return kernel.PipeExecToJupyter(msg, s.BinaryPath(), args...).
+	err := kernel.PipeExecToJupyter(msg, s.BinaryPath(), args...).
 		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
 		Exec()
+	if err != nil {
+		klog.Infof("goexec.Execute(): failed to run the compiled cell: %+v", msg)
+	}
+	return err
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.

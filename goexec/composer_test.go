@@ -3,6 +3,7 @@ package goexec
 import (
 	"fmt"
 	. "github.com/janpfeifer/gonb/common"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
@@ -31,7 +32,7 @@ func TestCreateGoFileFromLines(t *testing.T) {
 
 	cursorInCell := Cursor{38, 27} // "func (k *Kg) Gain(lasagna K_g) {"
 	cursorLine := cellLines[cursorInCell.Line]
-	cursorInFile, fileToCellLines, err := s.createGoFileFromLines(s.CodePath(), cellLines, skipLines, cursorInCell)
+	cursorInFile, fileToCellLines, err := s.createGoFileFromLines(s.CodePath(), 1, cellLines, skipLines, cursorInCell)
 	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.CodePath())
 
 	// Read generated contents:
@@ -62,4 +63,12 @@ func TestCreateGoFileFromLines(t *testing.T) {
 		}
 		require.Equalf(t, cellLines[cellLineIdx], newLine, "Line mapping look wrong: file line %d --> cell line %d", ii, cellLineIdx)
 	}
+
+	// Test check for invalid "package xxx" in cell.
+	cellLines = strings.Split("package xxx\n%%\nfmt.Println(\"Hello\")\n", "\n")
+	skipLines = MakeSet[int]()
+	cursorInCell = NoCursor
+	_, _, err = s.createGoFileFromLines(s.CodePath(), 1, cellLines, skipLines, cursorInCell)
+	assert.Errorf(t, err, "Expected error for unnecessary setting of package.")
+	assert.Contains(t, err.Error(), "Please don't set a `package`")
 }

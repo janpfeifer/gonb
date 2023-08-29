@@ -40,7 +40,7 @@ func createTestGoMain(t *testing.T, s *State, cellContent string) (fileToCellLin
 	}
 
 	var err error
-	_, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), lines, skipLines, NoCursor)
+	_, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), 1, lines, skipLines, NoCursor)
 	require.NoErrorf(t, err, "Failed createGoFileFromLines(%q)", s.CodePath())
 	return
 }

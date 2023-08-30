@@ -78,8 +78,8 @@ func (s *State) MakeWasmSubdir() (err error) {
 	}
 
 	// Set the environment variables with the directory/url.
-	if err = os.Setenv(protocol.GONB_WASM_SUBDIR_ENV, s.WasmDir); err != nil {
-		err = errors.Wrapf(err, "failed to set environment variable %q", protocol.GONB_WASM_SUBDIR_ENV)
+	if err = os.Setenv(protocol.GONB_WASM_DIR_ENV, s.WasmDir); err != nil {
+		err = errors.Wrapf(err, "failed to set environment variable %q", protocol.GONB_WASM_DIR_ENV)
 		return
 	}
 	if err = os.Setenv(protocol.GONB_WASM_URL_ENV, s.WasmUrl); err != nil {
@@ -193,8 +193,28 @@ func DeclareStringConst(decls *Declarations, name, value string) {
 	}
 }
 
+// DeclareVariable creates a variable definition in `decls`.
+// `value` is copied verbatim, so any type of variable goes.
+func DeclareVariable(decls *Declarations, name, value string) {
+	decls.Variables[name] = &Variable{
+		Cursor:          NoCursor,
+		CellLines:       CellLines{},
+		Key:             name,
+		Name:            name,
+		ValueDefinition: value,
+	}
+}
+
 func (s *State) ExportWasmConstants(decls *Declarations) {
-	DeclareStringConst(decls, protocol.GONB_WASM_SUBDIR_ENV, s.WasmDir)
-	DeclareStringConst(decls, protocol.GONB_WASM_URL_ENV, s.WasmUrl)
-	DeclareStringConst(decls, "GONB_WASM_DIV_ID", s.WasmDivId)
+	DeclareStringConst(decls, "GonbWasmDir", s.WasmDir)
+	DeclareStringConst(decls, "GonbWasmUrl", s.WasmUrl)
+	DeclareStringConst(decls, "GonbWasmDivId", s.WasmDivId)
+	DeclareVariable(decls, "GonbWasmArgs", fmt.Sprintf("%#v", s.Args))
+}
+
+func (s *State) RemoveWasmConstants(decls *Declarations) {
+	delete(decls.Constants, "GonbWasmDir")
+	delete(decls.Constants, "GonbWasmUrl")
+	delete(decls.Constants, "GonbWasmDivId")
+	delete(decls.Variables, "GonbWasmArgs")
 }

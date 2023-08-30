@@ -35,19 +35,24 @@ const (
 	// served by Jupyter: one can use `src="/file/...<path under GONB_JUPYTER_ROOT>..."`.
 	GONB_JUPYTER_ROOT_ENV = "GONB_JUPYTER_ROOT"
 
-	// GONB_WASM_SUBDIR_ENV is the temporary directory created in
-	// "${GONB_JUPYTER_ROOT}/.jupyter_files/<session_id>/wasm/"
+	// GONB_WASM_DIR_ENV is the temporary directory created in "${GONB_JUPYTER_ROOT}/.jupyter_files/<session_id>/wasm/"
 	// where the generated `.wasm` file is stored when using `%wasm`.
-	// It is set and the directory created when `%wasm` is first used.
+	// It is set/updated everytime `%wasm` is first used.
 	// It can be used to store/serve other static files if needed.
 	// See GONB_WASM_URL_ENV.
-	GONB_WASM_SUBDIR_ENV = "GONB_WASM_SUBDIR"
+	//
+	// Notice that the Wasm program gets this value from a global variable automatically introduced in the Go code,
+	// see `%help`.
+	GONB_WASM_DIR_ENV = "GONB_WASM_DIR"
 
-	// GONB_WASM_URL_ENV is the url used to fetch the generated `.wasm` file generated
-	// when using `%wasm`.
-	// It is set when `%wasm` is used.
+	// GONB_WASM_URL_ENV is the name of the environment variable defined in the `%wasm` environment
+	// that holds the url used to fetch the generated `.wasm` file.
+	// It is only set when `%wasm` is used.
 	// It can also be fetch other static files if needed.
-	// See GONB_WASM_SUBDIR_ENV.
+	// See GONB_WASM_DIR_ENV.
+	//
+	// Notice that the Wasm program gets this value from a global variable automatically introduced in the Go code,
+	// see `%help`.
 	GONB_WASM_URL_ENV = "GONB_WASM_URL"
 )
 

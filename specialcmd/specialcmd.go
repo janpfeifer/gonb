@@ -13,6 +13,7 @@ import (
 	"github.com/janpfeifer/gonb/gonbui"
 	"golang.org/x/exp/slices"
 	"os"
+	"strings"
 
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec"
@@ -141,8 +142,16 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 
 	case "env":
 		// Set environment variables.
+		if len(parts) == 2 {
+			// Adjust parts if one uses `%env KEY=VALUE` format instead.
+			if eqPos := strings.Index(parts[1], "="); eqPos > 1 {
+				key := parts[1][:eqPos]
+				value := parts[1][eqPos+1:]
+				parts = []string{parts[0], key, value}
+			}
+		}
 		if len(parts) != 3 {
-			return errors.Errorf("`%%env <VAR_NAME> <value>`: it takes 2 arguments, the variable name and it's content, but %d were given", len(parts)-1)
+			return errors.Errorf("`%%env <VAR_NAME> <value>` (or `%%env <VAR_NAME>=<value>`): it takes 2 arguments, the variable name and it's content, but %d were given", len(parts)-1)
 		}
 		err := os.Setenv(parts[1], parts[2])
 		if err != nil {

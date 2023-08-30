@@ -14,7 +14,7 @@
 
 ## 0.7.8 -- 2023/08/17
 
-* Added support for --raw_errros, where errors are not reported using HTML. Useful for
+* Added support for --raw_errors, where errors are not reported using HTML. Useful for
   running tests, for instance with `nbmake` (see #48, by @bagel897).
 * Added functional/integration tests by instrumenting `nbconvert` (bringing coverage from ~25% to ~55%).
 * Added `run_coverage.sh` to include integration tests in coverage report.

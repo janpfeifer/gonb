@@ -3,9 +3,13 @@
 ## Next
 
 * Added bare-bones "%wasm": allows compiling cell to WASM and running that in the notebook. One
-  can write widgets like this. Experimental: there are some use cases are not 100% clear. See
+  can write widgets like this. **Experimental**: there are some use cases are not 100% clear. See
   "%help" for details on how this works.
+  * Added also `github.com/janpfeifer/gonb/gonbui/wasm` library with some basic helpers to write
+    WASM widgets.
+  * Added `gonb/examples/wasm_demo.ipynb` with a couple of examples of Wasm.
 * Improved logging of errors; pre-checking for duplicate `package`, with improved error message.
+* Added support for `%env VAR=VALUE` syntax as well (like ipython uses).
 
 ## 0.8.0 -- Tests and Benchmarks, 2023/08/24
 

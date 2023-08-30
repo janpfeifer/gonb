@@ -75,6 +75,11 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 // This includes s.CellIsTest and s.Args.
 func (s *State) PostExecuteCell() {
 	klog.V(2).Infof("PostExecuteCell(): CellIsTest=%v", s.CellIsTest)
+	if s.CellIsWasm {
+		// Remove declarations exported for running in WASM.
+		s.RemoveWasmConstants(s.Definitions)
+	}
+
 	s.Args = nil
 	s.CellIsTest = false
 	s.CellTests = nil

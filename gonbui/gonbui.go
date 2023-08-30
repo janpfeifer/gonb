@@ -230,3 +230,13 @@ func RequestInput(prompt string, password bool) {
 		},
 	})
 }
+
+// ScriptJavascript executes the given Javascript script in the Notebook.
+func ScriptJavascript(js string) {
+	if !IsNotebook {
+		return
+	}
+	sendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
+	})
+}

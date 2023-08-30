@@ -448,6 +448,12 @@ func TestBashScript(t *testing.T) {
 	require.NoError(t, os.Remove(f.Name()))
 }
 
+// TestWasm checks that the environment variables are created.
+//
+// Unfortunately, `nbconvert` doesn't work with WASM, so it won't actually verify the wasm part is working.
+//
+// It does check that the cell is compiled to a `.wasm` file, as well as `wasm_exec.js` is copied from the
+// Go directory.
 func TestWasm(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")

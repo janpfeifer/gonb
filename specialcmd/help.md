@@ -28,6 +28,7 @@ fmt.Printf(`Hello world!\n`)
 
 ```
 
+
 ### Init Functions -- `func init()`
 
 Since there is always only one definition per function name, it's not possible for
@@ -35,6 +36,7 @@ each cell to have its own init() function.
 Instead, **GoNB** converts any function named `init_something()` to `init()` before 
 compiling and executing. 
 This way each cell can create its own `init_...()` and have it called at every cell execution.
+
 
 ### Special non-Go Commands
 
@@ -62,6 +64,7 @@ This way each cell can create its own `init_...()` and have it called at every c
 - `%with_password`: will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
 
+
 ### Managing Memorized Definitions
 
 - `%list` (or `%ls`): Lists all memorized definitions (imports, constants, types, variables and
@@ -72,6 +75,7 @@ This way each cell can create its own `init_...()` and have it called at every c
   as well as re-initializes the `go.mod` file. 
   If the optional `go.mod` parameter is given, it will re-initialize only the `go.mod` file -- 
   useful when testing different set up of versions of libraries.
+
 
 ### Executing Shell Commands
 
@@ -86,6 +90,7 @@ This way each cell can create its own `init_...()` and have it called at every c
   the notebook is created and maintained. Useful for manipulating `go.mod`,
   for instance to get a package from some specific version, something
   like `!*go get github.com/my/package@v3`.
+
 
 ### Tracking of Go Files In Development:
 
@@ -104,6 +109,7 @@ To manipulate the list of files tracked for changes:
   If suffixed with `...` it will remove all files prefixed with the string given (without the
   `...`). If no file is given, it lists the currently tracked files.
 
+
 ### Environment Variables
 
 For convenience, **GoNB** defines the following environment variables -- available for the shell
@@ -117,6 +123,7 @@ scripts (`!` and `!*`) and for the Go cells:
   to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
   This is used by the `**GoNB**ui`` functions described above, and doesn't need to be accessed directly.
 
+
 ### Writing for WASM (WebAssembly)
 
 **GoNB** can also compile to WASM and run in the notebook. This is experimental, and likely to change
@@ -128,17 +135,25 @@ directory.
 
 Then **GONB** outputs the javascript needed to run the compiled wam.
 
-The following environment variables are set:
+In the Go code, the following extra constants/variables are created in the global namespace, and can be used
+in your Go code:
 
-- `GONB_WASM_SUBDIR`: the directory where the wasm files are put.
-- `GONB_WASM_URL`: the URL (just a path) in which Jupyter serves those files (including the .wasm).
-  One can put more static files there.
+- `GonbWasmDir`, `GonbWasmUrl`: the directory and url (served by Jupyter) where the generated `.wasm` files are read.
+  Potentially, the user can use it to serve other files.
+  These are unique for the kernel, but shared among cells.
+- `GonbWasmDivId`: When a `%wasm` cell is executed, an empty `<div id="<unique_id>"></div>`
+  is created with a unique id -- every cell will have a different one.
+  This is where the Wasm code can dynamically create content.
+- `GonbWasmArgs`: Arguments passed to `%%` are copied to this `[]string` variable for convenience (since `os.Args`)
+  is not set for wasm programs. Checkout `gonbui/wasm` package `ParseFlags` method, so have flags parsed from this.
 
-In the Go code, the following string constants are created, and can be used in the Go code:
+The following environment variables are set when `%wasm` is created:
 
-- `GONB_WASM_SUBDIR`, `GONB_WASM_URL`: same as above.
-- `GONB_WASM_DIV_ID`: When a `%wasm` cell is executed, an empty `<div id="$GONB_WASM_DIV_ID"></div>`
-  is created, where the Wasm code can dynamically create content.
+- `GONB_WASM_SUBDIR`, `GONB_WASM_URL`: the directory and url (served by Jupyter) where the generated `.wasm` files are read.
+  Potentially, the user can use it to serve other files.
+  These environment variables are available for shell scripts (`!...` and `!*...` special commands) and non-wasm 
+  programs if they want to serve different files from there.
+
 
 ### Writing Tests and Benchmarks
 
@@ -158,6 +173,7 @@ So for a verbose output, use `%test -test.v`.
 For benchmarks, run `%test -test.bench=. -test.run=Benchmark`. 
 
 See examples in the [`gotest.ipynb` notebook here](https://github.com/janpfeifer/gonb/blob/main/examples/tests/gotest.ipynb).
+
 
 ### Other
 

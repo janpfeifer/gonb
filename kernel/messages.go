@@ -27,14 +27,14 @@ type zmqMsgHeader struct {
 type ComposedMsg struct {
 	Header       zmqMsgHeader
 	ParentHeader zmqMsgHeader
-	Metadata     map[string]interface{}
-	Content      interface{}
+	Metadata     map[string]any
+	Content      any
 }
 
 // MIMEMap holds data that can be presented in multiple formats. The keys are MIME types
 // and the values are the data formatted with respect to its MIME type.
 // All maps should contain at least a "text/plain" representation with a string value.
-type MIMEMap = map[string]interface{}
+type MIMEMap = map[string]any
 
 // Data is the exact structure returned to Jupyter.
 // It allows to fully specify how a value should be displayed.
@@ -90,6 +90,61 @@ type InspectReply struct {
 	Metadata MIMEMap `json:"metadata"`
 }
 
+// CommInfoReply message sent in reply to a "comm_info_request".
+// https://jupyter-client.readthedocs.io/en/latest/messaging.html#comm-info
+type CommInfoReply struct {
+	// Status should be set to 'ok' if the request succeeded or 'error',
+	// or with error information as in all other replies.
+	Status string `json:"status"`
+
+	// Comms is a dictionary of comm_id (uuids) to a dictionary of fields.
+	// The only field documented is "target_name".
+	Comms map[string]map[string]string `json:"comms"`
+}
+
+// CommOpen is part of the "custom messages" protocol.
+// The corresponding message type is "comm_open".
+// https://jupyter-client.readthedocs.io/en/latest/messaging.html#custom-messages
+type CommOpen struct {
+	// CommId is a UUID that identify this new "comm" channel being opened (?).
+	// Documentation is not clear how these should be used.
+	CommId string `json:"comm_id"`
+
+	// TargetName: documentation is not clear what it is, but it says:
+	// - If the target_name key is not found on the receiving side,
+	//   then it should immediately reply with a comm_close message to avoid an
+	//   inconsistent state.
+	TargetName string `json:"target_name"`
+
+	// Data key is always a dict and can be any extra JSON information used
+	// in initialization of the comm.
+	Data map[string]any `json:"data"`
+}
+
+// CommMsg is part of the "custom messages" protocol.
+// The corresponding message type is "comm_msg".
+// https://jupyter-client.readthedocs.io/en/latest/messaging.html#custom-messages
+type CommMsg struct {
+	// CommId is a UUID that identify this "comm" channel.
+	CommId string `json:"comm_id"`
+
+	// Data  key is always a dict and can be any extra JSON information used
+	// in initialization of the comm.
+	Data map[string]any `json:"data"`
+}
+
+// CommClose is part of the "custom messages" protocol.
+// The corresponding message type is "comm_close".
+// https://jupyter-client.readthedocs.io/en/latest/messaging.html#custom-messages
+type CommClose struct {
+	// CommId is a UUID that identify this "comm" channel.
+	CommId string `json:"comm_id"`
+
+	// Data  key is always a dict and can be any extra JSON information used
+	// in initialization of the comm.
+	Data map[string]any `json:"data"`
+}
+
 // InvalidSignatureError is returned when the signature on a received message does not
 // validate.
 type InvalidSignatureError struct{}
@@ -98,6 +153,8 @@ func (e *InvalidSignatureError) Error() string {
 	return "message had an invalid signature"
 }
 
+// Message is the interface of a received message.
+// It includes an identifier that allows publishing back results to the identifier.
 type Message interface {
 	// Error returns the error receiving the message, or nil if no error.
 	Error() error

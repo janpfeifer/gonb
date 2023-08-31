@@ -27,7 +27,7 @@ var (
 	// ProtocolVersion defines the Jupyter protocol version.
 	// Version 5.2 encodes cursor pos as one position per unicode character.
 	// (https://jupyter-client.readthedocs.io/en/stable/messaging.html#cursor-pos-and-unicode-offsets)
-	// But still Juypter lab is using UTF-16 encoding for cursor-pos.
+	// But still Jupyter-Lab is using UTF-16 encoding for cursor-pos.
 	ProtocolVersion = "5.2"
 )
 
@@ -130,15 +130,19 @@ func (k *Kernel) Stop() {
 	close(k.stop)
 	err := k.sockets.ShellSocket.Socket.Close()
 	if err != nil {
-		klog.Errorf("Failed to close socket: %v", err)
+		klog.Errorf("Failed to close Shell socket: %v", err)
 	}
 	err = k.sockets.StdinSocket.Socket.Close()
 	if err != nil {
-		klog.Errorf("Failed to close socket: %v", err)
+		klog.Errorf("Failed to close Stdin socket: %v", err)
 	}
 	err = k.sockets.ControlSocket.Socket.Close()
 	if err != nil {
-		klog.Errorf("Failed to close socket: %v", err)
+		klog.Errorf("Failed to close Control socket: %v", err)
+	}
+	err = k.sockets.IOPubSocket.Socket.Close()
+	if err != nil {
+		klog.Errorf("Failed to close IOPub socket: %v", err)
 	}
 }
 
@@ -147,7 +151,7 @@ func (k *Kernel) Stop() {
 // (similar to a Control+C).
 //
 // So instead of the kernel dying, it will recover, and where appropriate
-// interrupt other sub-processes it may have spawned.
+// interrupt other subprocesses it may have spawned.
 func (k *Kernel) HandleInterrupt() {
 	if k.sigintC == nil {
 		k.sigintC = make(chan os.Signal, 1)
@@ -249,38 +253,45 @@ func NewKernel(connectionFile string) (*Kernel, error) {
 		return nil, errors.WithMessagef(err, "failed to connect to sockets described in connection file %s", connectionFile)
 	}
 
-	// Set polling functions that will listen to the sockets and forward
-	// messages (or errors) to the corresponding channels.
-	poll := func(msgChan chan Message, sck zmq4.Socket, socketName string) {
-		k.pollingWait.Add(1)
-		go func() {
-			defer func() {
-				klog.V(1).Infof("Polling of socket %q finished.", socketName)
-				k.pollingWait.Done()
-				close(msgChan)
-			}()
-			for {
-				zmqMsg, err := sck.Recv()
-				var msg Message
-				if err != nil {
-					msg = &MessageImpl{kernel: k, err: err}
-				} else {
-					msg = k.FromWireMsg(zmqMsg)
-				}
-				select {
-				case msgChan <- msg:
-				case <-k.stop:
-					return
-				}
-			}
-		}()
-	}
-
 	k.pollHeartbeat()
-	poll(k.shell, k.sockets.ShellSocket.Socket, "shell")
-	poll(k.stdin, k.sockets.StdinSocket.Socket, "stdin")
-	poll(k.control, k.sockets.ControlSocket.Socket, "control")
+	k.pollCommonSocket(k.shell, k.sockets.ShellSocket.Socket, "shell")
+	k.pollCommonSocket(k.stdin, k.sockets.StdinSocket.Socket, "stdin")
+	k.pollCommonSocket(k.control, k.sockets.ControlSocket.Socket, "control")
 	return k, nil
+}
+
+// pollCommonSocket polls for messages from a socket, parses them, and sends them to msgChan.
+//
+// This function runs the loop of receiving messages, parsing and verifying from the wire
+// protocol with FromWireMsg, and then passing the parsed "composed" message to the msgChan given.
+//
+// It also handles stopping and a clean-up, when the kernel is stopped.
+//
+// It runs on a separate Go routine, and uses `k.pollingWait` to account for it (it adds 1
+// at the start, and calls `.Done()` when finished.
+func (k *Kernel) pollCommonSocket(msgChan chan Message, sck zmq4.Socket, socketName string) {
+	k.pollingWait.Add(1)
+	go func() {
+		defer func() {
+			klog.V(1).Infof("Polling of socket %q finished.", socketName)
+			k.pollingWait.Done()
+			close(msgChan)
+		}()
+		for {
+			zmqMsg, err := sck.Recv()
+			var msg Message
+			if err != nil {
+				msg = &MessageImpl{kernel: k, err: err}
+			} else {
+				msg = k.FromWireMsg(zmqMsg)
+			}
+			select {
+			case msgChan <- msg:
+			case <-k.stop:
+				return
+			}
+		}
+	}()
 }
 
 // pollHeartbeat starts a goroutine for handling heartbeat ping messages sent over the given
@@ -379,8 +390,11 @@ func bindSockets(connInfo connectionInfo) (sg *SocketGroup, err error) {
 }
 
 // FromWireMsg translates a multipart ZMQ messages received from a socket into
-// a ComposedMsg struct and a slice of return identities. This includes verifying the
-// message signature.
+// a ComposedMsg struct and a slice of return identities.
+// This includes verifying the message signature.
+//
+// This "Wire Protocol" of the messages is described here:
+// https://jupyter-client.readthedocs.io/en/latest/messaging.html#the-wire-protocol
 func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) Message {
 	parts := zmqMsg.Frames
 	signKey := k.sockets.Key

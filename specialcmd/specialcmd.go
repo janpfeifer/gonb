@@ -122,8 +122,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	case "%", "main", "args", "test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
-		//klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
-		klog.Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
+		klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
 		if parts[0] == "test" {
 			goExec.CellIsTest = true
 		}

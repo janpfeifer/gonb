@@ -10,9 +10,9 @@ import (
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/janpfeifer/gonb/specialcmd"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	"io"
 	"k8s.io/klog/v2"
-	"log"
 	"strings"
 	"sync"
 )
@@ -54,7 +54,7 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 		}
 		return msg.DeliverInput()
 	})
-	poll(k.Shell(), handleMsg)
+	poll(k.Shell(), handleShellMsg)
 	poll(k.Control(), func(msg kernel.Message, goExec *goexec.State) error {
 		if msg == nil {
 			return nil
@@ -62,38 +62,51 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 		if !msg.Ok() {
 			return errors.WithMessagef(msg.Error(), "control message error")
 		}
-		return handleMsg(msg, goExec)
+		return handleShellMsg(msg, goExec)
 	})
+
 	wg.Wait()
 }
 
-// handleMsg responds to a message on the shell or control ROUTER socket.
+// BusyMessageTypes are messages that triggers setting the kernel status to busy
+// while they are being handled.
+var BusyMessageTypes = []string{
+	"execute_request", "inspect_request", "complete_request",
+	"kernel_info_request",
+	//"kernel_info_request", "shutdown_request",
+}
+
+// handleShellMsg responds to a message on the shell or control ROUTER socket.
 //
 // It's assumed that more than one message may be handled concurrently, in particular
 // messages coming from the control socket.
-func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
-	_ = goExec
+func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	if !msg.Ok() {
 		return errors.WithMessagef(msg.Error(), "shell message error")
 	}
+	msgType := msg.ComposedMsg().Header.MsgType
+	klog.V(1).Infof("Dispatcher: handling %q", msgType)
 
-	// Tell the front-end that the kernel is working and when finished notify the
-	// front-end that the kernel is idle again.
-	if err = kernel.PublishKernelStatus(msg, kernel.StatusBusy); err != nil {
-		err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
-		return
-	}
-	klog.V(2).Infof("Received message %q from shell socket", msg.ComposedMsg().Header.MsgType)
-
-	// Defer publishing of status idle again, before returning.
-	defer func() {
-		newErr := kernel.PublishKernelStatus(msg, kernel.StatusIdle)
-		if err == nil && newErr != nil {
+	if slices.Contains(BusyMessageTypes, msgType) {
+		// Tell the front-end that the kernel is working and when finished, notify the
+		// front-end that the kernel is idle again.
+		if err = kernel.PublishKernelStatus(msg, kernel.StatusBusy); err != nil {
 			err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
+			return
 		}
-	}()
+		klog.V(2).Infof("> kernel status set to busy.")
 
-	switch msg.ComposedMsg().Header.MsgType {
+		// Defer publishing of status idle again, before returning.
+		defer func() {
+			newErr := kernel.PublishKernelStatus(msg, kernel.StatusIdle)
+			if err == nil && newErr != nil {
+				err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusIdle)
+			}
+			klog.V(2).Infof("> kernel status set to idle.")
+		}()
+	}
+
+	switch msgType {
 	case "kernel_info_request":
 		if err = kernel.SendKernelInfo(msg, Version); err != nil {
 			err = errors.WithMessagef(err, "replying to 'kernel_info_request'")
@@ -110,12 +123,17 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		if err = HandleInspectRequest(msg, goExec); err != nil {
 			err = errors.WithMessagef(err, "replying to 'inspect_request'")
 		}
-	case "is_complete_request":
-		klog.V(2).Infof("Received is_complete_request: ignoring, since it's not a console like kernel.")
 	case "complete_request":
 		if err := handleCompleteRequest(msg, goExec); err != nil {
-			log.Fatal(err)
+			klog.Fatal(err)
 		}
+
+	case "comm_open", "comm_msg", "comm_comm_close":
+		err = handleComms(msg, goExec)
+
+	case "is_complete_request":
+		klog.V(2).Infof("Received is_complete_request: ignoring, since it's not a console like kernel.")
+
 	default:
 		// Log, ignore, and hope for the best.
 		klog.Infof("Unhandled shell-socket message %q", msg.ComposedMsg().Header.MsgType)
@@ -125,7 +143,7 @@ func handleMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 
 // handleShutdownRequest sends a "shutdown" message.
 func handleShutdownRequest(msg kernel.Message) error {
-	content := msg.ComposedMsg().Content.(map[string]interface{})
+	content := msg.ComposedMsg().Content.(map[string]any)
 	restart := content["restart"].(bool)
 	type shutdownReply struct {
 		Restart bool `json:"restart"`
@@ -150,13 +168,17 @@ type OutErr struct {
 // and sends the various reply messages.
 func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Extract the data from the request.
-	content := msg.ComposedMsg().Content.(map[string]interface{})
+	content := msg.ComposedMsg().Content.(map[string]any)
 	code := content["code"].(string)
 	silent := content["silent"].(bool)
 	storeHistory := content["store_history"].(bool)
 
+	if klog.V(2).Enabled() {
+		klog.Infof("Message content: %+v", content)
+	}
+
 	// Prepare the map that will hold the reply content.
-	replyContent := make(map[string]interface{})
+	replyContent := make(map[string]any)
 	if storeHistory {
 		msg.Kernel().ExecCounter++
 		replyContent["execution_count"] = msg.Kernel().ExecCounter
@@ -201,6 +223,9 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	}
 
 	// Send the output back to the notebook.
+	if klog.V(2).Enabled() {
+		klog.Infof("> execute_reply: %+v", replyContent)
+	}
 	if err := msg.Reply("execute_reply", replyContent); err != nil {
 		return errors.WithMessagef(err, "publish 'execute_reply`")
 	}
@@ -210,7 +235,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 // HandleInspectRequest presents rich data (HTML?) with contextual information for the
 // contents under the cursor.
 func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
-	content := msg.ComposedMsg().Content.(map[string]interface{})
+	content := msg.ComposedMsg().Content.(map[string]any)
 	code := content["code"].(string)
 	cursorPos := int(content["cursor_pos"].(float64))
 	detailLevel := int(content["detail_level"].(float64))
@@ -265,6 +290,9 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 		CursorEnd:   0,
 		Metadata:    make(kernel.MIMEMap),
 	}
+
+	// Reply is sent in this deferred function, that may be just the error
+	// that happened.
 	defer func() {
 		if err != nil {
 			klog.Warningf("Handling `complete_request` failed: %+v", err)
@@ -274,7 +302,7 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 		err = msg.Reply("complete_reply", reply)
 	}()
 
-	content := msg.ComposedMsg().Content.(map[string]interface{})
+	content := msg.ComposedMsg().Content.(map[string]any)
 	if _, found := content["code"]; !found {
 		return
 	}

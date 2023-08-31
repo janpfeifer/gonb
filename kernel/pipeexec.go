@@ -2,8 +2,20 @@ package kernel
 
 import (
 	"github.com/janpfeifer/gonb/gonbui/protocol"
-	"github.com/pkg/errors"
+	"golang.org/x/exp/slices"
 	"io"
+	"strings"
+)
+
+// This files implements PipeExecToJupyter: a function that executes a program redirecting
+// its outputs (Stdout and Stderr) and input (at request) to/from Jupyter.
+// It also supports a special named pipe where a program can send rich content to be
+// displayed on the Jupyter front-end.
+//
+// See also pipepoll.go, for the polling side of the named pipe.
+
+import (
+	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
@@ -176,9 +188,17 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 	}
 
 	// Prepare named-pipe to use for rich-data display.
-	if err = StartNamedPipe(builder.msg, builder.dir, doneChan, cmdStdin); err != nil {
+	var namedPipePath string
+	namedPipePath, err = StartNamedPipe(builder.msg, builder.dir, doneChan, cmdStdin)
+
+	// Set the env variable GONB_PIPE for the command to be executed.
+	if err != nil {
 		return errors.WithMessagef(err, "failed to create named pipe for display content")
 	}
+	envVars := slices.DeleteFunc(cmd.Environ(),
+		func(s string) bool { return strings.HasPrefix(s, protocol.GONB_PIPE_ENV+"=") })
+	envVars = append(envVars, protocol.GONB_PIPE_ENV+"="+namedPipePath)
+	cmd.Env = envVars
 
 	// Define function to proper closing of the various concurrent plumbing
 	doneFn := func() {
@@ -224,23 +244,23 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 // remove it and quit.
 //
 // TODO: make this more secure, maybe with a secret key also passed by the environment.
-func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) error {
+func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) (string, error) {
 	// Create a temporary file name.
 	f, err := os.CreateTemp(dir, "gonb_pipe_")
 	if err != nil {
-		return err
+		return "", err
 	}
 	pipePath := f.Name()
 	if err = f.Close(); err != nil {
-		return err
+		return "", err
 	}
 	if err = os.Remove(pipePath); err != nil {
-		return err
+		return "", err
 	}
 
 	// Create pipe.
 	if err = syscall.Mkfifo(pipePath, 0600); err != nil {
-		return errors.Wrapf(err, "failed to create pipe (Mkfifo) for %q", pipePath)
+		return "", errors.Wrapf(err, "failed to create pipe (Mkfifo) for %q", pipePath)
 	}
 
 	// Synchronize pipe: if it's not opened by the program being executed,
@@ -268,7 +288,6 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin 
 		_ = os.Remove(pipePath)
 	}()
 
-	_ = os.Setenv(protocol.GONB_PIPE_ENV, pipePath)
 	go func() {
 		// Notice that opening pipeReader below blocks, until the other end
 		// (the go program being executed) opens it as well.
@@ -287,5 +306,6 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin 
 		<-doneChan
 		_ = pipeReader.Close()
 	}()
-	return nil
+
+	return pipePath, nil
 }

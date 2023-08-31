@@ -1,7 +1,9 @@
 package kernel
 
-// This file implements the protocol to display rich content: it provides PollGonbPipe that continuously
-// read from a named pipe (mkfifo(3)) and display it.
+// This file implements the polling on the $GONB_PIPE named pipe created to receive information
+// from the program being executed.
+//
+// It has a protocol (defined under `gonbui/protocol`) to display rich content.
 
 import (
 	"encoding/gob"
@@ -27,8 +29,9 @@ func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
 			klog.V(2).Infof("Named pipe closed / EOF: %v", err)
 			return
 		}
+
+		// Special case for a request for input:
 		if reqAny, found := data.Data[protocol.MIMEJupyterInput]; found {
-			// This is actually a request for input, process it separately.
 			klog.V(2).Infof("Received InputRequest: %v", reqAny)
 			req, ok := reqAny.(*protocol.InputRequest)
 			if !ok {
@@ -38,6 +41,8 @@ func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
 			processInputRequest(msg, cmdStdin, req)
 			continue
 		}
+
+		// Otherwise, just display with the corresponding MIME type:
 		processDisplayData(msg, data, knownBlockIds)
 	}
 }

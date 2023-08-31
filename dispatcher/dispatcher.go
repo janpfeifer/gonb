@@ -186,6 +186,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 
 	// Tell the front-end what the kernel is about to execute.
 	if !silent {
+		klog.V(1).Infof("> publish \"execute_input\" with code")
 		if err := kernel.PublishExecutionInput(msg, msg.Kernel().ExecCounter, code); err != nil {
 			return errors.WithMessagef(err, "publishing execution input")
 		}

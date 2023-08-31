@@ -27,10 +27,11 @@ import (
 // PipeExecToJupyterBuilder holds the configuration to executing a command that is piped to Jupyter.
 // Use PipeExecToJupyter to create it.
 type PipeExecToJupyterBuilder struct {
-	msg     Message
-	command string
-	args    []string
-	dir     string
+	msg            Message
+	executionCount int
+	command        string
+	args           []string
+	dir            string
 
 	stdoutWriter, stderrWriter io.Writer
 
@@ -46,10 +47,21 @@ type PipeExecToJupyterBuilder struct {
 func PipeExecToJupyter(msg Message, command string, args ...string) *PipeExecToJupyterBuilder {
 	return &PipeExecToJupyterBuilder{
 		msg:                 msg,
+		executionCount:      -1,
 		command:             command,
 		args:                args,
 		millisecondsToInput: -1,
 	}
+}
+
+// ExecutionCount sets the "execution_count" updated field when replying to an "execute_request" message.
+// If set it publishes data as "execute_result" messages, as opposed to "display_data".
+//
+// For the most practical purposes, they work the same.
+// But since the protocol seems to distinguish them, there is an option to set it.
+func (builder *PipeExecToJupyterBuilder) ExecutionCount(c int) *PipeExecToJupyterBuilder {
+	builder.executionCount = c
+	return builder
 }
 
 // InDir configures the PipeExecToJupyterBuilder to execute within the given directory. Returns
@@ -189,7 +201,7 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 
 	// Prepare named-pipe to use for rich-data display.
 	var namedPipePath string
-	namedPipePath, err = StartNamedPipe(builder.msg, builder.dir, doneChan, cmdStdin)
+	namedPipePath, err = StartNamedPipe(builder.msg, builder.executionCount, builder.dir, doneChan, cmdStdin)
 
 	// Set the env variable GONB_PIPE for the command to be executed.
 	if err != nil {
@@ -243,8 +255,10 @@ func (builder *PipeExecToJupyterBuilder) Exec() error {
 // The doneChan is listened to: when it is closed, it will trigger the listener goroutine to close the pipe,
 // remove it and quit.
 //
+// If `execution_count` >= 0, this is being output on the behest of an "execute_request".
+//
 // TODO: make this more secure, maybe with a secret key also passed by the environment.
-func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) (string, error) {
+func StartNamedPipe(msg Message, executionCount int, dir string, doneChan <-chan struct{}, cmdStdin io.Writer) (string, error) {
 	// Create a temporary file name.
 	f, err := os.CreateTemp(dir, "gonb_pipe_")
 	if err != nil {
@@ -300,7 +314,7 @@ func StartNamedPipe(msg Message, dir string, doneChan <-chan struct{}, cmdStdin 
 		muFifo.Lock()
 		fifoOpenedForReading = true
 		muFifo.Unlock()
-		go PollGonbPipe(msg, pipeReader, cmdStdin)
+		go PollGonbPipe(msg, executionCount, pipeReader, cmdStdin)
 
 		// Wait till channel is closed and then close reader.
 		<-doneChan

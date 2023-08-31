@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"image"
 	"image/png"
-	"log"
+	"k8s.io/klog/v2"
 	"os"
 	"sync"
 )
@@ -62,8 +62,14 @@ func openLocked() error {
 	return nil
 }
 
-// sendData to be displayed in the connected Notebook.
-func sendData(data *protocol.DisplayData) {
+// SendData to be displayed in the connected Notebook.
+//
+// This is a lower level function, that most end users won't need to use, instead
+// look for the other functions DisplayHTML, DisplayMarkdown, etc.
+//
+// But if you are testing new types of MIME types, this is the way to result
+// messages ("execute_result" message type) directly to the front-end.
+func SendData(data *protocol.DisplayData) {
 	mu.Lock()
 	defer mu.Unlock()
 	if err := openLocked(); err != nil {
@@ -73,7 +79,7 @@ func sendData(data *protocol.DisplayData) {
 	if err != nil {
 		gonbPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
 		gonbPipe.Close()
-		log.Printf("%+v", gonbPipeError)
+		klog.Errorf("%+v", gonbPipeError)
 	}
 }
 
@@ -82,7 +88,7 @@ func DisplayHTML(html string) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMETextHTML: html},
 	})
 }
@@ -96,7 +102,7 @@ func DisplayMarkdown(markdown string) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
 	})
 }
@@ -124,7 +130,7 @@ func UpdateHTML(id, html string) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data:      map[protocol.MIMEType]any{protocol.MIMETextHTML: html},
 		DisplayID: id,
 	})
@@ -151,7 +157,7 @@ func UpdateMarkdown(id, markdown string) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data:      map[protocol.MIMEType]any{protocol.MIMETextMarkdown: markdown},
 		DisplayID: id,
 	})
@@ -162,7 +168,7 @@ func DisplayPNG(png []byte) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMEImagePNG: png},
 	})
 }
@@ -188,7 +194,7 @@ func DisplaySVG(svg string) {
 	// So we try a simple workaround of embedding the SVG as HTML.
 	// (Question in Jupyter forum:
 	// https://discourse.jupyter.org/t/svg-either-not-loading-right-or-not-exporting-to-html/17824)
-	//sendData(&protocol.DisplayData{
+	//SendData(&protocol.DisplayData{
 	//	Data: map[protocol.MIMEType]any{protocol.MIMEImageSVG: svg},
 	//})
 	DisplayHTML(fmt.Sprintf("<div>%s</div>", svg))
@@ -224,7 +230,7 @@ func RequestInput(prompt string, password bool) {
 		Prompt:   prompt,
 		Password: password,
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{
 			protocol.MIMEJupyterInput: &req,
 		},
@@ -236,7 +242,7 @@ func ScriptJavascript(js string) {
 	if !IsNotebook {
 		return
 	}
-	sendData(&protocol.DisplayData{
+	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
 	})
 }

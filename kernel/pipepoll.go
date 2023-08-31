@@ -15,9 +15,18 @@ import (
 	"os"
 )
 
+func init() {
+	// Register generic gob types we want to make sure are understood.
+	gob.Register(map[string]any{})
+	gob.Register([]string{})
+	gob.Register([]any{})
+}
+
 // PollGonbPipe will continuously read for incoming requests for displaying content on the notebook.
 // It expects pipeIn to be closed when the polling is to stop.
-func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
+//
+// If `executionCount` is < 0, this is not being output on the behest of an "execute_request".
+func PollGonbPipe(msg Message, executionCount int, pipeReader *os.File, cmdStdin io.Writer) {
 	decoder := gob.NewDecoder(pipeReader)
 	knownBlockIds := make(map[string]struct{})
 	for {
@@ -26,7 +35,7 @@ func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
 			return
 		} else if err != nil {
-			klog.V(2).Infof("Named pipe closed / EOF: %v", err)
+			klog.Infof("Named pipe: failed to parse message: %+v", err)
 			return
 		}
 
@@ -43,7 +52,7 @@ func PollGonbPipe(msg Message, pipeReader *os.File, cmdStdin io.Writer) {
 		}
 
 		// Otherwise, just display with the corresponding MIME type:
-		processDisplayData(msg, data, knownBlockIds)
+		processDisplayData(msg, executionCount, data, knownBlockIds)
 	}
 }
 
@@ -65,17 +74,19 @@ func logDisplayData(data MIMEMap) {
 			if len(displayValue) > 20 {
 				displayValue = displayValue[:20] + "..."
 			}
-			klog.Infof("DisplayData(%s): %q", key, displayValue)
+			klog.Infof("Data[%s]=%q", key, displayValue)
 		case []byte:
-			klog.Infof("DisplayData(%s): %d bytes", key, len(value))
+			klog.Infof("Data[%s]=...%d bytes...", key, len(value))
 		default:
-			klog.Infof("DisplayData(%s): unknown type %t", key, value)
+			klog.Infof("Data[%s]: unknown type %t", key, value)
 		}
 	}
 }
 
 // processDisplayData process an incoming `protocol.DisplayData` object.
-func processDisplayData(msg Message, data *protocol.DisplayData, knownBlockIds map[string]struct{}) {
+//
+// If `executionCount` is < 0, this is not being output on the behest of an "execute_request".
+func processDisplayData(msg Message, executionCount int, data *protocol.DisplayData, knownBlockIds map[string]struct{}) {
 	// Log info about what is being displayed.
 	msgData := Data{
 		Data:      make(MIMEMap, len(data.Data)),
@@ -103,7 +114,11 @@ func processDisplayData(msg Message, data *protocol.DisplayData, knownBlockIds m
 	if isUpdate {
 		err = PublishUpdateDisplayData(msg, msgData)
 	} else {
-		err = PublishDisplayData(msg, msgData)
+		if executionCount >= 0 {
+			err = PublishExecutionResult(msg, executionCount, msgData)
+		} else {
+			err = PublishDisplayData(msg, msgData)
+		}
 	}
 	if err != nil {
 		klog.Errorf("Failed to display data (ignoring): %v", err)

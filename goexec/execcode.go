@@ -135,6 +135,7 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 		args = s.DefaultCellTestArgs()
 	}
 	err := kernel.PipeExecToJupyter(msg, s.BinaryPath(), args...).
+		ExecutionCount(msg.Kernel().ExecCounter).
 		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
 		Exec()
 	if err != nil {

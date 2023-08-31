@@ -265,6 +265,7 @@ func (m *MessageImpl) Publish(msgType string, content interface{}) error {
 	if err != nil {
 		return err
 	}
+	klog.V(1).Infof("[IOPub] Publish message %q -- parent msg_id=%q", msgType, msg.ParentHeader.MsgID)
 	msg.Content = content
 	return m.kernel.sockets.IOPubSocket.RunLocked(func(socket zmq4.Socket) error {
 		return m.sendMessage(socket, msg)
@@ -336,7 +337,7 @@ func (m *MessageImpl) Reply(msgType string, content interface{}) error {
 	}
 
 	msg.Content = content
-	klog.V(1).Infof("Reply(%s):", msgType)
+	klog.V(1).Infof("[Shell] Reply message %q, parent msg_id=%q", msgType, msg.ParentHeader.MsgID)
 	return m.kernel.sockets.ShellSocket.RunLocked(func(shell zmq4.Socket) error {
 		return m.sendMessage(shell, msg)
 	})
@@ -363,6 +364,7 @@ func EnsureMIMEMap(bundle MIMEMap) MIMEMap {
 //}
 
 // PublishExecutionResult publishes the result of the `execCount` execution as a string.
+// Very similar to PublishDisplayData, but in response to an "execute_request" message.
 func PublishExecutionResult(msg Message, execCount int, data Data) error {
 	return msg.Publish("execute_result", struct {
 		ExecCount int     `json:"execution_count"`
@@ -390,7 +392,7 @@ func PublishExecutionError(msg Message, err string, trace []string, name string)
 	)
 }
 
-// PublishDisplayData publishes a single image.
+// PublishDisplayData publishes data of arbitrary data-types.
 func PublishDisplayData(msg Message, data Data) error {
 	if msg == nil {
 		// Ignore if there is no message to reply to.

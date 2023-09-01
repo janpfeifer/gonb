@@ -128,7 +128,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 			klog.Fatal(err)
 		}
 
-	case "comm_open", "comm_msg", "comm_comm_close":
+	case "comm_open", "comm_msg", "comm_comm_close", "comm_info_request":
 		err = handleComms(msg, goExec)
 
 	case "is_complete_request":

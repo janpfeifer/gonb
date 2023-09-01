@@ -28,8 +28,9 @@ func handleComms(msg kernel.Message, goExec *goexec.State) error {
 	if klog.V(2).Enabled() {
 		klog.Infof("Comms message %q: %+v", msgType, msg.ComposedMsg())
 	}
+
 	switch msgType {
-	case "comm_info":
+	case "comm_info_request":
 		// https://jupyter-client.readthedocs.io/en/latest/messaging.html#comm-info
 
 	case "comm_open":

@@ -60,11 +60,11 @@ type MIMEType string
 
 const (
 	MIMETextHTML       MIMEType = "text/html"
-	MIMETextJavascript          = "text/javascript"
-	MIMETextMarkdown            = "text/markdown"
-	MIMETextPlain               = "text/plain"
-	MIMEImagePNG                = "image/png"
-	MIMEImageSVG                = "image/svg+xml"
+	MIMETextJavascript MIMEType = "text/javascript"
+	MIMETextMarkdown   MIMEType = "text/markdown"
+	MIMETextPlain      MIMEType = "text/plain"
+	MIMEImagePNG       MIMEType = "image/png"
+	MIMEImageSVG       MIMEType = "image/svg+xml"
 
 	// MIMEJupyterInput should be associated with an `*InputRequest`.
 	// It's a GoNB specific mime type.

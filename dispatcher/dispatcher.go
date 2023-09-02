@@ -187,7 +187,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Tell the front-end what the kernel is about to execute.
 	if !silent {
 		klog.V(1).Infof("> publish \"execute_input\" with code")
-		if err := kernel.PublishExecutionInput(msg, msg.Kernel().ExecCounter, code); err != nil {
+		if err := kernel.PublishExecuteInput(msg, code); err != nil {
 			return errors.WithMessagef(err, "publishing execution input")
 		}
 	}
@@ -255,14 +255,14 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	var data kernel.MIMEMap
 	if usedLines.Has(cursorLine) {
 		// If special command, use our help message as inspect content.
-		data = kernel.MIMEMap{protocol.MIMETextPlain: any(specialcmd.HelpMessage)}
+		data = kernel.MIMEMap{string(protocol.MIMETextPlain): any(specialcmd.HelpMessage)}
 	} else {
 		// Parse Go.
 		var err error
 		data, err = goExec.InspectIdentifierInCell(lines, usedLines, cursorLine, cursorCol)
 		if err != nil {
 			data = kernel.MIMEMap{
-				protocol.MIMETextPlain: any(
+				string(protocol.MIMETextPlain): any(
 					fmt.Sprintf("%s", err.Error())),
 				//fmt.Sprintf("Failed to inspect: in cell=[line=%d, col=%d]:\n%+v", cursorLine+1, cursorCol+1, err)),
 			}

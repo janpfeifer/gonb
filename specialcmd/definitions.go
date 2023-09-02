@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// This file handle the commands %list (or %ls), %remove (%rm) and %reset, which help manipulate
+// This file handles the commands %list (or %ls), %remove (%rm) and %reset, which help manipulate
 // memorized definitions.
 
 // reset removes all definitions memorized, as if the kernel had been reset.
@@ -32,7 +32,7 @@ func displayEnumeration(msg kernel.Message, title string, items []string) {
 		htmlParts = append(htmlParts, "<li><pre>"+item+"</pre></li>")
 	}
 	htmlParts = append(htmlParts, "</ul>")
-	err := kernel.PublishDisplayDataWithHTML(msg, strings.Join(htmlParts, "\n"))
+	err := kernel.PublishHtml(msg, strings.Join(htmlParts, "\n"))
 	if err != nil {
 		klog.Errorf("Failed to publish list for %q back to jupyter: %+v", title, err)
 	}
@@ -40,7 +40,7 @@ func displayEnumeration(msg kernel.Message, title string, items []string) {
 
 // listDefinitions lists all memorized definitions. It implements the "%list" (or "%ls") command.
 func listDefinitions(msg kernel.Message, goExec *goexec.State) {
-	_ = kernel.PublishDisplayDataWithHTML(msg, "<h3>Memorized Definitions</h3>\n")
+	_ = kernel.PublishHtml(msg, "<h3>Memorized Definitions</h3>\n")
 	displayEnumeration(msg, "Imports", common.SortedKeys(goExec.Definitions.Imports))
 	displayEnumeration(msg, "Constants", common.SortedKeys(goExec.Definitions.Constants))
 	displayEnumeration(msg, "Types", common.SortedKeys(goExec.Definitions.Types))
@@ -62,7 +62,7 @@ func removeDefinitionImpl[T any](msg kernel.Message, mapName string, m *map[stri
 	return true
 }
 
-// removeDefinitions from memorized list. It implements the "%remove" (or "%rm") command.
+// removeDefinitions from the memorized list. It implements the "%remove" (or "%rm") command.
 func removeDefinitions(msg kernel.Message, goExec *goexec.State, keys []string) {
 	klog.V(1).Infof("removing definitions %v", keys)
 	for _, key := range keys {

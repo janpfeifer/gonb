@@ -145,36 +145,53 @@ func GoRoot() (string, error) {
 	return goRoot, nil
 }
 
-var runWasmTemplate = template.Must(template.New("wasm_exec").Parse(
-	`<script src="{{.WasmExecJsUrl}}"></script>
-<script>
-var go_{{.Id}} = new Go();
- 
-WebAssembly.instantiateStreaming(fetch("{{.CompiledWasmUrl}}"), go_{{.Id}}.importObject).
-	then((result) => { go_{{.Id}}.run(result.instance); });
-</script>
-<div id="{{.WasmDivId}}"></div>
+var (
+	runWasmHtml = template.Must(template.New("wasm_exec_html").Parse(
+		`<div id="{{.WasmDivId}}"></div><script src="{{.WasmExecJsUrl}}"></script>`))
+
+	runWasmScript = template.Must(template.New("wasm_exec_js").Parse(
+		`
+(() => {
+	var go_{{.Id}} = new globalThis.Go();
+	go_{{.Id}}.argv = ["js"].concat([{{range .Args}}"{{.}}", {{end}}]);
+	console.log("argv="+go_{{.Id}}.argv);
+	WebAssembly.instantiateStreaming(fetch("{{.CompiledWasmUrl}}"), go_{{.Id}}.importObject).
+		then((result) => { go_{{.Id}}.run(result.instance); });
+})();
 `))
+)
 
 // ExecuteWasm expects `wasm_exec.js` and CompiledWasmName to be in the directory
 // pointed to `s.WasmDir` already.
 func (s *State) ExecuteWasm(msg kernel.Message) error {
 	data := struct {
 		Id, WasmExecJsUrl, CompiledWasmUrl, WasmDivId string
+		Args                                          []string
 	}{
 		Id:              s.UniqueID,
 		WasmExecJsUrl:   path.Join(s.WasmUrl, "wasm_exec.js"),
 		CompiledWasmUrl: path.Join(s.WasmUrl, CompiledWasmName),
 		WasmDivId:       s.WasmDivId,
+		Args:            s.Args,
 	}
 	var buf bytes.Buffer
-	err := runWasmTemplate.Execute(&buf, &data)
+	err := runWasmHtml.Execute(&buf, &data)
+	html := buf.String()
+	if err != nil {
+		return errors.Wrapf(err, "failed to generate html to bootstrap WASM")
+	}
+	if err = kernel.PublishHtml(msg, html); err != nil {
+		return err
+	}
+
+	buf.Reset()
+	err = runWasmScript.Execute(&buf, &data)
 	if err != nil {
 		return errors.Wrapf(err, "failed to generate javascript to bootstrap WASM")
 	}
 	js := buf.String()
 	klog.V(2).Infof("WASM bootstrap code served:\n%s\n", js)
-	return kernel.PublishDisplayDataWithHTML(msg, js)
+	return kernel.PublishJavascript(msg, js)
 }
 
 // DeclareStringConst creates a const definition in `decls` for a string value.
@@ -209,12 +226,10 @@ func (s *State) ExportWasmConstants(decls *Declarations) {
 	DeclareStringConst(decls, "GonbWasmDir", s.WasmDir)
 	DeclareStringConst(decls, "GonbWasmUrl", s.WasmUrl)
 	DeclareStringConst(decls, "GonbWasmDivId", s.WasmDivId)
-	DeclareVariable(decls, "GonbWasmArgs", fmt.Sprintf("%#v", s.Args))
 }
 
 func (s *State) RemoveWasmConstants(decls *Declarations) {
 	delete(decls.Constants, "GonbWasmDir")
 	delete(decls.Constants, "GonbWasmUrl")
 	delete(decls.Constants, "GonbWasmDivId")
-	delete(decls.Variables, "GonbWasmArgs")
 }

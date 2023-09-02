@@ -115,11 +115,11 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 		if len(messages) > 0 {
 			parts = append(parts, messages...)
 		}
-		return kernel.MIMEMap{protocol.MIMETextPlain: strings.Join(parts, "\n\n")}, nil
+		return kernel.MIMEMap{string(protocol.MIMETextPlain): strings.Join(parts, "\n\n")}, nil
 	}
 
 	// Return MIMEMap with markdown.
-	mimeMap = kernel.MIMEMap{protocol.MIMETextMarkdown: desc}
+	mimeMap = kernel.MIMEMap{string(protocol.MIMETextMarkdown): desc}
 	return
 }
 

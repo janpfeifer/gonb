@@ -106,7 +106,7 @@ func (nbErr *GonbError) PublishWithHTML(msg kernel.Message) {
 	htmlReport := "<pre>" + nbErr.errMsg + "</pre>" // If anything goes wrong, simply display the err message.
 	defer func() {
 		// Display HTML report on exit.
-		err := kernel.PublishDisplayDataWithHTML(msg, htmlReport)
+		err := kernel.PublishHtml(msg, htmlReport)
 		if err != nil {
 			klog.Errorf("Failed to publish data in DisplayErrorWithContext: %+v", err)
 		}

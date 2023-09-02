@@ -14,6 +14,13 @@ import (
 //    https://jupyter-client.readthedocs.io/en/latest/messaging.html#comm-info
 // 2. Custom Messages:
 //    https://jupyter-client.readthedocs.io/en/latest/messaging.html#custom-messages
+//
+// Javascript front-end:
+//
+// - Session id: part of the filename of the json file passed to the kernel execution as an argument (--kernel=<file.json>).
+//   It can be separated from the file name with a regexp like `^.*/kernel-([a-f0-9-]+).json$`.
+// - Websocket connection: /api/kernels/cb142eeb-450a-47ed-9e9c-5c31aa8dba27/channels
+// - JupyterServer Websocket Protocol: https://jupyter-server.readthedocs.io/en/latest/developers/websocket-protocols.html
 
 // This file handles Comm messages (custom messages), coming from the Shell socket.
 // Notice that in the front-end they are sent/received in the IOPub channel.

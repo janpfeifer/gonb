@@ -144,8 +144,6 @@ in your Go code:
 - `GonbWasmDivId`: When a `%wasm` cell is executed, an empty `<div id="<unique_id>"></div>`
   is created with a unique id -- every cell will have a different one.
   This is where the Wasm code can dynamically create content.
-- `GonbWasmArgs`: Arguments passed to `%%` are copied to this `[]string` variable for convenience (since `os.Args`)
-  is not set for wasm programs. Checkout `gonbui/wasm` package `ParseFlags` method, so have flags parsed from this.
 
 The following environment variables are set when `%wasm` is created:
 

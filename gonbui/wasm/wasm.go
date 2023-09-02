@@ -23,7 +23,6 @@ import (
 	"github.com/gowebapi/webapi/dom"
 	"github.com/gowebapi/webapi/dom/domcore"
 	"github.com/gowebapi/webapi/html"
-	"os"
 	"reflect"
 	"strings"
 )
@@ -54,26 +53,6 @@ func init() {
 // Use at the end of the program.
 func WaitForever() {
 	<-make(chan struct{})
-}
-
-// ParseFlags should take as parameters the arguments passed to Wasm by GoNB, in the variable
-// `GonbWasmArgs`.
-// It sets `os.Args` and uses that to parse flags as usual.
-//
-// Example of cell:
-//
-//		```
-//		%wasm
-//		import "github.com/janpfeifer/gonb/gonbui/wasm"
-//	 var flagName = flag.String("name", "", "enter your name")
-//		%% --name="World"
-//	 wasm.ParseFlags(GonbWasmArgs)
-//	 wasm.Alertf("Hello %s!", *flagName)
-//		```
-func ParseFlags(args []string) {
-	// We need to include Args[0], which we hard-code to "wasm".
-	os.Args = append([]string{"wasm"}, args...)
-	flag.Parse()
 }
 
 // Alert opens up a pop-up with the given msg.

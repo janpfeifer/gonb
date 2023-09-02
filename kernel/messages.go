@@ -363,20 +363,6 @@ func EnsureMIMEMap(bundle MIMEMap) MIMEMap {
 //	return a
 //}
 
-// PublishExecutionResult publishes the result of the `execCount` execution as a string.
-// Very similar to PublishDisplayData, but in response to an "execute_request" message.
-func PublishExecutionResult(msg Message, execCount int, data Data) error {
-	return msg.Publish("execute_result", struct {
-		ExecCount int     `json:"execution_count"`
-		Data      MIMEMap `json:"data"`
-		Metadata  MIMEMap `json:"metadata"`
-	}{
-		ExecCount: execCount,
-		Data:      data.Data,
-		Metadata:  EnsureMIMEMap(data.Metadata),
-	})
-}
-
 // PublishExecutionError publishes a serialized error that was encountered during execution.
 func PublishExecutionError(msg Message, err string, trace []string, name string) error {
 	return msg.Publish("error",
@@ -390,6 +376,22 @@ func PublishExecutionError(msg Message, err string, trace []string, name string)
 			Trace: trace,
 		},
 	)
+}
+
+// PublishExecuteResult publishes using "execute_result" method.
+// Very similar to PublishDisplayData, but in response to an "execute_request" message.
+func PublishExecuteResult(msg Message, data Data) error {
+	return msg.Publish("execute_result", struct {
+		ExecCount int     `json:"execution_count"`
+		Metadata  MIMEMap `json:"metadata"`
+		Data      MIMEMap `json:"data"`
+		Transient MIMEMap `json:"transient"`
+	}{
+		ExecCount: msg.Kernel().ExecCounter,
+		Data:      data.Data,
+		Metadata:  EnsureMIMEMap(data.Metadata),
+		Transient: EnsureMIMEMap(data.Transient),
+	})
 }
 
 // PublishDisplayData publishes data of arbitrary data-types.
@@ -410,9 +412,24 @@ func PublishDisplayData(msg Message, data Data) error {
 	})
 }
 
+// PublishData is a wrapper to either PublishExecuteResult or PublishDisplayData, depending
+// if the parent message was "execute_result" or something else.
+func PublishData(msg Message, data Data) error {
+	if klog.V(1).Enabled() {
+		logDisplayData(data.Data)
+	}
+	if msg.ComposedMsg().Header.MsgType == "execute_request" {
+		return PublishExecuteResult(msg, data)
+	}
+	return PublishDisplayData(msg, data)
+}
+
 // PublishUpdateDisplayData is like PublishDisplayData, but expects `transient.display_id` to be set, and that a
 // previous `display_data` has already created this id.
 func PublishUpdateDisplayData(msg Message, data Data) error {
+	if klog.V(1).Enabled() {
+		logDisplayData(data.Data)
+	}
 	// copy Data in a struct with appropriate json tags
 	return msg.Publish("update_display_data", struct {
 		Data      MIMEMap `json:"data"`
@@ -425,32 +442,31 @@ func PublishUpdateDisplayData(msg Message, data Data) error {
 	})
 }
 
-// PublishDisplayDataWithHTML is a shortcut to PublishDisplayData for HTML content.
-func PublishDisplayDataWithHTML(msg Message, html string) error {
-	msgData := Data{
-		Data:      make(MIMEMap, 1),
+// PublishHtml is a shortcut to PublishData for HTML content.
+func PublishHtml(msg Message, html string) error {
+	return PublishData(msg, Data{
+		Data:      MIMEMap{string(protocol.MIMETextHTML): html},
 		Metadata:  make(MIMEMap),
 		Transient: make(MIMEMap),
-	}
-	msgData.Data[string(protocol.MIMETextHTML)] = html
-	if klog.V(1).Enabled() {
-		logDisplayData(msgData.Data)
-	}
-	return PublishDisplayData(msg, msgData)
+	})
 }
 
-// PublishDisplayDataWithMarkdown is a shortcut to PublishDisplayData for markdown content.
-func PublishDisplayDataWithMarkdown(msg Message, markdown string) error {
-	msgData := Data{
-		Data:      make(MIMEMap, 1),
+// PublishMarkdown is a shortcut to PublishData for markdown content.
+func PublishMarkdown(msg Message, markdown string) error {
+	return PublishData(msg, Data{
+		Data:      MIMEMap{string(protocol.MIMETextMarkdown): markdown},
 		Metadata:  make(MIMEMap),
 		Transient: make(MIMEMap),
-	}
-	msgData.Data[string(protocol.MIMETextMarkdown)] = markdown
-	if klog.V(1).Enabled() {
-		logDisplayData(msgData.Data)
-	}
-	return PublishDisplayData(msg, msgData)
+	})
+}
+
+// PublishJavascript is a shortcut to PublishData for javascript content to be executed.
+func PublishJavascript(msg Message, js string) error {
+	return PublishData(msg, Data{
+		Data:      MIMEMap{string(protocol.MIMETextJavascript): js},
+		Metadata:  make(MIMEMap),
+		Transient: make(MIMEMap),
+	})
 }
 
 const (
@@ -536,15 +552,15 @@ func SendKernelInfo(msg Message, version string) error {
 	)
 }
 
-// PublishExecutionInput publishes a status message notifying front-ends of what code is
+// PublishExecuteInput publishes a status message notifying front-ends of what code is
 // currently being executed.
-func PublishExecutionInput(msg Message, execCount int, code string) error {
+func PublishExecuteInput(msg Message, code string) error {
 	return msg.Publish("execute_input",
 		struct {
 			ExecCount int    `json:"execution_count"`
 			Code      string `json:"code"`
 		}{
-			ExecCount: execCount,
+			ExecCount: msg.Kernel().ExecCounter,
 			Code:      code,
 		},
 	)

@@ -193,7 +193,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			goExec.GoBuildFlags = nonEmptyArgs
 		}
 
-		err := kernel.PublishDisplayDataWithMarkdown(msg,
+		err := kernel.PublishMarkdown(msg,
 			fmt.Sprintf("* `%%goflags=%q`", goExec.GoBuildFlags))
 		if err != nil {
 			klog.Errorf("Failed publishing contents: %+v", err)
@@ -206,7 +206,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		goExec.AutoGet = false
 	case "help":
 		//_ = kernel.PublishWriteStream(msg, kernel.StreamStdout, HelpMessage)
-		err := kernel.PublishDisplayDataWithMarkdown(msg, HelpMessage)
+		err := kernel.PublishMarkdown(msg, HelpMessage)
 		if err != nil {
 			klog.Errorf("Failed publishing %help contents: %+v", err)
 		}

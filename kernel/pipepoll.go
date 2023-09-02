@@ -114,11 +114,7 @@ func processDisplayData(msg Message, executionCount int, data *protocol.DisplayD
 	if isUpdate {
 		err = PublishUpdateDisplayData(msg, msgData)
 	} else {
-		if executionCount >= 0 {
-			err = PublishExecutionResult(msg, executionCount, msgData)
-		} else {
-			err = PublishDisplayData(msg, msgData)
-		}
+		err = PublishData(msg, msgData)
 	}
 	if err != nil {
 		klog.Errorf("Failed to display data (ignoring): %v", err)

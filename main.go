@@ -15,12 +15,13 @@ import (
 )
 
 var (
-	flagInstall  = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
-	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
-	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
-	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
-	flagRawError = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
-	flagWork     = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
+	flagInstall   = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
+	flagKernel    = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
+	flagExtraLog  = flag.String("extra_log", "", "Extra file to include in the log.")
+	flagForceDeps = flag.Bool("force_deps", false, "Force install even if goimports and/or gopls are missing.")
+	flagForceCopy = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")
+	flagRawError  = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
+	flagWork      = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
 )
 
 var (
@@ -69,7 +70,7 @@ func main() {
 		if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
 			extraArgs = append(extraArgs, "--work")
 		}
-		err := kernel.Install(extraArgs, *flagForce)
+		err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)
 		}

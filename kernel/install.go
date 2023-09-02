@@ -28,7 +28,12 @@ type jupyterKernelConfig struct {
 // Install gonb in users local Jupyter configuration, making it available. It assumes
 // the kernel is implemented by the same binary that is calling this function (os.Args[0])
 // and that the flag to pass the `connection_file` is `--kernel`.
-func Install(extraArgs []string, force bool) error {
+//
+// If the binary is under `/tmp` (or if forceCopy is true), it is copied to the location of
+// the kernel configuration, and that copy is used.
+//
+// If forceDeps is true, installation will succeed even with missing dependencies.
+func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	gonbPath, err := os.Executable()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to find path to GoNB binary")
@@ -64,9 +69,9 @@ func Install(extraArgs []string, force bool) error {
 	// If binary is in /tmp, presumably temporary compilation of Go binary,
 	// make a copy of the binary (since it will be deleted) to the configuration
 	// directory.
-	if strings.HasPrefix(os.Args[0], "/tmp/") {
+	if strings.HasPrefix(os.Args[0], "/tmp/") || forceCopy {
 		newBinary := path.Join(kernelDir, "gonb")
-		// Move previous version out of the way.
+		// Move the previous version out of the way.
 		if _, err := os.Stat(newBinary); err == nil {
 			err = os.Rename(newBinary, newBinary+"~")
 			if err != nil {
@@ -114,7 +119,7 @@ go install golang.org/x/tools/cmd/goimports@latest
 go install golang.org/x/tools/gopls@latest
 
 `
-		if !force {
+		if !forceDeps {
 			klog.Fatalf(msg)
 		}
 		klog.Infof(msg)

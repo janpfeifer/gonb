@@ -10,7 +10,9 @@ require (
 	github.com/go-language-server/uri v0.2.0
 	github.com/go-zeromq/zmq4 v0.15.0
 	github.com/gofrs/uuid v4.4.0+incompatible
+	github.com/gorilla/websocket v1.5.0
 	github.com/gowebapi/webapi v0.0.0-20221221115732-41cedfc27a0b
+	github.com/janpfeifer/must v0.0.2
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
 	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb

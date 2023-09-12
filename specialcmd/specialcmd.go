@@ -139,6 +139,9 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		}
 		goExec.WasmDivId = gonbui.UniqueID() // Create a unique ID for this cell.
 
+	case "widgets":
+		return goExec.Comms.InstallJavascript(msg)
+
 	case "env":
 		// Set environment variables.
 		if len(parts) == 2 {

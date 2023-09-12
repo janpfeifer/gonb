@@ -111,8 +111,9 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		if err = kernel.SendKernelInfo(msg, Version); err != nil {
 			err = errors.WithMessagef(err, "replying to 'kernel_info_request'")
 		}
+
 	case "shutdown_request":
-		if err = handleShutdownRequest(msg); err != nil {
+		if err = handleShutdownRequest(msg, goExec); err != nil {
 			err = errors.WithMessagef(err, "replying 'shutdown_request'")
 		}
 	case "execute_request":
@@ -142,7 +143,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 }
 
 // handleShutdownRequest sends a "shutdown" message.
-func handleShutdownRequest(msg kernel.Message) error {
+func handleShutdownRequest(msg kernel.Message, goExec *goexec.State) error {
 	content := msg.ComposedMsg().Content.(map[string]any)
 	restart := content["restart"].(bool)
 	type shutdownReply struct {
@@ -155,6 +156,12 @@ func handleShutdownRequest(msg kernel.Message) error {
 		return errors.WithMessagef(err, "replying shutdown_reply")
 	}
 	klog.Infof("Shutting down in response to shutdown_request")
+
+	// Shutdown comms with front-end first.
+	if err := goExec.Comms.Close(msg); err != nil {
+		klog.Warningf("comms: failure closing connection to front-end: %+v", err)
+	}
+
 	msg.Kernel().Stop()
 	return nil
 }

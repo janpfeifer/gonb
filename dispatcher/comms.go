@@ -41,7 +41,7 @@ func handleComms(msg kernel.Message, goExec *goexec.State) error {
 		// https://jupyter-client.readthedocs.io/en/latest/messaging.html#comm-info
 
 	case "comm_open":
-		//
+		return goExec.Comms.HandleOpen(msg)
 
 	case "comm_close":
 

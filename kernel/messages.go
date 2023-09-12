@@ -424,21 +424,42 @@ func PublishData(msg Message, data Data) error {
 	return PublishDisplayData(msg, data)
 }
 
-// PublishUpdateDisplayData is like PublishDisplayData, but expects `transient.display_id` to be set, and that a
-// previous `display_data` has already created this id.
+// PublishUpdateDisplayData is like PublishDisplayData, but expects `transient.display_id` to be set.
+// If the "display_id" is new, it will publish the data with the given "display_id" as usual, creating a new block ("<div>").
+// If it has already been seen, instead it updates the previously create display data on that "display_id".
 func PublishUpdateDisplayData(msg Message, data Data) error {
 	if klog.V(1).Enabled() {
 		logDisplayData(data.Data)
 	}
-	// copy Data in a struct with appropriate json tags
-	return msg.Publish("update_display_data", struct {
+
+	// Get displayId.
+	displayIdAny, found := data.Transient["display_id"]
+	if !found {
+		return errors.Errorf("PublishUpdateDisplayData without a Trasient[display_id] set!?")
+	}
+	displayId, ok := displayIdAny.(string)
+	if !ok {
+		return errors.Errorf("PublishUpdateDisplayData call with a Trasient[display_id] that is not string, instead %T!?", displayIdAny)
+	}
+
+	// Check whether displayId is new.
+	kernel := msg.Kernel()
+	msgType := "display_data"
+	if kernel.KnownBlockIds.Has(displayId) {
+		msgType = "update_display_data"
+	} else {
+		kernel.KnownBlockIds.Insert(displayId)
+	}
+
+	// Publish message.
+	return msg.Publish(msgType, struct {
 		Data      MIMEMap `json:"data"`
 		Metadata  MIMEMap `json:"metadata"`
 		Transient MIMEMap `json:"transient"`
 	}{
 		Data:      data.Data,
 		Metadata:  EnsureMIMEMap(data.Metadata),
-		Transient: EnsureMIMEMap(data.Transient),
+		Transient: data.Transient,
 	})
 }
 

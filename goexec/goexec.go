@@ -9,6 +9,8 @@ import (
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec/goplsclient"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/janpfeifer/gonb/internal/comms"
+	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
@@ -35,6 +37,10 @@ const (
 // That is, if the user runs a cell that defines, let's say `func f(x int) int { return x+1 }`,
 // the definition of `f` will be stored in Definitions field.
 type State struct {
+	// Kernel is set when actually connecting to JupyterServer.
+	// In tests its left as nil.
+	Kernel *kernel.Kernel
+
 	// Temporary directory where Go program is build at each execution.
 	UniqueID, Package, TempDir string
 
@@ -82,6 +88,9 @@ type State struct {
 	// CellIsWasm indicates whether the current cell is to be compiled for WebAssembly (wasm).
 	CellIsWasm                  bool
 	WasmDir, WasmUrl, WasmDivId string
+
+	// Comms represents the communication with the front-end.
+	Comms *comms.State
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.
@@ -109,6 +118,7 @@ func New(uniqueID string, preserveTempDir, rawError bool) (*State, error) {
 		trackingInfo:    newTrackingInfo(),
 		preserveTempDir: preserveTempDir,
 		rawError:        rawError,
+		Comms:           comms.New(),
 	}
 
 	// Create directory.

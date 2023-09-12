@@ -28,7 +28,6 @@ func init() {
 // If `executionCount` is < 0, this is not being output on the behest of an "execute_request".
 func PollGonbPipe(msg Message, executionCount int, pipeReader *os.File, cmdStdin io.Writer) {
 	decoder := gob.NewDecoder(pipeReader)
-	knownBlockIds := make(map[string]struct{})
 	for {
 		data := &protocol.DisplayData{}
 		err := decoder.Decode(data)
@@ -52,7 +51,7 @@ func PollGonbPipe(msg Message, executionCount int, pipeReader *os.File, cmdStdin
 		}
 
 		// Otherwise, just display with the corresponding MIME type:
-		processDisplayData(msg, executionCount, data, knownBlockIds)
+		processDisplayData(msg, executionCount, data)
 	}
 }
 
@@ -86,7 +85,7 @@ func logDisplayData(data MIMEMap) {
 // processDisplayData process an incoming `protocol.DisplayData` object.
 //
 // If `executionCount` is < 0, this is not being output on the behest of an "execute_request".
-func processDisplayData(msg Message, executionCount int, data *protocol.DisplayData, knownBlockIds map[string]struct{}) {
+func processDisplayData(msg Message, executionCount int, data *protocol.DisplayData) {
 	// Log info about what is being displayed.
 	msgData := Data{
 		Data:      make(MIMEMap, len(data.Data)),
@@ -102,16 +101,9 @@ func processDisplayData(msg Message, executionCount int, data *protocol.DisplayD
 	for key, content := range data.Metadata {
 		msgData.Metadata[key] = content
 	}
-	isUpdate := false
+	var err error
 	if data.DisplayID != "" {
 		msgData.Transient["display_id"] = data.DisplayID
-		if _, found := knownBlockIds[data.DisplayID]; found {
-			isUpdate = true
-		}
-		knownBlockIds[data.DisplayID] = struct{}{}
-	}
-	var err error
-	if isUpdate {
 		err = PublishUpdateDisplayData(msg, msgData)
 	} else {
 		err = PublishData(msg, msgData)

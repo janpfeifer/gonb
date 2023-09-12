@@ -13,10 +13,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/janpfeifer/must"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"
 	"os/signal"
+	"regexp"
 	"sync"
 	"sync/atomic"
 
@@ -24,11 +28,13 @@ import (
 )
 
 var (
-	// ProtocolVersion defines the Jupyter protocol version.
-	// Version 5.2 encodes cursor pos as one position per unicode character.
+	// ProtocolVersion defines the Jupyter protocol version. See differences here:
+	// https://jupyter-client.readthedocs.io/en/stable/messaging.html#changelog
+	//
+	// Version >= 5.2 encodes cursor pos as one position per unicode character.
 	// (https://jupyter-client.readthedocs.io/en/stable/messaging.html#cursor-pos-and-unicode-offsets)
 	// But still Jupyter-Lab is using UTF-16 encoding for cursor-pos.
-	ProtocolVersion = "5.2"
+	ProtocolVersion = "5.4"
 )
 
 const (
@@ -104,6 +110,17 @@ type Kernel struct {
 	// stdinMsg holds the MessageImpl that last asked from input from stdin (MessageImpl.PromptInput).
 	stdinMsg *MessageImpl
 	stdinFn  OnInputFn // Callback when stdin input is received.
+
+	// JupyterKernelId is a unique id associated to the kernel by Jupyter.
+	// It's different from the id created by goexec.State to identify the temporary Go
+	// code compilation.
+	// The use so far, besides to match Jupyter logs, is also to create URL to websocket port
+	// for the session (see `dispatcher/comm.go`).
+	JupyterKernelId string
+
+	// KnownBlockIds are display data blocks with a "display_id" that have already been created, and
+	// hence should be updated (instead of created anew) in calls to PublishUpdate
+	KnownBlockIds common.Set[string]
 }
 
 // IsStopped returns whether the Kernel has been stopped.
@@ -220,7 +237,10 @@ func (k *Kernel) Control() <-chan Message {
 	return k.control
 }
 
-// NewKernel builds and start a kernel. Various goroutines are started to poll
+var reExtractJupyterSessionId = regexp.MustCompile(
+	`^.*kernel-([0-9a-f-]+)\.json$`)
+
+// New builds and start a kernel. Various goroutines are started to poll
 // for incoming messages. It automatically handles the heartbeat.
 //
 // Incoming messages should be listened to using Kernel.Stdin, Kernel.Shell and
@@ -229,12 +249,27 @@ func (k *Kernel) Control() <-chan Message {
 // The Kernel can be stopped by calling Kernel.Stop. And one can wait for the
 // kernel clean up of the various goroutines, after it is stopped, by calling
 // kernel.ExitWait.
-func NewKernel(connectionFile string) (*Kernel, error) {
+//
+// The `connectionFile` is created by Jupyter with information on which ports to
+// connect to each socket. The path itself is also used to extract the JupyterKernelId
+// associated with this instance of the kernel.
+func New(connectionFile string) (*Kernel, error) {
 	k := &Kernel{
 		stop:    make(chan struct{}),
 		shell:   make(chan Message, 1),
 		stdin:   make(chan Message, 1),
 		control: make(chan Message, 1),
+
+		KnownBlockIds: make(common.Set[string]),
+	}
+
+	if matches := reExtractJupyterSessionId.FindStringSubmatch(connectionFile); len(matches) == 2 {
+		k.JupyterKernelId = matches[1]
+		must.M(os.Setenv(protocol.GONB_JUPYTER_KERNEL_ID_ENV, k.JupyterKernelId))
+		klog.Infof("%s=%s", protocol.GONB_JUPYTER_KERNEL_ID_ENV, k.JupyterKernelId)
+	} else {
+		klog.Warningf("Could not parse Jupyter KernelId from kernel configuration path %q",
+			connectionFile)
 	}
 
 	// Parse the connection info.

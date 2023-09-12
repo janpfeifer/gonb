@@ -94,7 +94,7 @@ func main() {
 	}
 
 	// Create a kernel.
-	k, err := kernel.NewKernel(*flagKernel)
+	k, err := kernel.New(*flagKernel)
 	klog.Infof("kernel created\n")
 	if err != nil {
 		log.Fatalf("Failed to start kernel: %+v", err)
@@ -103,6 +103,7 @@ func main() {
 
 	// Create a Go executor.
 	goExec, err := goexec.New(UniqueID, *flagWork, *flagRawError)
+	goExec.Kernel = k
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}
@@ -111,7 +112,10 @@ func main() {
 	dispatcher.RunKernel(k, goExec)
 
 	// Stop gopls.
-	goExec.Stop()
+	err = goExec.Stop()
+	if err != nil {
+		klog.Warningf("Error during shutdown: %+v", err)
+	}
 
 	// Wait for all polling goroutines.
 	k.ExitWait()

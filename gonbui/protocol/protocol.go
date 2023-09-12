@@ -35,6 +35,12 @@ const (
 	// served by Jupyter: one can use `src="/file/...<path under GONB_JUPYTER_ROOT>..."`.
 	GONB_JUPYTER_ROOT_ENV = "GONB_JUPYTER_ROOT"
 
+	// GONB_JUPYTER_KERNEL_ID_ENV is the environment variable with the unique id assigned
+	// by Jupyter to this kernel.
+	// It's used to build some of the API paths to the JupyterServer.
+	// If it's not set, GoNB was not able to parse it from the kernel file path.
+	GONB_JUPYTER_KERNEL_ID_ENV = "GONB_JUPYTER_KERNEL_ID"
+
 	// GONB_WASM_DIR_ENV is the temporary directory created in "${GONB_JUPYTER_ROOT}/.jupyter_files/<session_id>/wasm/"
 	// where the generated `.wasm` file is stored when using `%wasm`.
 	// It is set/updated everytime `%wasm` is first used.

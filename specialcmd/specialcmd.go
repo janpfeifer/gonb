@@ -14,6 +14,7 @@ import (
 	"golang.org/x/exp/slices"
 	"os"
 	"strings"
+	"time"
 
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/goexec"
@@ -141,6 +142,18 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 
 	case "widgets":
 		return goExec.Comms.InstallJavascript(msg)
+
+	case "widgets_hb":
+		var hb bool
+		hb, err := goExec.Comms.SendHeartbeatAndWait(msg, 1*time.Second)
+		if err != nil {
+			return err
+		}
+		if hb {
+			return kernel.PublishHtml(msg, "Heartbeat pong received back.")
+		} else {
+			return kernel.PublishHtml(msg, "Timed-out, no heartbeat pong received. Try installing front-end websockets with %widgets ?")
+		}
 
 	case "env":
 		// Set environment variables.

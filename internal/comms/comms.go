@@ -9,6 +9,7 @@ package comms
 
 import (
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/internal/websocket"
@@ -17,6 +18,7 @@ import (
 	"k8s.io/klog/v2"
 	"strings"
 	"sync"
+	"time"
 )
 
 // State for comms protocol. There is a singleton for the kernel, owned
@@ -43,11 +45,29 @@ type State struct {
 
 	// CommId created when the channel is opened from the front-end.
 	CommId string
+
+	// LastMsgTime is used to condition the need of a heartbeat, to access if the connection is still alive.
+	LastMsgTime time.Time
+
+	// HeartbeatPongLatch is triggered when we receive a heartbeat reply ("pong"), or when it times out.
+	// A true value means it got the heartbeat, false means it didn't.
+	// It is recreated everytime a HeartbeatPing is sent.
+	HeartbeatPongLatch *common.Latch[bool]
 }
+
+const (
+	// HeartbeatPingAddress is a protocol private message address used as heartbeat request.
+	HeartbeatPingAddress = "#heartbeat/ping"
+
+	// HeartbeatPongAddress is a protocol private message address used as heartbeat reply.
+	HeartbeatPongAddress = "#heartbeat/pong"
+)
 
 // New creates and initializes an empty comms.State.
 func New() *State {
-	s := &State{}
+	s := &State{
+		IsWebSocketInstalled: false,
+	}
 	return s
 }
 
@@ -79,6 +99,11 @@ func getFromJson[T any](values map[string]any, key string) (value T, err error) 
 	return
 }
 
+const (
+	HeartbeatTimeout          = 500 * time.Millisecond
+	HeartbeatRequestThreshold = 1 * time.Second
+)
+
 // InstallJavascript in the front end that open websocket for communication.
 // The javascript is output as a transient output, so it's not saved.
 //
@@ -88,10 +113,35 @@ func (s *State) InstallJavascript(msg kernel.Message) error {
 	defer s.mu.Unlock()
 
 	if s.IsWebSocketInstalled {
-		// Already installed.
-		klog.V(1).Infof("comms.State.InstallJavascript(): already installed")
-		return nil
+		// Already installed: if we haven't heard from the other side in more than HeartbeatRequestThreshold, then
+		// we want to confirm with a ping.
+		if time.Since(s.LastMsgTime) <= HeartbeatRequestThreshold {
+			klog.V(1).Infof("comms.State.InstallJavascript(): already installed")
+			return nil
+		}
+
+		// Send heartbeat to confirm.
+		if s.CommId != "" && s.Opened {
+			klog.V(1).Infof("comms.State.InstallJavascript(): confirm installation with heartbeat")
+			heartbeat, err := s.sendHeartbeatPingLocked(msg, HeartbeatTimeout)
+			if err != nil {
+				return err
+			}
+			if heartbeat {
+				// We got a heartbeat: websocket already installed, and connection is established.
+				klog.V(1).Infof("comms.State.InstallJavascript(): heartbeat pong received, all good.")
+				return nil
+			}
+			klog.V(1).Infof("comms.State.InstallJavascript(): heartbeat timed out and not heard back.")
+		}
+
+		// Likely we have a stale comms connection (e.g.: if the browser reloaded), we reset it and
+		// follow with the re-install.
+		s.CommId = ""
+		s.IsWebSocketInstalled = false
+		s.Opened = false
 	}
+
 	js := websocket.Javascript()
 	jsData := kernel.Data{
 		Data:      make(kernel.MIMEMap, 1),
@@ -165,9 +215,57 @@ func (s *State) HandleOpen(msg kernel.Message) (err error) {
 	// Mark comms opened.
 	s.CommId = commId
 	s.Opened = true
-	return s.send(msg, map[string]any{
+	s.LastMsgTime = time.Now()
+	return s.sendLocked(msg, map[string]any{
 		"comm_open_ack": true,
 	})
+}
+
+// HandleMsg is called by the dispatcher whenever a new `comm_msg` arrives from the front-end.
+// It filters out messages with the wrong `comm_id`, handles protocol messages (heartbeat)
+// and routes other messages.
+func (s *State) HandleMsg(msg kernel.Message) (err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	content, ok := msg.ComposedMsg().Content.(map[string]any)
+	if !ok {
+		klog.Warningf("comms: ignored comm_msg, no content in msg %+v", msg.ComposedMsg())
+		return nil
+	}
+
+	var commId string
+	commId, err = getFromJson[string](content, "comm_id")
+	if err != nil {
+		klog.Warningf("comms: ignored comm_msg, \"comm_id\" not set: %+v", err)
+		return nil
+	}
+	if commId != s.CommId {
+		klog.Warningf("comms: ignored comm_msg, \"comm_id\" (%q) different than the one we established the connection (%q)",
+			commId, s.CommId)
+		return nil
+	}
+
+	// Update connection alive signal.
+	s.LastMsgTime = time.Now()
+
+	// Parses address of message.
+	var address string
+	address, err = getFromJson[string](content, "data/address")
+	if err != nil {
+		klog.Warningf("comms: comm_msg did not set an \"content/data/address\" field: %+v", err)
+		return nil
+	}
+
+	switch address {
+	case HeartbeatPongAddress:
+		return s.handleHeartbeatPongLocked(msg)
+	case HeartbeatPingAddress:
+		return s.handleHeartbeatPongLocked(msg)
+	default:
+		klog.Warningf("comms: comm_msg to address %q dropped, since there were no recipients", address)
+		return nil
+	}
 }
 
 // Close connection with front-end. It sends a "comm_close" message.
@@ -196,9 +294,85 @@ func (s *State) closeLocked(msg kernel.Message) error {
 
 // send using "comm_msg" message type.
 func (s *State) send(msg kernel.Message, data map[string]any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sendLocked(msg, data)
+}
+
+// sendLocked is like send, but assumed lock is already acquired.
+func (s *State) sendLocked(msg kernel.Message, data map[string]any) error {
 	content := map[string]any{
 		"comm_id": s.CommId,
 		"data":    data,
 	}
-	return msg.Reply("comm_msg", content)
+	klog.Infof("comms: send %+v", content)
+	return msg.Publish("comm_msg", content)
+	//return msg.Reply("comm_msg", content)
+}
+
+// SendHeartbeatAndWait sends a heartbeat request (ping) and waits for a reply within the given timeout.
+// Returns true if a heartbeat was replied (pong) back, or false if it timed out.
+// It returns an error if it failed to send the heartbeat message.
+func (s *State) SendHeartbeatAndWait(msg kernel.Message, timeout time.Duration) (heartbeat bool, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.sendHeartbeatPingLocked(msg, timeout)
+}
+
+// sendHeartbeatPingLocked sends a heartbeat request (ping) and waits for a reply within the given timeout.
+// Returns true if a heartbeat was replied (pong) back, or false if it timed out.
+// It returns an error if it failed to send the heartbeat message.
+//
+// It unlocks the State while waiting, and reacquire the state before returning.
+//
+// If a heartbeat has already been sent, it won't create a new one, and the timeout time may not be honored, instead
+// it will be used the one previously set.
+func (s *State) sendHeartbeatPingLocked(msg kernel.Message, timeout time.Duration) (heartbeat bool, err error) {
+	if s.HeartbeatPongLatch != nil {
+		klog.Warningf("comms: heartbeat ping requested, but one is already running (it will be reused).")
+	} else {
+		klog.V(1).Infof("comms: sending heartbeat ping")
+		data := map[string]any{
+			"address": HeartbeatPingAddress,
+			"value":   true,
+		}
+		err = s.sendLocked(msg, data)
+		if err != nil {
+			err = errors.WithMessagef(err, "failed to send heartbeat ping message")
+			return
+		}
+
+		// Create latch to receive response, and a timeout trigger for the latch, in case we don't
+		// get the reply in time.
+		s.HeartbeatPongLatch = common.NewLatch[bool]()
+		go func(l *common.Latch[bool]) {
+			time.Sleep(timeout)
+			// If latch has already triggered in the meantime, this trigger is discarded automatically.
+			l.Trigger(false)
+		}(s.HeartbeatPongLatch)
+	}
+
+	// Unlock and wait for reply (pong).
+	latch := s.HeartbeatPongLatch
+	s.mu.Unlock()
+	heartbeat = latch.Wait() // true if heartbeat pong received, false if timed out.
+
+	s.mu.Lock()
+	// Clear the latch that we already used -- care in case in between some other process created a new latch.
+	if s.HeartbeatPongLatch == latch {
+		s.HeartbeatPongLatch = nil
+	}
+	return
+}
+
+// handleHeartbeatPong when one is received.
+func (s *State) handleHeartbeatPongLocked(msg kernel.Message) error {
+	if s.HeartbeatPongLatch != nil {
+		klog.V(1).Infof("comms: heartbeat pong received, latch triggered")
+		s.HeartbeatPongLatch.Trigger(true)
+	} else {
+		klog.Warningf("comms: heartbeat pong received but no one listening (no associated latch)!?")
+	}
+	return nil
 }

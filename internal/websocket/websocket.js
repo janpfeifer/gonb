@@ -113,6 +113,32 @@
         }
     };
 
+    /** send a value to the given address.
+     *
+     * Message is immediately enqueued. There is no acknowledgement of delivery -- in case of issues, it won't report
+     * back to the caller -- but errors are logged in the console.
+     *
+     * @param address A string, by convention organized hierarchically, separated by "/". E.g.: "/hyperparameters/learning_rate".
+     * @param value Any pod (plain-old-data) value, or an object. It will be JASON.stringified.
+     */
+    gonb_comm.send = function(address, value) {
+        gonb_comm._is_connected.
+            then(() => {
+                let msg = this._build_raw_message("comm_msg");
+                msg.content = {
+                    comm_id: this._comm_id,
+                    data: {
+                        address: address,
+                        value: value,
+                    },
+                }
+                let err = this._send(msg);
+                if (err) {
+                    console.error(`gonb_comm: failed sending data to address "${address}": ${err.message}`);
+                }
+        })
+    }
+
     /** close closes websocket connection and cleans up.
      * Once websocket closes, gonb_comm will be deleted from the global scope.
      */
@@ -142,6 +168,20 @@
             return;
         }
         debug_log(`gonb_comm: received comm_msg\n${JSON.stringify(msg, null, 2)}`);
+
+        let address = data?.address;
+        if (!address) {
+            console.error(`gonb_comm: received comm_msg without a address \n${JSON.stringify(msg, null, 2)}`);
+            return;
+        }
+
+        if (address === "#heartbeat/ping") {
+            // Internal heartbeat request.
+            this.send("#heartbeat/pong", true);
+            return;
+        }
+
+        debug_log(`gonb_comm: received comm_msg to address \"${address}\"`)
     }
 
     /**
@@ -150,11 +190,10 @@
      * See _build_raw_message to build compatible messages.
      *
      * @param msg message sent to be sent to the JupyterServer.
-     * @returns {Promise<void>}
+     * @returns Error or null.
      */
-    gonb_comm._send = async function(msg) {
+    gonb_comm._send = function(msg) {
         debug_log(`gonb_comm._send(${this._kernel_id})`);
-        await this._wait_websocket();
         let msg_str = JSON.stringify(msg);
         try {
             this._websocket.send(msg_str);
@@ -162,7 +201,7 @@
             return null;
         } catch (err) {
             debug_log(`gonb_comm._send(${msg_str}) failed: ${err.message}`);
-            return Promise.reject(err);
+            return err;
         }
     }
 
@@ -194,6 +233,7 @@
 
         try {
             // Create comm_id and send "comm_open".
+            await this._wait_websocket();
             this._comm_id = crypto.randomUUID();
             let msg = this._build_raw_message("comm_open");
             msg.content = {
@@ -201,8 +241,7 @@
                 target_name: "gonb_comm",
                 data: {},
             }
-            await this._wait_websocket();
-            await this._send(msg);
+            let err = this._send(msg);
             await this._wait_open_ack();
         } catch (err) {
             console.error(`gonb_comm: failed to connect to kernel, communication (and widgets) will not work: ${err.message}`);
@@ -245,5 +284,7 @@
             };
         });
     }
-    debug_log("gonb_comm started...");
+
+    // Start connecting protocol ("comm_open", and a "comm_open_ack" message).
+    gonb_comm._is_connected = gonb_comm._connect_to_gonb();
 })();

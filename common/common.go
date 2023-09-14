@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Set implements a Set for the key type T.
@@ -120,4 +121,51 @@ func ReplaceTildeInDir(dir string) string {
 	}
 	homeDir := usr.HomeDir
 	return path.Join(homeDir, dir[1+len(userName):])
+}
+
+// Latch implements a "latch" synchronization mechanism, with a value associated with the
+// triggering of the latch.
+//
+// A Latch is a signal that can be waited for until it is triggered. Once triggered it never
+// changes state, it's forever triggered.
+type Latch[T any] struct {
+	value     T
+	muTrigger sync.Mutex
+	wait      chan struct{}
+}
+
+// NewLatch returns an un-triggered latch.
+func NewLatch[T any]() *Latch[T] {
+	return &Latch[T]{
+		wait: make(chan struct{}),
+	}
+}
+
+// Trigger latch and saves the associated value.
+func (l *Latch[T]) Trigger(value T) {
+	l.muTrigger.Lock()
+	defer l.muTrigger.Unlock()
+
+	if l.Test() {
+		// Already triggered, discard value.
+		return
+	}
+	l.value = value
+	close(l.wait)
+}
+
+// Wait waits for the latch to be triggered, and returns the trigger value.
+func (l *Latch[T]) Wait() T {
+	<-l.wait
+	return l.value
+}
+
+// Test checks whether the latch has been triggered.
+func (l *Latch[T]) Test() bool {
+	select {
+	case <-l.wait:
+		return true
+	default:
+		return false
+	}
 }

@@ -2,13 +2,20 @@
 
 ## Next
 
-* Added bare-bones "%wasm": allows compiling cell to WASM and running that in the notebook. One
-  can write widgets like this. **Experimental**: there are some use cases are not 100% clear. See
-  "%help" for details on how this works.
+* Added **widgets** support (experimental): 
+  * a websocket opened from the front-end that communicates
+    to the kernel, and through it to the users cells.
+  * (TODO) API to use it in `gonb/gonbui/widgets`. 
+* Added "%wasm" support (experimental): 
+  * Allows compiling cell to WASM and running that in the notebook. One
+    can write widgets like this. **Experimental**: there are some use cases are not 100% clear. See
+    "%help" for details on how this works.
   * Added also `github.com/janpfeifer/gonb/gonbui/wasm` library with some basic helpers to write
     WASM widgets.
   * Added `gonb/examples/wasm_demo.ipynb` with a couple of examples of Wasm.
 * Improved logging of errors; pre-checking for duplicate `package`, with improved error message.
+* Handle incoming messages in a separated goroutine, so asynchronous/concurrent messages can be
+  handled. Specially important when executing cells that take a long time.
 * Added support for `%env VAR=VALUE` syntax as well (like ipython uses).
 
 ## 0.8.0 -- Tests and Benchmarks, 2023/08/24

@@ -46,6 +46,7 @@ func handleComms(msg kernel.Message, goExec *goexec.State) error {
 	case "comm_close":
 
 	case "comm_msg":
+		return goExec.Comms.HandleMsg(msg)
 
 	}
 	return nil

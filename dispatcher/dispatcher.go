@@ -35,14 +35,16 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 				case <-kernelStop:
 					return
 				case msg := <-ch:
-					err := fn(msg, goExec)
-					if err != nil {
-						if !k.IsStopped() {
-							klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
-							k.Stop()
+					go func(msg kernel.Message) {
+						err := fn(msg, goExec)
+						if err != nil {
+							if !k.IsStopped() {
+								klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
+								k.Stop()
+							}
+							return
 						}
-						return
-					}
+					}(msg)
 				}
 			}
 		}()
@@ -86,6 +88,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	}
 	msgType := msg.ComposedMsg().Header.MsgType
 	klog.V(1).Infof("Dispatcher: handling %q", msgType)
+	klog.Infof("comms: IsWebSocketInstalled=%v", goExec.Comms.IsWebSocketInstalled)
 
 	if slices.Contains(BusyMessageTypes, msgType) {
 		// Tell the front-end that the kernel is working and when finished, notify the

@@ -56,6 +56,9 @@ type State struct {
 }
 
 const (
+	// CommOpenAckAddress is messaged in acknowledgement to a "comm_open" message.
+	CommOpenAckAddress = "#comm_open_ack"
+
 	// HeartbeatPingAddress is a protocol private message address used as heartbeat request.
 	HeartbeatPingAddress = "#heartbeat/ping"
 
@@ -216,8 +219,9 @@ func (s *State) HandleOpen(msg kernel.Message) (err error) {
 	s.CommId = commId
 	s.Opened = true
 	s.LastMsgTime = time.Now()
-	return s.sendLocked(msg, map[string]any{
-		"comm_open_ack": true,
+	return s.sendDataLocked(msg, map[string]any{
+		"address": CommOpenAckAddress,
+		"value":   true,
 	})
 }
 
@@ -292,27 +296,37 @@ func (s *State) closeLocked(msg kernel.Message) error {
 	return err
 }
 
-// send using "comm_msg" message type.
-func (s *State) send(msg kernel.Message, data map[string]any) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.sendLocked(msg, data)
+// Send value to the given address in the front-end.
+// This, along with subscribe, is the basic communication operation with the front-end.
+// The value will be converted to JSON before being sent.
+func (s *State) Send(msg kernel.Message, address string, value any) error {
+	return s.sendData(msg, map[string]any{
+		"address": address,
+		"value":   value,
+	})
 }
 
-// sendLocked is like send, but assumed lock is already acquired.
-func (s *State) sendLocked(msg kernel.Message, data map[string]any) error {
+// sendData using "comm_msg" message type.
+func (s *State) sendData(msg kernel.Message, data map[string]any) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sendDataLocked(msg, data)
+}
+
+// sendDataLocked is like sendData, but assumed lock is already acquired.
+func (s *State) sendDataLocked(msg kernel.Message, data map[string]any) error {
 	content := map[string]any{
 		"comm_id": s.CommId,
 		"data":    data,
 	}
-	klog.Infof("comms: send %+v", content)
+	klog.Infof("comms: sendData %+v", content)
 	return msg.Publish("comm_msg", content)
 	//return msg.Reply("comm_msg", content)
 }
 
 // SendHeartbeatAndWait sends a heartbeat request (ping) and waits for a reply within the given timeout.
 // Returns true if a heartbeat was replied (pong) back, or false if it timed out.
-// It returns an error if it failed to send the heartbeat message.
+// It returns an error if it failed to sendData the heartbeat message.
 func (s *State) SendHeartbeatAndWait(msg kernel.Message, timeout time.Duration) (heartbeat bool, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -322,7 +336,7 @@ func (s *State) SendHeartbeatAndWait(msg kernel.Message, timeout time.Duration) 
 
 // sendHeartbeatPingLocked sends a heartbeat request (ping) and waits for a reply within the given timeout.
 // Returns true if a heartbeat was replied (pong) back, or false if it timed out.
-// It returns an error if it failed to send the heartbeat message.
+// It returns an error if it failed to sendData the heartbeat message.
 //
 // It unlocks the State while waiting, and reacquire the state before returning.
 //
@@ -337,9 +351,9 @@ func (s *State) sendHeartbeatPingLocked(msg kernel.Message, timeout time.Duratio
 			"address": HeartbeatPingAddress,
 			"value":   true,
 		}
-		err = s.sendLocked(msg, data)
+		err = s.sendDataLocked(msg, data)
 		if err != nil {
-			err = errors.WithMessagef(err, "failed to send heartbeat ping message")
+			err = errors.WithMessagef(err, "failed to sendData heartbeat ping message")
 			return
 		}
 

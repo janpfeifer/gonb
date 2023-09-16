@@ -51,11 +51,14 @@
         _kernel_id: "{{.KernelId}}",
         _ws_url: "ws://" + document.location.host + "/api/kernels/{{.KernelId}}/channels",
         _comm_id: null,
+        _self_closed: false,
 
         // Subscriptions:
         _onopen_subscribers: [],
         _onopen_ack: null,
-        _self_closed: false,
+        _address_subscriptions: {},  // map address -> map id(Symbol) -> callback.
+        _address_subscriptions_next_id: 0,
+        _address_subscriptions_id_to_address: 0,  // map id(Symbol) -> address.
     }
     globalThis.gonb_comm = gonb_comm; // Make it globally available.
     gonb_comm._websocket = new WebSocket(gonb_comm._ws_url);
@@ -115,8 +118,8 @@
 
     /** send a value to the given address.
      *
-     * Message is immediately enqueued. There is no acknowledgement of delivery -- in case of issues, it won't report
-     * back to the caller -- but errors are logged in the console.
+     * Message with value is immediately enqueued. There is no acknowledgement of delivery --
+     * in case of issues, it won't report back to the caller -- but errors are logged in the console.
      *
      * @param address A string, by convention organized hierarchically, separated by "/". E.g.: "/hyperparameters/learning_rate".
      * @param value Any pod (plain-old-data) value, or an object. It will be JASON.stringified.
@@ -139,6 +142,45 @@
         })
     }
 
+
+    /** subscribe to receive values sent to the given address.
+     *
+     * @param address A string, by convention organized hierarchically, separated by "/". E.g.: "/hyperparameters/learning_rate".
+     * @param callback is called when a new value is received. The signature is `function(address, value)`.
+     * @return Symbol that can be used to unsubscribe.
+     */
+    gonb_comm.subscribe = function(address, callback) {
+        let id = Symbol(`gonb_id_${this._address_subscriptions_next_id}`)
+        this._address_subscriptions++;
+        let l = this._address_subscriptions[address];
+        if (!l) {
+            this._address_subscriptions[address] = {id: callback};
+        } else {
+            this._address_subscriptions[address][id] = callback;
+        }
+        this._address_subscriptions_id_to_address[id] = address;
+    }
+
+    /** unsubscribe uses the id returned when subscribing to unsubscribe from new messages. */
+    gonb_comm.unsubscribe = function(subscription_id) {
+        let address = this._address_subscriptions_id_to_address[subscription_id];
+        if (!address) {
+            // Not (or no longer) subscribed.
+            return;
+        }
+        delete this._address_subscriptions_id_to_address[subscription_id];
+        let l = this._address_subscriptions[address];
+        if (!l) {
+            // No longer subscribed ?
+            return;
+        }
+        delete l[subscription_id];
+        if (Object.keys(l).length === 0) {
+            // No more subscriptions to this address.
+            delete this._address_subscriptions[address];
+        }
+    }
+
     /** close closes websocket connection and cleans up.
      * Once websocket closes, gonb_comm will be deleted from the global scope.
      */
@@ -159,29 +201,42 @@
             debug_log(`gonb_comm: discarding comm_msg with unknown comm_id "${msg?.content?.comm_id}".`);
             return;
         }
-        let data = msg?.content?.data;
-        if (data?.comm_open_ack) {
-            debug_log(`gonb_comm: received comm_msg with comm_open_ack.`);
-            if (this._onopen_ack) {
-                this._onopen_ack();
-            }
-            return;
-        }
-        debug_log(`gonb_comm: received comm_msg\n${JSON.stringify(msg, null, 2)}`);
 
+        let data = msg?.content?.data;
         let address = data?.address;
         if (!address) {
             console.error(`gonb_comm: received comm_msg without a address \n${JSON.stringify(msg, null, 2)}`);
             return;
         }
 
-        if (address === "#heartbeat/ping") {
+        if (address === "#comm_open_ack") {
+            debug_log(`gonb_comm: received comm_msg addressed to #comm_open_ack.`);
+            if (this._onopen_ack) {
+                this._onopen_ack();
+            }
+            return;
+        } else if (address === "#heartbeat/ping") {
             // Internal heartbeat request.
             this.send("#heartbeat/pong", true);
+            debug_log(`gonb_comm: replied #heartbeat/ping with /pong`);
             return;
         }
 
-        debug_log(`gonb_comm: received comm_msg to address \"${address}\"`)
+        let subscribers = this._address_subscriptions[address];
+        if (!subscribers) {
+            console.error(`gonb_comm: comm_msg to address \"${address}\" but no one listening.`);
+            return;
+        }
+
+        let value = data?.value;
+        if (!value) {
+            console.error(`gonb_comm: comm_msg to address \"${address}\" but with no value!?.`);
+            return;
+        }
+        debug_log(`gonb_comm: delivered comm_msg to address \"${address}\" to ${Object.keys(subscribers).length} listener(s).`)
+        for (let callback of Object.values(subscribers)) {
+            callback(address, value);
+        }
     }
 
     /**

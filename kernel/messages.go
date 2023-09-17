@@ -416,7 +416,7 @@ func PublishDisplayData(msg Message, data Data) error {
 // if the parent message was "execute_result" or something else.
 func PublishData(msg Message, data Data) error {
 	if klog.V(1).Enabled() {
-		logDisplayData(data.Data)
+		LogDisplayData(data.Data)
 	}
 	if msg.ComposedMsg().Header.MsgType == "execute_request" {
 		return PublishExecuteResult(msg, data)
@@ -429,7 +429,7 @@ func PublishData(msg Message, data Data) error {
 // If it has already been seen, instead it updates the previously create display data on that "display_id".
 func PublishUpdateDisplayData(msg Message, data Data) error {
 	if klog.V(1).Enabled() {
-		logDisplayData(data.Data)
+		LogDisplayData(data.Data)
 	}
 
 	// Get displayId.
@@ -585,4 +585,22 @@ func PublishExecuteInput(msg Message, code string) error {
 			Code:      code,
 		},
 	)
+}
+
+// LogDisplayData prints out the display data using `klog`.
+func LogDisplayData(data MIMEMap) {
+	for key, valueAny := range data {
+		switch value := valueAny.(type) {
+		case string:
+			displayValue := value
+			if len(displayValue) > 20 {
+				displayValue = displayValue[:20] + "..."
+			}
+			klog.Infof("Data[%s]=%q", key, displayValue)
+		case []byte:
+			klog.Infof("Data[%s]=...%d bytes...", key, len(value))
+		default:
+			klog.Infof("Data[%s]: unknown type %t", key, value)
+		}
+	}
 }

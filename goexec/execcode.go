@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	. "github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
@@ -134,7 +135,8 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 	if len(args) == 0 && s.CellIsTest {
 		args = s.DefaultCellTestArgs()
 	}
-	err := kernel.PipeExecToJupyter(msg, s.BinaryPath(), args...).
+	err := jpyexec.New(msg, s.BinaryPath(), args...).
+		UseNamedPipes().
 		ExecutionCount(msg.Kernel().ExecCounter).
 		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
 		Exec()

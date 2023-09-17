@@ -5,7 +5,7 @@
 * Added **widgets** support (experimental): 
   * a websocket opened from the front-end that communicates
     to the kernel, and through it to the users cells.
-  * (TODO) API to use it in `gonb/gonbui/widgets`. 
+  * API to use it in `gonb/gonbui/widgets`. 
 * Added "%wasm" support (experimental): 
   * Allows compiling cell to WASM and running that in the notebook. One
     can write widgets like this. **Experimental**: there are some use cases are not 100% clear. See

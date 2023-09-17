@@ -74,9 +74,10 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 	}
 	visited.Insert(current)
 
-	return filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
+	err := filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
 		if info == nil {
-			return errors.Errorf("file %q does not exist!?", entryPath)
+			// This happens when a linked file/dir does not exist, ignoring.
+			return nil
 		}
 		if info.Type() == os.ModeSymlink {
 			// Recursively follow symbolic links.
@@ -85,12 +86,20 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 				err = errors.Wrapf(err, "WalkDirWithSymbolicLinks failed to resolve symlink %q", entryPath)
 				return err
 			}
-			return walkDirWithSymbolicLinksImpl(root, linkedPath, dirFunc, visited)
+			err = walkDirWithSymbolicLinksImpl(root, linkedPath, dirFunc, visited)
+			if err != nil {
+				err = errors.WithMessagef(err, "while traversing symlink %q -> %q", entryPath, linkedPath)
+				return err
+			}
 		}
 
 		// If not a symbolic link, call the user's function.
 		return dirFunc(entryPath, info, err)
 	})
+	if err != nil {
+		err = errors.WithMessagef(err, "while traversing dir %q", current)
+	}
+	return err
 }
 
 // ReplaceTildeInDir by the user's home directory. Returns dir if it doesn't start with "~".

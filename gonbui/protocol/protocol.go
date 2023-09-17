@@ -6,11 +6,19 @@ import "encoding/gob"
 
 const (
 	// GONB_PIPE_ENV is the name of the environment variable holding
-	// the path to the unix named pipe to communicate rich content to the kernel.
+	// the path to the unix named pipe to communicate from the kernel to
+	// the Go program.
 	//
-	// One doesn't need to use this directly usually, just use gonbui package instead,
-	// they will use this.
+	// It is used to display rich content in Jupyter, and to update widgets.
+	//
+	// One doesn't need to use this directly usually, just use gonbui package instead.
 	GONB_PIPE_ENV = "GONB_PIPE"
+
+	// GONB_PIPE_BACK_ENV is the name of the environment variable holding
+	// the path to the unix named pipe to communicate from the Go program to the kernel.
+	//
+	// It is used to receive updates from widgets displayed in the front-end (Jupyter notebook).
+	GONB_PIPE_BACK_ENV = "GONB_PIPE_BACK"
 
 	// GONB_DIR_ENV is the name of the environment variable holding the
 	// current execution directory for the Go cells, and the scripts executed

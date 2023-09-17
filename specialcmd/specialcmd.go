@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/janpfeifer/gonb/gonbui"
+	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"golang.org/x/exp/slices"
 	"os"
 	"strings"
@@ -209,8 +210,8 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			goExec.GoBuildFlags = nonEmptyArgs
 		}
 
-		err := kernel.PublishMarkdown(msg,
-			fmt.Sprintf("* `%%goflags=%q`", goExec.GoBuildFlags))
+		err := kernel.PublishWriteStream(msg, kernel.StreamStdout,
+			fmt.Sprintf("%%goflags=%q\n", goExec.GoBuildFlags))
 		if err != nil {
 			klog.Errorf("Failed publishing contents: %+v", err)
 		}
@@ -288,17 +289,17 @@ func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).
+		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
 			ExecutionCount(msg.Kernel().ExecCounter).
 			InDir(execDir).WithInputs(MillisecondsWaitForInput).Exec()
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).
+		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
 			ExecutionCount(msg.Kernel().ExecCounter).
 			InDir(execDir).WithPassword(MillisecondsWaitForInput).Exec()
 	} else {
-		return kernel.PipeExecToJupyter(msg, "/bin/bash", "-c", cmdStr).
+		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
 			ExecutionCount(msg.Kernel().ExecCounter).
 			InDir(execDir).Exec()
 	}

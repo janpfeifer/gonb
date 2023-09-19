@@ -12,6 +12,7 @@ import (
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"github.com/janpfeifer/gonb/internal/websocket"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
@@ -53,6 +54,19 @@ type State struct {
 	// A true value means it got the heartbeat, false means it didn't.
 	// It is recreated everytime a HeartbeatPing is sent.
 	HeartbeatPongLatch *common.Latch[bool]
+
+	// AddressSubscriptions by the program being executed. Needs to be reset at every program
+	// execution.
+	AddressSubscriptions common.Set[string]
+
+	// ProgramExecutor is a reference to the executor of the user's program (current cell).
+	// It is used to dispatch comms coming from the front-end to the program.
+	// This is set at the start of every cell execution, and reset to nil when the execution finishes.
+	ProgramExecutor *jpyexec.Executor
+
+	// ExecMsg is the kernel.Message used to start the program.
+	// This is set at the start of every cell execution, and reset to nil when the execution finishes.
+	ExecMsg kernel.Message
 }
 
 const (
@@ -70,6 +84,7 @@ const (
 func New() *State {
 	s := &State{
 		IsWebSocketInstalled: false,
+		AddressSubscriptions: make(common.Set[string]),
 	}
 	return s
 }

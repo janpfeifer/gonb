@@ -80,9 +80,25 @@ const (
 	MIMEImagePNG       MIMEType = "image/png"
 	MIMEImageSVG       MIMEType = "image/svg+xml"
 
-	// MIMEJupyterInput should be associated with an `*InputRequest`.
+	// MIMEJupyterInput maps to an `*InputRequest`, and requests input from Jupyter.
+	// It's used by `gonbui.RequestInput`.
+	//
 	// It's a GoNB specific mime type.
-	MIMEJupyterInput = "input/jupyter"
+	MIMEJupyterInput MIMEType = "gonb/jupyter_input"
+
+	// MIMECommValue maps to a `*CommValue`. It can be used to send or request a value to/from
+	// the front-end (notebook).
+	// It's used by `comms.UpdateValue` and `comms.ReadValue`, used by widgets implementations.
+	//
+	// It's a GoNB specific mime type.
+	MIMECommValue MIMEType = "gonb/comm_value"
+
+	// MIMECommSubscribe maps to a `*CommSubscription`, and requests updates for the given
+	// address in the front-end (notebook).
+	// It's used by `comms.Subscribe`, used by widgets implementations.
+	//
+	// It's a GoNB specific mime type.
+	MIMECommSubscribe MIMEType = "gonb/comm_subscribe"
 )
 
 // DisplayData mimics the contents of the "display_data" message used by Jupyter, see
@@ -111,6 +127,38 @@ type InputRequest struct {
 	Password bool
 }
 
+// CommValueTypes currently accepted for communication with front-end.
+// Can be used in generics for type matching, even though through the wire
+// they are simply encoded as `any`.
+type CommValueTypes interface {
+	int | float64 | string | []int | []float64 | []string |
+		map[string]int | map[string]float64 | map[string]string
+}
+
+// CommValue update or request to the front-end.
+type CommValue struct {
+	Address string
+	Request bool
+	Value   any
+}
+
+// CommSubscription to changes to an address in the front-end.
+type CommSubscription struct {
+	Address     string
+	Unsubscribe bool // Set to true to unsubscribe instead.
+}
+
 func init() {
+	gob.Register(&DisplayData{})
 	gob.Register(&InputRequest{})
+	gob.Register(&CommValue{})
+	gob.Register(&CommSubscription{})
+
+	// Register CommValueTypes.
+	gob.Register([]int{})
+	gob.Register([]float64{})
+	gob.Register([]string{})
+	gob.Register(map[string]int{})
+	gob.Register(map[string]float64{})
+	gob.Register(map[string]string{})
 }

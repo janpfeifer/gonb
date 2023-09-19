@@ -84,7 +84,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.jsonHandler = &jsonrpc2Handler{client: c}
 	c.jsonConn.AddHandler(c.jsonHandler)
 	go func(currentConn net.Conn) {
-		// Exec should use a non-expiring context.
+		// ProgramExecutor should use a non-expiring context.
 		ctx := context.Background()
 		_ = c.jsonConn.Run(ctx)
 		klog.Infof("- gopls connection stopped")

@@ -88,7 +88,6 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	}
 	msgType := msg.ComposedMsg().Header.MsgType
 	klog.V(1).Infof("Dispatcher: handling %q", msgType)
-	klog.Infof("comms: IsWebSocketInstalled=%v", goExec.Comms.IsWebSocketInstalled)
 
 	if slices.Contains(BusyMessageTypes, msgType) {
 		// Tell the front-end that the kernel is working and when finished, notify the

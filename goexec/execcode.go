@@ -46,7 +46,7 @@ func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skip
 	}
 	klog.V(2).Infof("ExecuteCell: after s.parseLinesAndComposeMain()")
 
-	// Exec `goimports` (or the code that implements it) -- it updates `updatedDecls` with
+	// ProgramExecutor `goimports` (or the code that implements it) -- it updates `updatedDecls` with
 	// the new imports, if there are any.
 	_, fileToCellIdAndLine, err = s.GoImports(msg, updatedDecls, mainDecl, fileToCellIdAndLine)
 
@@ -128,6 +128,11 @@ func (s *State) AlternativeDefinitionsPath() string {
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
+	// Makes sure there is only one execution of cell at a time.
+	// Concurrent requests will wait -- there is no order guarantee.
+	s.muExecution.Lock()
+	defer s.muExecution.Unlock()
+
 	if s.CellIsWasm {
 		return s.ExecuteWasm(msg)
 	}
@@ -136,7 +141,7 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 		args = s.DefaultCellTestArgs()
 	}
 	err := jpyexec.New(msg, s.BinaryPath(), args...).
-		UseNamedPipes().
+		UseNamedPipes(s.Comms).
 		ExecutionCount(msg.Kernel().ExecCounter).
 		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
 		Exec()

@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"sync"
 )
 
 const (
@@ -77,6 +78,12 @@ type State struct {
 
 	// rawError indicates no HTML context to compilation errors should be added.
 	rawError bool
+
+	// muExecution makes sure only one cell is executed at a time.
+	// Notice GoNB is able to handle multiple requests simultaneously, but it will
+	// only execute one cell at a time -- many parts of the code assumes there is
+	// no more than one execution simultaneously.
+	muExecution sync.Mutex
 
 	// CellIsTest indicates whether the current cell is to be compiled with `go test` (as opposed to `go build`).
 	// This also triggers writing the code to `main_test.go` as opposed to `main.go`.
@@ -196,7 +203,7 @@ func (s *State) GoModInit() error {
 		klog.Errorf("Failed to remove go.mod: %+v", err)
 		return errors.Wrapf(err, "failed to remove go.mod")
 	}
-	// Exec `go mod init` on given directory.
+	// ProgramExecutor `go mod init` on given directory.
 	cmd := exec.Command("go", "mod", "init", s.Package)
 	cmd.Dir = s.TempDir
 	var output []byte

@@ -9,8 +9,12 @@ It implements the underlying javascript `WebSocket`, the Jupyter protocol using 
 on top of that a minimal simpler API in javascript (it can also be used from WASM) to send/receive messages keyed
 by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
 
-The corresponding kernel side of the protocol is implemented in `gonb/internal/comms`. And the API for exchanging
-messages with the front-end for the user is available in `gonb/gonbui/comms`. There one can send/receive messages keyed
+The corresponding kernel side of the protocol is implemented in `gonb/internal/comms`. 
+
+The API for exchanging messages with the front-end from the end-user program is available
+in `gonb/gonbui/comms`. It uses 2 named pipes opened to talk to the executed cell. 
+
+There one can send/receive messages keyed
 by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
 
 ## Examples for End User

@@ -26,10 +26,10 @@ var (
 	// mu control access to displaying content.
 	mu sync.Mutex
 
-	// gonbPipe is the currently opened gonbPipe, if one is opened.
-	gonbPipe      *os.File
-	gonbPipeError error
-	gonbEncoder   *gob.Encoder
+	// gonbWriterPipe is the currently opened gonbWriterPipe, if one is opened.
+	gonbWriterPipe      *os.File
+	gonbWriterPipeError error
+	gonbEncoder         *gob.Encoder
 )
 
 // Error returns the first error that may have happened in communication to the kernel. Nil if there has been
@@ -37,7 +37,7 @@ var (
 func Error() error {
 	mu.Lock()
 	defer mu.Unlock()
-	return gonbPipeError
+	return gonbWriterPipeError
 }
 
 // openLock a singleton connection to the GoNB kernel, assuming `mu` is already locked. Returns any potential error.
@@ -46,19 +46,19 @@ func Error() error {
 // Notice the display functions will call Open automatically, so it's not necessarily needed. Also, if the pipe is
 // already opened, this becomes a no-op.
 func openLocked() error {
-	if gonbPipeError != nil {
-		return gonbPipeError // Errors are persistent, it won't recover.
+	if gonbWriterPipeError != nil {
+		return gonbWriterPipeError // Errors are persistent, it won't recover.
 	}
-	if gonbPipe != nil {
+	if gonbWriterPipe != nil {
 		// Pipe already opened.
 		return nil
 	}
-	gonbPipe, gonbPipeError = os.OpenFile(os.Getenv(protocol.GONB_PIPE_ENV), os.O_WRONLY, 0600)
-	if gonbPipeError != nil {
-		gonbPipeError = errors.Wrapf(gonbPipeError, "failed opening pipe %q", os.Getenv(protocol.GONB_PIPE_ENV))
-		return gonbPipeError
+	gonbWriterPipe, gonbWriterPipeError = os.OpenFile(os.Getenv(protocol.GONB_PIPE_ENV), os.O_WRONLY, 0600)
+	if gonbWriterPipeError != nil {
+		gonbWriterPipeError = errors.Wrapf(gonbWriterPipeError, "failed opening pipe %q", os.Getenv(protocol.GONB_PIPE_ENV))
+		return gonbWriterPipeError
 	}
-	gonbEncoder = gob.NewEncoder(gonbPipe)
+	gonbEncoder = gob.NewEncoder(gonbWriterPipe)
 	return nil
 }
 
@@ -77,9 +77,9 @@ func SendData(data *protocol.DisplayData) {
 	}
 	err := gonbEncoder.Encode(data)
 	if err != nil {
-		gonbPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
-		gonbPipe.Close()
-		klog.Errorf("%+v", gonbPipeError)
+		gonbWriterPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
+		gonbWriterPipe.Close()
+		klog.Errorf("%+v", gonbWriterPipeError)
 	}
 }
 
@@ -189,7 +189,7 @@ func DisplaySVG(svg string) {
 	if !IsNotebook {
 		return
 	}
-	// This should be the implementation, but the Jupyter doesn't handle well SVG data
+	// This should be the implementation, but Jupyter doesn't handle well SVG data
 	// when the notebook is converted to HTML.
 	// So we try a simple workaround of embedding the SVG as HTML.
 	// (Question in Jupyter forum:
@@ -213,6 +213,21 @@ func EmbedImageAsPNGSrc(img image.Image) (string, error) {
 	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
 }
 
+// ScriptJavascript executes the given Javascript script in the Notebook.
+//
+// Errors in javascript parsing are sent by Jupyter Server to the stderr -- as opposed to showing
+// to the browser console.
+// These may be harder to debug during development than simply putting the contents inside a
+// `<script>...javascript...</script>` and using `DisplayHTML` instead.
+func ScriptJavascript(js string) {
+	if !IsNotebook {
+		return
+	}
+	SendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
+	})
+}
+
 // RequestInput from the Jupyter notebook.
 // It triggers the opening of a small text field in the cell output area where the user
 // can type something.
@@ -234,15 +249,5 @@ func RequestInput(prompt string, password bool) {
 		Data: map[protocol.MIMEType]any{
 			protocol.MIMEJupyterInput: &req,
 		},
-	})
-}
-
-// ScriptJavascript executes the given Javascript script in the Notebook.
-func ScriptJavascript(js string) {
-	if !IsNotebook {
-		return
-	}
-	SendData(&protocol.DisplayData{
-		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
 	})
 }

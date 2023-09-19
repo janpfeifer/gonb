@@ -16,7 +16,7 @@ import (
 
 var (
 	flagInstall   = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
-	flagKernel    = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
+	flagKernel    = flag.String("kernel", "", "ProgramExecutor kernel using given path for the `connection_file` provided by Jupyter client")
 	flagExtraLog  = flag.String("extra_log", "", "Extra file to include in the log.")
 	flagForceDeps = flag.Bool("force_deps", false, "Force install even if goimports and/or gopls are missing.")
 	flagForceCopy = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")

@@ -153,6 +153,44 @@ func (exec *Executor) pollNamedPipeReader() {
 			continue
 		}
 
+		// CommValue: update or read value in the front-end.
+		if reqAny, found := data.Data[protocol.MIMECommValue]; found {
+			req, ok := reqAny.(*protocol.CommValue)
+			if !ok {
+				exec.reportCellError(errors.New("A MIMECommValue sent to GONB_PIPE without an associated protocol.CommValue!?"))
+				continue
+			}
+			if exec.commsHandler == nil {
+				klog.V(2).Infof("Received and dropped (no handler registered) CommValue: %+v", req)
+			} else if req.Request {
+				klog.V(2).Infof("ProgramReadValueRequest(%q) requested", req.Address)
+				exec.commsHandler.ProgramReadValueRequest(req.Address)
+			} else {
+				klog.V(2).Infof("ProgramValueUpdateRequest(%q, %v) requested", req.Address, req.Value)
+				exec.commsHandler.ProgramValueUpdateRequest(req.Address, req.Value)
+			}
+			continue
+		}
+
+		// ProgramSubscribeRequest: (un-)subscribe to address in the front-end.
+		if reqAny, found := data.Data[protocol.MIMECommSubscribe]; found {
+			req, ok := reqAny.(*protocol.CommSubscription)
+			if !ok {
+				exec.reportCellError(errors.New("A MIMECommSubscribe sent to GONB_PIPE without an associated protocol.CommSubscription!?"))
+				continue
+			}
+			if exec.commsHandler == nil {
+				klog.V(2).Infof("Received and dropped (no handler registered) ProgramSubscribeRequest: %+v", req)
+			} else if req.Unsubscribe {
+				klog.V(2).Infof("ProgramUnsubscribeRequest(%q) requested", req.Address)
+				exec.commsHandler.ProgramUnsubscribeRequest(req.Address)
+			} else {
+				klog.V(2).Infof("ProgramSubscribeRequest(%q) requested", req.Address)
+				exec.commsHandler.ProgramSubscribeRequest(req.Address)
+			}
+			continue
+		}
+
 		// Otherwise, just display with the corresponding MIME type:
 		exec.dispatchDisplayData(data)
 	}
@@ -162,7 +200,7 @@ func (exec *Executor) pollNamedPipeReader() {
 func (exec *Executor) reportCellError(err error) {
 	errStr := fmt.Sprintf("%+v", err) // Error with stack.
 	klog.Errorf("%s", errStr)
-	err = kernel.PublishWriteStream(exec.msg, kernel.StreamStderr, errStr)
+	err = kernel.PublishWriteStream(exec.Msg, kernel.StreamStderr, errStr)
 	if err != nil {
 		klog.Errorf("%+v", errors.WithStack(err))
 	}
@@ -188,9 +226,9 @@ func (exec *Executor) dispatchDisplayData(data *protocol.DisplayData) {
 	var err error
 	if data.DisplayID != "" {
 		msgData.Transient["display_id"] = data.DisplayID
-		err = kernel.PublishUpdateDisplayData(exec.msg, msgData)
+		err = kernel.PublishUpdateDisplayData(exec.Msg, msgData)
 	} else {
-		err = kernel.PublishData(exec.msg, msgData)
+		err = kernel.PublishData(exec.Msg, msgData)
 	}
 	if err != nil {
 		klog.Errorf("Failed to display data (ignoring): %v", err)
@@ -224,7 +262,7 @@ func (exec *Executor) dispatchInputRequest(req *protocol.InputRequest) {
 		}()
 		return nil
 	}
-	err := exec.msg.PromptInput(req.Prompt, req.Password, writeStdinFn)
+	err := exec.Msg.PromptInput(req.Prompt, req.Password, writeStdinFn)
 	if err != nil {
 		exec.reportCellError(err)
 	}

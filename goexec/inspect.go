@@ -86,7 +86,7 @@ func (s *State) InspectIdentifierInCell(lines []string, skipLines map[int]struct
 		}()
 
 	} else {
-		// Exec `goimports`: we just want to make sure that "go get" is executed for the needed packages.
+		// ProgramExecutor `goimports`: we just want to make sure that "go get" is executed for the needed packages.
 		cursorInFile, _, err = s.GoImports(nil, updatedDecls, mainDecl, fileToCellIdAndLine)
 		if err != nil {
 			err = errors.WithMessagef(err, "goimports failed")

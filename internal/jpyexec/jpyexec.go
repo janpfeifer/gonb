@@ -22,12 +22,13 @@ import (
 // Use New to create it.
 type Executor struct {
 	// Configuration, before execution
-	msg                        kernel.Message
+	Msg                        kernel.Message
 	executionCount             int
 	command                    string
 	args                       []string
 	dir                        string
 	useNamedPipes              bool
+	commsHandler               CommsHandler
 	stdoutWriter, stderrWriter io.Writer
 	millisecondsToInput        int
 	inputPassword              bool
@@ -46,16 +47,16 @@ type Executor struct {
 }
 
 // New creates an executor for the given command plus arguments,
-// and pipe the output to Jupyter stdout and stderr streams connected to msg.
+// and pipe the output to Jupyter stdout and stderr streams connected to Msg.
 //
 // It returns a configuration/state Executor object, that can be further configured.
-// Call Exec when the configuration is isDone to actually execute the command.
+// Call ProgramExecutor when the configuration is isDone to actually execute the command.
 //
 // See `UseNamedPipes` to add support for rich data (HTML, PNG, SVG, Markdown, etc.) and widgets.
 // See `gonb/gonbui` and `gonb/gonbui/widgets`.
 func New(msg kernel.Message, command string, args ...string) *Executor {
 	return &Executor{
-		msg:                 msg,
+		Msg:                 msg,
 		executionCount:      -1,
 		command:             command,
 		args:                args,
@@ -63,11 +64,46 @@ func New(msg kernel.Message, command string, args ...string) *Executor {
 	}
 }
 
+// CommsHandler interface is used if Executor.UseNamedPipes is called, and a CommsHandler
+// is provided.
+//
+// It is assumed there is at most one program being executed at a time. GoNB will never
+// execute two cells simultaneously.
+type CommsHandler interface {
+	// ProgramStart is called when the program execution is about to start.
+	// If program start failed (e.g.: during creation of pipes), ProgramStart may not be called,
+	// and yet ProgramFinished is called.
+	ProgramStart(exec *Executor)
+
+	// ProgramFinished is called when the program execution finishes.
+	// Notice this may be called even if ProgramStart has not been called, if the execution
+	// failed during the creation of the various pipes.
+	ProgramFinished()
+
+	// ProgramValueUpdateRequest is called upon a request to update the value at an address
+	// by the program being executed.
+	ProgramValueUpdateRequest(address string, value any)
+
+	// ProgramReadValueRequest handler.
+	ProgramReadValueRequest(address string)
+
+	// ProgramSubscribeRequest handler.
+	ProgramSubscribeRequest(address string)
+
+	// ProgramUnsubscribeRequest handler.
+	ProgramUnsubscribeRequest(address string)
+}
+
 // UseNamedPipes enables the creation of the side named pipes that add support for
 // rich data (HTML, PNG, SVG, Markdown, etc.) and widgets.
+//
+// commsHandler is called to handle Comms request from the program. If left as nil
+// comms requests are simply ignored.
+//
 // See `gonb/gonbui` and `gonb/gonbui/widgets`.
-func (exec *Executor) UseNamedPipes() *Executor {
+func (exec *Executor) UseNamedPipes(commsHandler CommsHandler) *Executor {
 	exec.useNamedPipes = true
+	exec.commsHandler = commsHandler
 	return exec
 }
 
@@ -161,10 +197,10 @@ func (exec *Executor) Exec() error {
 
 	// Pipe all stdout and stderr to Jupyter (or the provided `io.Writer`'s).
 	if exec.stdoutWriter == nil {
-		exec.stdoutWriter = kernel.NewJupyterStreamWriter(exec.msg, kernel.StreamStdout)
+		exec.stdoutWriter = kernel.NewJupyterStreamWriter(exec.Msg, kernel.StreamStdout)
 	}
 	if exec.stderrWriter == nil {
-		exec.stderrWriter = kernel.NewJupyterStreamWriter(exec.msg, kernel.StreamStderr)
+		exec.stderrWriter = kernel.NewJupyterStreamWriter(exec.Msg, kernel.StreamStderr)
 	}
 	var streamersWG sync.WaitGroup
 	streamersWG.Add(2)
@@ -193,6 +229,9 @@ func (exec *Executor) Exec() error {
 		if err = exec.handleNamedPipes(); err != nil {
 			return err
 		}
+		if exec.commsHandler != nil {
+			exec.commsHandler.ProgramStart(exec)
+		}
 	}
 
 	// Start command.
@@ -205,10 +244,10 @@ func (exec *Executor) Exec() error {
 	streamersWG.Wait()
 	if err := cmd.Wait(); err != nil {
 		errMsg := err.Error() + "\n"
-		if exec.msg.Kernel().Interrupted.Load() {
+		if exec.Msg.Kernel().Interrupted.Load() {
 			errMsg = "^C\n" + errMsg
 		}
-		_ = kernel.PublishWriteStream(exec.msg, kernel.StreamStderr, errMsg)
+		_ = kernel.PublishWriteStream(exec.Msg, kernel.StreamStderr, errMsg)
 	}
 
 	klog.V(2).Infof("Execution finished successfully")
@@ -227,12 +266,16 @@ func (exec *Executor) done() {
 	}
 	exec.isDone = true
 	if exec.millisecondsToInput > 0 {
-		_ = exec.msg.CancelInput()
+		_ = exec.Msg.CancelInput()
 	}
 	_ = exec.cmdStdin.Close()
 	close(exec.doneChan)
 	_ = exec.cmdStderr.Close()
 	_ = exec.cmdStdout.Close()
+	if exec.useNamedPipes && exec.commsHandler != nil {
+		// Inform CommsHandler that program has finished.
+		exec.commsHandler.ProgramFinished()
+	}
 }
 
 // handleJupyterInput should only be called if exec.millisecondsToInput is set.
@@ -246,7 +289,7 @@ func (exec *Executor) handleJupyterInput() {
 		klog.V(2).Infof("%d milliseconds elapsed, prompt for input", exec.millisecondsToInput)
 		exec.muDone.Lock()
 		if !exec.isDone {
-			_ = exec.msg.PromptInput(" ", exec.inputPassword, writeStdinFn)
+			_ = exec.Msg.PromptInput(" ", exec.inputPassword, writeStdinFn)
 		}
 		exec.muDone.Unlock()
 	}

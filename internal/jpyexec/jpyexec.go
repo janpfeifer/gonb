@@ -9,6 +9,7 @@
 package jpyexec
 
 import (
+	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/kernel"
 	"github.com/pkg/errors"
 	"io"
@@ -38,8 +39,19 @@ type Executor struct {
 	cmdStdout, cmdStderr                     io.ReadCloser
 	cmdStdin                                 io.WriteCloser
 	namedPipeReaderPath, namedPipeWriterPath string
-	pipeReader                               io.ReadCloser  // GONB_PIPE
-	pipeWriter                               io.WriteCloser // GONB_PIPE_BACK
+	pipeReader                               io.ReadCloser // GONB_PIPE
+
+	// pipeWriter is the pipe opened to send content to the program.
+	// jpyexec.Executor handles the opening/closing of the file, and exports
+	// PipeWriterFifo as the means to send messages through the pipe.
+	pipeWriter io.WriteCloser // GONB_PIPE_BACK
+
+	// PipeWriterFifo is the channel used to send message updates to pipeWriter.
+	// It has a fixed buffer size: if the buffer is full, messages are dropped -- this can only
+	// happen if, for instance, the program doesn't interact/open the pipe.
+	//
+	// Currently, it is assumed that it will be used by the CommsHandler.
+	PipeWriterFifo chan *protocol.CommValue
 
 	isDone   bool
 	doneChan chan struct{}
@@ -64,40 +76,10 @@ func New(msg kernel.Message, command string, args ...string) *Executor {
 	}
 }
 
-// CommsHandler interface is used if Executor.UseNamedPipes is called, and a CommsHandler
-// is provided.
-//
-// It is assumed there is at most one program being executed at a time. GoNB will never
-// execute two cells simultaneously.
-type CommsHandler interface {
-	// ProgramStart is called when the program execution is about to start.
-	// If program start failed (e.g.: during creation of pipes), ProgramStart may not be called,
-	// and yet ProgramFinished is called.
-	ProgramStart(exec *Executor)
-
-	// ProgramFinished is called when the program execution finishes.
-	// Notice this may be called even if ProgramStart has not been called, if the execution
-	// failed during the creation of the various pipes.
-	ProgramFinished()
-
-	// ProgramValueUpdateRequest is called upon a request to update the value at an address
-	// by the program being executed.
-	ProgramValueUpdateRequest(address string, value any)
-
-	// ProgramReadValueRequest handler.
-	ProgramReadValueRequest(address string)
-
-	// ProgramSubscribeRequest handler.
-	ProgramSubscribeRequest(address string)
-
-	// ProgramUnsubscribeRequest handler.
-	ProgramUnsubscribeRequest(address string)
-}
-
 // UseNamedPipes enables the creation of the side named pipes that add support for
 // rich data (HTML, PNG, SVG, Markdown, etc.) and widgets.
 //
-// commsHandler is called to handle Comms request from the program. If left as nil
+// commsHandler is called to handle Comms request from the program. If left as nil,
 // comms requests are simply ignored.
 //
 // See `gonb/gonbui` and `gonb/gonbui/widgets`.

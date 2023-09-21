@@ -10,7 +10,9 @@ import (
 	"github.com/pkg/errors"
 	"image"
 	"image/png"
+	"io"
 	"k8s.io/klog/v2"
+	"log"
 	"os"
 	"sync"
 )
@@ -27,17 +29,43 @@ var (
 	mu sync.Mutex
 
 	// gonbWriterPipe is the currently opened gonbWriterPipe, if one is opened.
-	gonbWriterPipe      *os.File
-	gonbWriterPipeError error
-	gonbEncoder         *gob.Encoder
+	gonbWriterPipe, gonbReaderPipe *os.File
+	gonbPipesError                 error
+
+	// gonbEncoder encodes messages to GoNB, to gonbWriterPipe.
+	//
+	// The messages are always a protocol.DisplayData object.
+	gonbEncoder *gob.Encoder
+
+	// gonbDecoder decodes messages coming from GoNB, from gonbReaderPipe.
+	//
+	// The messages are always a protocol.CommValue.
+	gonbDecoder *gob.Decoder
 )
 
-// Error returns the first error that may have happened in communication to the kernel. Nil if there has been
-// no errors.
+// Error returns the error that triggered failure on the communication with GoNB.
+// It returns nil if there hasn't been any errors.
+//
+// It can be tested as a health check.
 func Error() error {
+	return gonbPipesError
+}
+
+// OnCommValueUpdate handler and dispatcher of value updates.
+//
+// Internal use only -- used by `gonb/gonbui/comms`.
+var OnCommValueUpdate func(valueMsg *protocol.CommValue)
+
+// Open pipes used to communicate to GoNB (and through it, to the front-end).
+// This can be called every time, if connections are already opened, it does nothing.
+//
+// Users don't need to use this directly, since this is called every time by all other functions.
+//
+// Returns nil if succeeded (or if connections were already opened).
+func Open() error {
 	mu.Lock()
 	defer mu.Unlock()
-	return gonbWriterPipeError
+	return openLocked()
 }
 
 // openLock a singleton connection to the GoNB kernel, assuming `mu` is already locked. Returns any potential error.
@@ -46,20 +74,62 @@ func Error() error {
 // Notice the display functions will call Open automatically, so it's not necessarily needed. Also, if the pipe is
 // already opened, this becomes a no-op.
 func openLocked() error {
-	if gonbWriterPipeError != nil {
-		return gonbWriterPipeError // Errors are persistent, it won't recover.
+	if !IsNotebook {
+		return errors.Errorf("Trying to communicate with GoNB, but apparently program is not being executed by GoNB.")
 	}
-	if gonbWriterPipe != nil {
-		// Pipe already opened.
-		return nil
+	log.Printf("openLocked() ...")
+	if gonbPipesError != nil {
+		return gonbPipesError // Errors are persistent, it won't recover.
 	}
-	gonbWriterPipe, gonbWriterPipeError = os.OpenFile(os.Getenv(protocol.GONB_PIPE_ENV), os.O_WRONLY, 0600)
-	if gonbWriterPipeError != nil {
-		gonbWriterPipeError = errors.Wrapf(gonbWriterPipeError, "failed opening pipe %q", os.Getenv(protocol.GONB_PIPE_ENV))
-		return gonbWriterPipeError
+	if gonbWriterPipe == nil {
+		gonbWriterPath := os.Getenv(protocol.GONB_PIPE_ENV)
+		log.Printf("openLocked(): opening writer in %q...", gonbWriterPath)
+		gonbWriterPipe, gonbPipesError = os.OpenFile(gonbWriterPath, os.O_WRONLY, 0600)
+		log.Printf("openLocked(): opened writer in %q...", gonbWriterPath)
+		if gonbPipesError != nil {
+			gonbPipesError = errors.Wrapf(gonbPipesError, "failed opening pipe %q for writing", gonbWriterPath)
+			closePipesLocked()
+			return gonbPipesError
+		}
+		gonbEncoder = gob.NewEncoder(gonbWriterPipe)
 	}
-	gonbEncoder = gob.NewEncoder(gonbWriterPipe)
+	if gonbReaderPipe == nil {
+		gonbReaderPath := os.Getenv(protocol.GONB_PIPE_BACK_ENV)
+		log.Printf("openLocked(): opening reader in %q...", gonbReaderPath)
+		readerPipe, err := os.OpenFile(gonbReaderPath, os.O_RDONLY, 0600)
+		log.Printf("openLocked(): opened reader in %q...", gonbReaderPath)
+		if err == nil {
+			gonbReaderPipe = readerPipe
+			gonbDecoder = gob.NewDecoder(readerPipe)
+		} else {
+			if gonbPipesError == nil {
+				gonbPipesError = errors.Wrapf(gonbPipesError, "failed opening pipe %q for reading", gonbReaderPath)
+				closePipesLocked()
+			}
+		}
+		if gonbPipesError != nil {
+			log.Printf("openLocked(): failed with %+v", gonbPipesError)
+			return gonbPipesError
+		}
+		// Start polling in this separate goroutine.
+		go pollReaderPipe()
+	}
 	return nil
+}
+
+// closePipesLocked closes the remaining opened pipes dropping any errors while closing.
+// It assumes mu is locked.
+//
+// This should be called in case of I/O errors any of the pipes.
+func closePipesLocked() {
+	if gonbWriterPipe != nil {
+		_ = gonbWriterPipe.Close()
+		gonbWriterPipe = nil
+	}
+	if gonbReaderPipe != nil {
+		_ = gonbReaderPipe.Close()
+		gonbReaderPipe = nil
+	}
 }
 
 // SendData to be displayed in the connected Notebook.
@@ -70,16 +140,47 @@ func openLocked() error {
 // But if you are testing new types of MIME types, this is the way to result
 // messages ("execute_result" message type) directly to the front-end.
 func SendData(data *protocol.DisplayData) {
+	log.Printf("SendData() sending ...")
 	mu.Lock()
 	defer mu.Unlock()
+
 	if err := openLocked(); err != nil {
+		log.Printf("SendData(): failed, error: %+v", err)
 		return
 	}
 	err := gonbEncoder.Encode(data)
 	if err != nil {
-		gonbWriterPipeError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipe closed", os.Getenv(protocol.GONB_PIPE_ENV))
-		gonbWriterPipe.Close()
-		klog.Errorf("%+v", gonbWriterPipeError)
+		gonbPipesError = errors.Wrapf(err, "failed to write to GoNB pipe %q, pipes closed", os.Getenv(protocol.GONB_PIPE_ENV))
+		closePipesLocked()
+		klog.Errorf("%+v", gonbPipesError)
+	}
+}
+
+// pollReaderPipe loops on reading messages (protocol.CommValue) from gonbReaderPipe and
+// calling comms.DeliverValue, until the pipe is closed.
+func pollReaderPipe() {
+	log.Printf("pollReaderPipe() started")
+	for gonbReaderPipe != nil {
+		valueMsg := &protocol.CommValue{}
+		err := gonbDecoder.Decode(valueMsg)
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
+			log.Printf("pollReaderPipe() closed")
+			return
+		} else if err != nil {
+			log.Printf("pollReaderPipe() error decoding: %+v", err)
+			mu.Lock()
+			if gonbPipesError == nil {
+				gonbPipesError = errors.Wrapf(err, "failed to read from GoNB pipe %q, pipes closed", os.Getenv(protocol.GONB_PIPE_BACK_ENV))
+				closePipesLocked()
+				klog.Errorf("%+v", gonbPipesError)
+			}
+			mu.Unlock()
+			break
+		}
+		log.Printf("pollReaderPipe() received %+v", valueMsg)
+		if OnCommValueUpdate != nil {
+			OnCommValueUpdate(valueMsg)
+		}
 	}
 }
 

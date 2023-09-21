@@ -64,9 +64,9 @@ type State struct {
 	// This is set at the start of every cell execution, and reset to nil when the execution finishes.
 	ProgramExecutor *jpyexec.Executor
 
-	// ExecMsg is the kernel.Message used to start the program.
+	// ProgramExecMsg is the kernel.Message used to start the program.
 	// This is set at the start of every cell execution, and reset to nil when the execution finishes.
-	ExecMsg kernel.Message
+	ProgramExecMsg kernel.Message
 }
 
 const (
@@ -202,6 +202,16 @@ func (s *State) HandleOpen(msg kernel.Message) (err error) {
 		return nil
 	}
 
+	kernelId := msg.Kernel().JupyterKernelId
+	var msgKernelId string
+	msgKernelId, err = getFromJson[string](content, "kernel_id")
+	if err != nil || msgKernelId != kernelId {
+		klog.V(1).Infof("comms: ignored comm_open, field \"kernel_id\" not set or unknown (%q) -- "+
+			"current kernelId is %q: %v", msgKernelId, kernelId, err)
+		return nil
+	}
+	klog.V(2).Infof("comm_open: kernel_id=%q", kernelId)
+
 	var commId string
 	commId, err = getFromJson[string](content, "comm_id")
 	if err != nil {
@@ -275,6 +285,7 @@ func (s *State) HandleMsg(msg kernel.Message) (err error) {
 		klog.Warningf("comms: comm_msg did not set an \"content/data/address\" field: %+v", err)
 		return nil
 	}
+	klog.V(2).Infof("comms: HandleMsg(address=%q)", address)
 
 	switch address {
 	case HeartbeatPongAddress:
@@ -282,7 +293,17 @@ func (s *State) HandleMsg(msg kernel.Message) (err error) {
 	case HeartbeatPingAddress:
 		return s.handleHeartbeatPongLocked(msg)
 	default:
-		klog.Warningf("comms: comm_msg to address %q dropped, since there were no recipients", address)
+		var value any
+		value, err = getFromJson[any](content, "data/value")
+		if err != nil {
+			klog.Warningf("comms: comm_msg did not set an \"content/data/value\" field: %+v", err)
+			return nil
+		}
+		if s.deliverProgramSubscriptionsLocked(address, value) {
+			klog.V(2).Infof("comms: HandleMsg(address=%q) delivered", address)
+		} else {
+			klog.V(1).Infof("comms: HandleMsg(address=%q) dropped -- usually because there were no recipients", address)
+		}
 		return nil
 	}
 }

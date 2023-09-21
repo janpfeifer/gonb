@@ -93,7 +93,7 @@
             gonb_comm._onopen_subscribers = [];
         }
 
-        if (!gonb_comm._self_closed) {
+        if (globalThis.gonb_comm === gonb_comm) {
             delete globalThis.gonb_comm;
         }
     };
@@ -102,17 +102,25 @@
 
     gonb_comm._websocket.onerror = (event) => {
         debug_log("GoNB communications (gonb_comm) error:\nEvent = "+JSON.stringify(event));
-        gonb_comm._websocket.close(1000, `closing due to error in communication - ${event.message}`)
+        gonb_comm.close(1000, `closing due to error in communication - ${event.message}`)
     }
 
     // onmessage sees incoming messages from WebSocket which includes all types of status/execute_result/etc.
     // It filters out messages that are not part of the "custom messages" protocol ("comm_*" messages), and
     // routes the "comm_*" message appropriately.
     gonb_comm._websocket.onmessage =  (event) => {
+        if (globalThis.gonb_comm !== gonb_comm) {
+            // Reference lost for object, better close it.
+            console.error("gonb_comm from previous kernel still hanging, closing it");
+            gonb_comm.close(1000, "gonb_comm from previous kernel still hanging, closing it");
+        }
+
         const msg = JSON.parse(event.data);
-        debug_log(`gonb_comm: websocket received "${msg.msg_type}"`);
+        // debug_log(`gonb_comm: websocket received "${msg.msg_type}"`);
         if (msg.msg_type === "comm_msg") {
             gonb_comm._on_comm_msg(msg);
+        } else if (msg.msg_type.startsWith("comm_")) {
+            debug_log(`gonb_comm: websocket received and ignored "${msg.msg_type}"`);
         }
     };
 
@@ -125,7 +133,7 @@
      * @param value Any pod (plain-old-data) value, or an object. It will be JASON.stringified.
      */
     gonb_comm.send = function(address, value) {
-        gonb_comm._is_connected.
+        this._is_connected.
             then(() => {
                 let msg = this._build_raw_message("comm_msg");
                 msg.content = {
@@ -185,10 +193,13 @@
      * Once websocket closes, gonb_comm will be deleted from the global scope.
      */
     gonb_comm.close = function(code, reason) {
+        debug_log(`gonb_comm.close(${code}, ${reason}) called`);
+        if (globalThis.gonb_comm === this) {
+            delete globalThis.gonb_comm;
+        }
         this._comm_id = null;  // Won't recognize or deliver any more comm_msg.
         this._self_closed = true;  // Prevents a second deletion of global gonb_comm, since a new one may be in the process of being created.
         this._websocket.close(code, reason);  // Will trigger clean up on this._websocket.onclose().
-        delete globalThis.gonb_comm;
     }
 
     // _on_comm_msg handles "comm_msg"
@@ -294,6 +305,7 @@
             msg.content = {
                 comm_id: this._comm_id,
                 target_name: "gonb_comm",
+                kernel_id: this._kernel_id,
                 data: {},
             }
             let err = this._send(msg);

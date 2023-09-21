@@ -103,6 +103,9 @@ const (
 
 // DisplayData mimics the contents of the "display_data" message used by Jupyter, see
 // https://jupyter-client.readthedocs.io/en/latest/messaging.html
+//
+// It is also used for Comms communication, if `Data[MIMECommValue]` or `Data[MIMECommSubscribe]`
+// is set.
 type DisplayData struct {
 	// Data maps MIME Type to content. Content depends on the mime type. Usually either string or []byte.
 	Data map[MIMEType]any
@@ -142,17 +145,17 @@ type CommValue struct {
 	Value   any
 }
 
-// CommSubscription to changes to an address in the front-end.
+// CommSubscription (un-)subscribe to changes to an address in the front-end.
 type CommSubscription struct {
 	Address     string
 	Unsubscribe bool // Set to true to unsubscribe instead.
 }
 
 func init() {
-	gob.Register(&DisplayData{})
-	gob.Register(&InputRequest{})
-	gob.Register(&CommValue{})
-	gob.Register(&CommSubscription{})
+	gob.Register(DisplayData{})
+	gob.Register(InputRequest{})
+	gob.Register(CommValue{})
+	gob.Register(CommSubscription{})
 
 	// Register CommValueTypes.
 	gob.Register([]int{})

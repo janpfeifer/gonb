@@ -12,13 +12,20 @@ import (
 	"image/png"
 	"io"
 	"k8s.io/klog/v2"
-	"log"
 	"os"
 	"sync"
 )
 
 func init() {
 	IsNotebook = os.Getenv(protocol.GONB_PIPE_ENV) != ""
+}
+
+var Debug bool
+
+func logf(format string, args ...any) {
+	if Debug {
+		logf(format, args...)
+	}
 }
 
 var (
@@ -77,15 +84,15 @@ func openLocked() error {
 	if !IsNotebook {
 		return errors.Errorf("Trying to communicate with GoNB, but apparently program is not being executed by GoNB.")
 	}
-	log.Printf("openLocked() ...")
+	logf("openLocked() ...")
 	if gonbPipesError != nil {
 		return gonbPipesError // Errors are persistent, it won't recover.
 	}
 	if gonbWriterPipe == nil {
 		gonbWriterPath := os.Getenv(protocol.GONB_PIPE_ENV)
-		log.Printf("openLocked(): opening writer in %q...", gonbWriterPath)
+		logf("openLocked(): opening writer in %q...", gonbWriterPath)
 		gonbWriterPipe, gonbPipesError = os.OpenFile(gonbWriterPath, os.O_WRONLY, 0600)
-		log.Printf("openLocked(): opened writer in %q...", gonbWriterPath)
+		logf("openLocked(): opened writer in %q...", gonbWriterPath)
 		if gonbPipesError != nil {
 			gonbPipesError = errors.Wrapf(gonbPipesError, "failed opening pipe %q for writing", gonbWriterPath)
 			closePipesLocked()
@@ -95,9 +102,9 @@ func openLocked() error {
 	}
 	if gonbReaderPipe == nil {
 		gonbReaderPath := os.Getenv(protocol.GONB_PIPE_BACK_ENV)
-		log.Printf("openLocked(): opening reader in %q...", gonbReaderPath)
+		logf("openLocked(): opening reader in %q...", gonbReaderPath)
 		readerPipe, err := os.OpenFile(gonbReaderPath, os.O_RDONLY, 0600)
-		log.Printf("openLocked(): opened reader in %q...", gonbReaderPath)
+		logf("openLocked(): opened reader in %q...", gonbReaderPath)
 		if err == nil {
 			gonbReaderPipe = readerPipe
 			gonbDecoder = gob.NewDecoder(readerPipe)
@@ -108,7 +115,7 @@ func openLocked() error {
 			}
 		}
 		if gonbPipesError != nil {
-			log.Printf("openLocked(): failed with %+v", gonbPipesError)
+			logf("openLocked(): failed with %+v", gonbPipesError)
 			return gonbPipesError
 		}
 		// Start polling in this separate goroutine.
@@ -140,12 +147,12 @@ func closePipesLocked() {
 // But if you are testing new types of MIME types, this is the way to result
 // messages ("execute_result" message type) directly to the front-end.
 func SendData(data *protocol.DisplayData) {
-	log.Printf("SendData() sending ...")
+	logf("SendData() sending ...")
 	mu.Lock()
 	defer mu.Unlock()
 
 	if err := openLocked(); err != nil {
-		log.Printf("SendData(): failed, error: %+v", err)
+		logf("SendData(): failed, error: %+v", err)
 		return
 	}
 	err := gonbEncoder.Encode(data)
@@ -159,15 +166,15 @@ func SendData(data *protocol.DisplayData) {
 // pollReaderPipe loops on reading messages (protocol.CommValue) from gonbReaderPipe and
 // calling comms.DeliverValue, until the pipe is closed.
 func pollReaderPipe() {
-	log.Printf("pollReaderPipe() started")
+	logf("pollReaderPipe() started")
 	for gonbReaderPipe != nil {
 		valueMsg := &protocol.CommValue{}
 		err := gonbDecoder.Decode(valueMsg)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
-			log.Printf("pollReaderPipe() closed")
+			logf("pollReaderPipe() closed")
 			return
 		} else if err != nil {
-			log.Printf("pollReaderPipe() error decoding: %+v", err)
+			logf("pollReaderPipe() error decoding: %+v", err)
 			mu.Lock()
 			if gonbPipesError == nil {
 				gonbPipesError = errors.Wrapf(err, "failed to read from GoNB pipe %q, pipes closed", os.Getenv(protocol.GONB_PIPE_BACK_ENV))
@@ -177,7 +184,7 @@ func pollReaderPipe() {
 			mu.Unlock()
 			break
 		}
-		log.Printf("pollReaderPipe() received %+v", valueMsg)
+		logf("pollReaderPipe() received %+v", valueMsg)
 		if OnCommValueUpdate != nil {
 			OnCommValueUpdate(valueMsg)
 		}

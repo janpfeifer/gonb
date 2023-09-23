@@ -418,9 +418,9 @@ func PublishData(msg Message, data Data) error {
 	if klog.V(1).Enabled() {
 		LogDisplayData(data.Data)
 	}
-	if msg.ComposedMsg().Header.MsgType == "execute_request" {
-		return PublishExecuteResult(msg, data)
-	}
+	//if msg.ComposedMsg().Header.MsgType == "execute_request" {
+	//	return PublishExecuteResult(msg, data)
+	//}
 	return PublishDisplayData(msg, data)
 }
 

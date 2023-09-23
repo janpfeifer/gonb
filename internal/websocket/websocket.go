@@ -22,7 +22,7 @@ var tmplWebSocketConnectJs = template.Must(template.New("ws").Parse(
 
 // Javascript returns the javascript required to bootstrap the WebSocket library.
 func Javascript() string {
-	uuid := gonbui.UniqueID()
+	uuid := gonbui.UniqueId()
 	data := struct {
 		FormId, MsgId, LogId string
 		KernelId             string

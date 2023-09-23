@@ -16,9 +16,11 @@ package comms
 import (
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
+	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
-	"k8s.io/klog/v2"
 	"log"
+	"math"
+	"strconv"
 	"sync"
 )
 
@@ -110,12 +112,13 @@ func Subscribe[T protocol.CommValueTypes](address string, callback func(address 
 	// Create a wrapper callback that converts the incoming `any` type to the selected
 	// user type during subscription.
 	fn := func(address string, value any) {
-		typedValue, ok := value.(T)
-		if !ok {
+		typedValue, err := ConvertTo[T](value)
+		if err != nil {
 			// If conversion fails, we warn the user, and callback anyway with the default (zero)
 			// value for the users given type.
-			log.Printf("Warning: gonbui/comms: received from front-end type %T for address %q, wanted type %T",
-				value, address, typedValue)
+			log.Printf("Warning: gonbui/comms: received from front-end type %T for address %q, wanted type %T. "+
+				"Error reported: %+v",
+				value, address, typedValue, err)
 		}
 		callback(address, typedValue)
 	}
@@ -142,6 +145,63 @@ func Subscribe[T protocol.CommValueTypes](address string, callback func(address 
 	return id
 }
 
+// ConvertTo converts from `any` value to one of the `CommValueTypes`.
+// If the conversion fails, it returns an error.
+func ConvertTo[T protocol.CommValueTypes](from any) (to T, err error) {
+	var ok bool
+	to, ok = from.(T)
+	if ok {
+		return
+	}
+	var anyTo any
+	anyTo = to
+	switch anyTo.(type) {
+	case int:
+		// Target type T is int:
+		switch typedFrom := from.(type) {
+		case float64:
+			anyTo = int(math.Round(typedFrom))
+			to = anyTo.(T)
+			return
+		case float32:
+			anyTo = int(math.Round(float64(typedFrom)))
+			to = anyTo.(T)
+			return
+		case string:
+			anyTo, err = strconv.Atoi(typedFrom)
+			if err != nil {
+				err = errors.Wrapf(err, "failed to convert %q to int", typedFrom)
+				return
+			}
+			to = anyTo.(T)
+			return
+		}
+
+	case float64:
+		// Target type T is float64:
+		switch typedFrom := from.(type) {
+		case int:
+			anyTo = float64(typedFrom)
+			to = anyTo.(T)
+			return
+		case float32:
+			anyTo = float64(typedFrom)
+			to = anyTo.(T)
+			return
+		case string:
+			anyTo, err = strconv.ParseFloat(typedFrom, 64)
+			if err != nil {
+				err = errors.Wrapf(err, "failed to convert %q to float64", typedFrom)
+				return
+			}
+			to = anyTo.(T)
+			return
+		}
+	}
+	err = errors.Errorf("failed to convert type %T (%v) to requested type %T", from, from, to)
+	return
+}
+
 // Unsubscribe from receiving front-end updates, using the SubscriptionID returned by Subscribe.
 func Unsubscribe(id SubscriptionID) {
 	if gonbui.Open() != nil {
@@ -162,6 +222,7 @@ func Unsubscribe(id SubscriptionID) {
 	} else {
 		delete(subscriptions, address)
 	}
+	gonbui.Logf("comms.Unsubscribe(%q): %d subscriptions remain to address", address, len(s))
 	muSubscriptions.Unlock()
 
 	// No more subscriptions to the address.
@@ -182,7 +243,7 @@ func dispatchValueUpdates(valueMsg *protocol.CommValue) {
 	if gonbui.Open() != nil {
 		return
 	}
-	klog.Infof("dispatchValueUpdates(%q, %v)", valueMsg.Address, valueMsg.Value)
+	gonbui.Logf("dispatchValueUpdates(%q, %v)", valueMsg.Address, valueMsg.Value)
 	if valueMsg.Request {
 		log.Printf("WARNING: gonbui/comms.DeliverValue(%+v): invalid message with Request=true received from front-end!?", valueMsg)
 		return

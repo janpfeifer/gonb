@@ -15,21 +15,15 @@
  * See documentation and examples of how to use in gonb/internal/websockets/README.md.
  */
 (() => {
-    /** is_debug_enabled indicates whether to debug_log information on what is going on in gonb_comm. */
-    function is_debug_enabled() {
-        return true;
-    }
-
     /**
      * debug_log is used to print out debugging information on what is going on in gonb_comm.
      *
-     * It is enabled by `is_debug_enabled()`.
+     * It is enabled by setting `globalThis.gonb_comm.debug = true`.
      */
     function debug_log(...data) {
-        if (!is_debug_enabled()) {
-            return;
+        if (globalThis?.gonb_comm?.debug) {
+            console.log(...data);
         }
-        console.log(...data);
     }
 
     if (globalThis.gonb_comm) {
@@ -47,6 +41,7 @@
     // Create gonb_comm, the communication object to GoNB.
     // The `comm` abbreviation comes from Jupyter `comm` protocol used by it.
     let gonb_comm = {
+        debug: true,  // Set to true to see verbose debugging messages in the console.
         websocket_is_opened: false,
         _kernel_id: "{{.KernelId}}",
         _ws_url: "ws://" + document.location.host + "/api/kernels/{{.KernelId}}/channels",
@@ -58,8 +53,11 @@
         _onopen_ack: null,
         _address_subscriptions: {},  // map address -> map id(Symbol) -> callback.
         _address_subscriptions_next_id: 0,
-        _address_subscriptions_id_to_address: 0,  // map id(Symbol) -> address.
-    }
+        _address_subscriptions_id_to_address: {},  // map id(Symbol) -> address.
+
+        // Synced Variables:
+        _address_to_synced_var: {},  // map address -> variable.
+    };
     globalThis.gonb_comm = gonb_comm; // Make it globally available.
     gonb_comm._websocket = new WebSocket(gonb_comm._ws_url);
 
@@ -133,6 +131,7 @@
      * @param value Any pod (plain-old-data) value, or an object. It will be JASON.stringified.
      */
     gonb_comm.send = function(address, value) {
+        debug_log(`gonb_comm.send(${address}, ${value})`);
         this._is_connected.
             then(() => {
                 let msg = this._build_raw_message("comm_msg");
@@ -143,6 +142,7 @@
                         value: value,
                     },
                 }
+                debug_log(`async gonb_comm.send(${address}, ${value})`);
                 let err = this._send(msg);
                 if (err) {
                     console.error(`gonb_comm: failed sending data to address "${address}": ${err.message}`);
@@ -159,7 +159,7 @@
      */
     gonb_comm.subscribe = function(address, callback) {
         let id = Symbol(`gonb_id_${this._address_subscriptions_next_id}`)
-        this._address_subscriptions++;
+        this._address_subscriptions_next_id++;
         let l = this._address_subscriptions[address];
         if (!l) {
             this._address_subscriptions[address] = {id: callback};
@@ -245,7 +245,9 @@
             return;
         }
         debug_log(`gonb_comm: delivered comm_msg to address \"${address}\" to ${Object.keys(subscribers).length} listener(s).`)
-        for (let callback of Object.values(subscribers)) {
+        for (const key of Reflect.ownKeys(subscribers)) {
+            debug_log(`\t> ${key.toString()}.callback(address, value);`);
+            let callback = subscribers[key];
             callback(address, value);
         }
     }
@@ -263,7 +265,6 @@
         let msg_str = JSON.stringify(msg);
         try {
             this._websocket.send(msg_str);
-            debug_log(`\tgonb_comm._send() enqueued.`);
             return null;
         } catch (err) {
             debug_log(`gonb_comm._send(${msg_str}) failed: ${err.message}`);
@@ -351,6 +352,131 @@
             };
         });
     }
+
+
+    /** newSyncedVariable creates a SyncedVariable object associated to the given address
+     *  and initializes its value.
+     *
+     * If a variable created to that address already exists, it has its value updated and is
+     * returned instead.
+     *
+     * @param address that the SyncedVariable will be bound. Updates are received/sent from/to GoNB keyed
+     *        by this address.
+     * @param value initial value. If the SyncedVariable already exists, it's udpated to this value.
+     * @return SyncedVariable
+     */
+    gonb_comm.newSyncedVariable = function(address, value) {
+        let v = this._address_to_synced_var[address];
+        if (v) {
+            v.set(value);
+            return v;
+        }
+        v = new SyncedVariable(address, value);
+        return v
+    }
+
+    /**
+     * SyncedVariable constructor.
+     * This constructor is hidden inside the anonymous function.
+     * Instead, users should use the method `globalThis.gonb_comm.newSyncedVariable`.
+     *
+     * @param gonb_comm connection to GoNB.
+     * @param address address to subscribe to listen and send updates from/to GoNB.
+     * @param value initial value of variable.
+     */
+    function SyncedVariable(address, value) {
+        debug_log(`new SyncedVariable(${address}, ${value});`);
+        this._address = address;
+        this._subscribers = {};  // map symbol -> callback.
+        this._next_subscriber_id = 0;
+        this._value = null;
+
+        // Update value without sync to GoNB (if the update came from GoNB)
+        this._set_no_sync = function(value) {
+            if (this._value === value) {
+                debug_log(`SyncedVariable(${this._address})._set_no_sync() called with same value.`);
+                return;
+            }
+            debug_log(`SyncedVariable(${this._address})._set_no_sync(${value})`);
+            this._value = value;
+            for (const key of Reflect.ownKeys(this._subscribers)) {
+                debug_log(`\t> ${key.toString()}.callback(value);`);
+                let callback = this._subscribers[key];
+                callback(value);
+            }
+        }
+
+        // Subscribe in gonb_comm to receive updates from address.
+        if (globalThis.gonb_comm) {
+            this._gonb_subscription = gonb_comm.subscribe(address, (address, value) => {
+                debug_log(`SyncedVariable(${this._address}) <- ${value} (from GoNB)`)
+                this._set_no_sync(value);
+            })
+        } else {
+            console.error(`SyncedVariable(${this._address}) cannot connect to GoNB, globalthis.gonb_comm not defined!? Widgets may not work correctly.`);
+        }
+
+        /** set updates the value of the SyncedVariable and,
+         * if the value is different from current, sends updates to subscribers and GoNB.
+         *
+         * @param value Updated value.
+         */
+        this.set = function (value) {
+            if (value === this._value) {
+                return;
+            }
+            this._set_no_sync(value);  // this._value is set here.
+            if (globalThis.gonb_comm) {
+                globalThis.gonb_comm.send(this._address, value);
+            } else {
+                console.error(`SyncedVariable(${this._address}) cannot connect to GoNB, globalthis.gonb_comm not defined!? Widgets may not work correctly.`);
+            }
+        }
+
+        /** get returns the current value of the SyncedVariable. */
+        this.get = function() {
+            return this._value;
+        }
+
+        /** subscribe to changes in the value of the variable.
+         * @param callback will be called when the value is changed, and it has a signature function(value).
+         * @return symbol that can be used to unsubscribe.
+         */
+        this.subscribe = function(callback) {
+            let subscription_id = Symbol(`gonb_id_${this._next_subscriber_id}`)
+            this._next_subscriber_id++;
+            this._subscribers[subscription_id] = callback;
+            return subscription_id;
+        }
+
+        /** unsubscribe to changes.
+         * @param subscription_id returned by subscribe.
+         */
+        this.unsubscribe = function(subscription_id) {
+            delete(this._subscribers[subscription_id]);
+        }
+
+        this.set(value);  // This will send update to GoNB, if value not null.
+        return this;
+    }
+
+
+    /*
+    const element = document.querySelector('#my-element');
+
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'childList' && mutation.removedNodes.includes(element) || mutation.removedNodes.includes(element.parentNode)) {
+      // The element or its parent was removed from the DOM.
+      // Execute your callback function here.
+    }
+  });
+});
+
+observer.observe(element.parentNode, { childList: true });
+     */
+
+
 
     // Start connecting protocol ("comm_open", and a "comm_open_ack" message).
     gonb_comm._is_connected = gonb_comm._connect_to_gonb();

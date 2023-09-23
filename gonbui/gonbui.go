@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"io"
 	"k8s.io/klog/v2"
+	"log"
 	"os"
 	"sync"
 )
@@ -22,9 +23,13 @@ func init() {
 
 var Debug bool
 
-func logf(format string, args ...any) {
+// Logf is used to log debugging messages for the gonbui library.
+// It is enabled by setting the global Debug to true.
+//
+// Usually only useful for those developing new widgets and the like.
+func Logf(format string, args ...any) {
 	if Debug {
-		logf(format, args...)
+		log.Printf(format, args...)
 	}
 }
 
@@ -51,7 +56,7 @@ var (
 )
 
 // Error returns the error that triggered failure on the communication with GoNB.
-// It returns nil if there hasn't been any errors.
+// It returns nil if there were no errors.
 //
 // It can be tested as a health check.
 func Error() error {
@@ -84,15 +89,15 @@ func openLocked() error {
 	if !IsNotebook {
 		return errors.Errorf("Trying to communicate with GoNB, but apparently program is not being executed by GoNB.")
 	}
-	logf("openLocked() ...")
+	Logf("openLocked() ...")
 	if gonbPipesError != nil {
 		return gonbPipesError // Errors are persistent, it won't recover.
 	}
 	if gonbWriterPipe == nil {
 		gonbWriterPath := os.Getenv(protocol.GONB_PIPE_ENV)
-		logf("openLocked(): opening writer in %q...", gonbWriterPath)
+		Logf("openLocked(): opening writer in %q...", gonbWriterPath)
 		gonbWriterPipe, gonbPipesError = os.OpenFile(gonbWriterPath, os.O_WRONLY, 0600)
-		logf("openLocked(): opened writer in %q...", gonbWriterPath)
+		Logf("openLocked(): opened writer in %q...", gonbWriterPath)
 		if gonbPipesError != nil {
 			gonbPipesError = errors.Wrapf(gonbPipesError, "failed opening pipe %q for writing", gonbWriterPath)
 			closePipesLocked()
@@ -102,9 +107,9 @@ func openLocked() error {
 	}
 	if gonbReaderPipe == nil {
 		gonbReaderPath := os.Getenv(protocol.GONB_PIPE_BACK_ENV)
-		logf("openLocked(): opening reader in %q...", gonbReaderPath)
+		Logf("openLocked(): opening reader in %q...", gonbReaderPath)
 		readerPipe, err := os.OpenFile(gonbReaderPath, os.O_RDONLY, 0600)
-		logf("openLocked(): opened reader in %q...", gonbReaderPath)
+		Logf("openLocked(): opened reader in %q...", gonbReaderPath)
 		if err == nil {
 			gonbReaderPipe = readerPipe
 			gonbDecoder = gob.NewDecoder(readerPipe)
@@ -115,7 +120,7 @@ func openLocked() error {
 			}
 		}
 		if gonbPipesError != nil {
-			logf("openLocked(): failed with %+v", gonbPipesError)
+			Logf("openLocked(): failed with %+v", gonbPipesError)
 			return gonbPipesError
 		}
 		// Start polling in this separate goroutine.
@@ -147,12 +152,12 @@ func closePipesLocked() {
 // But if you are testing new types of MIME types, this is the way to result
 // messages ("execute_result" message type) directly to the front-end.
 func SendData(data *protocol.DisplayData) {
-	logf("SendData() sending ...")
+	Logf("SendData() sending ...")
 	mu.Lock()
 	defer mu.Unlock()
 
 	if err := openLocked(); err != nil {
-		logf("SendData(): failed, error: %+v", err)
+		Logf("SendData(): failed, error: %+v", err)
 		return
 	}
 	err := gonbEncoder.Encode(data)
@@ -166,15 +171,15 @@ func SendData(data *protocol.DisplayData) {
 // pollReaderPipe loops on reading messages (protocol.CommValue) from gonbReaderPipe and
 // calling comms.DeliverValue, until the pipe is closed.
 func pollReaderPipe() {
-	logf("pollReaderPipe() started")
+	Logf("pollReaderPipe() started")
 	for gonbReaderPipe != nil {
 		valueMsg := &protocol.CommValue{}
 		err := gonbDecoder.Decode(valueMsg)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, os.ErrClosed) {
-			logf("pollReaderPipe() closed")
+			Logf("pollReaderPipe() closed")
 			return
 		} else if err != nil {
-			logf("pollReaderPipe() error decoding: %+v", err)
+			Logf("pollReaderPipe() error decoding: %+v", err)
 			mu.Lock()
 			if gonbPipesError == nil {
 				gonbPipesError = errors.Wrapf(err, "failed to read from GoNB pipe %q, pipes closed", os.Getenv(protocol.GONB_PIPE_BACK_ENV))
@@ -184,7 +189,7 @@ func pollReaderPipe() {
 			mu.Unlock()
 			break
 		}
-		logf("pollReaderPipe() received %+v", valueMsg)
+		Logf("pollReaderPipe() received %+v", valueMsg)
 		if OnCommValueUpdate != nil {
 			OnCommValueUpdate(valueMsg)
 		}
@@ -226,7 +231,7 @@ func DisplayMarkdown(markdown string) {
 //
 // ```go
 //
-//	counterDisplayId := gonbui.UniqueID()
+//	counterDisplayId := gonbui.UniqueId()
 //	for ii := 0; ii < 10; ii++ {
 //	  gonbui.UpdateHTML(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
 //	}
@@ -244,14 +249,18 @@ func UpdateHTML(id, html string) {
 	})
 }
 
-// UniqueID returns a unique id that can be used for UpdateHTML.
-// It should be generated once per display block the program wants to update.
-func UniqueID() string {
+// UniqueId returns newly created unique id with a "gonb_id" prefix.
+// It can be used for instance with UpdateHTML.
+func UniqueId() string {
 	uuid, _ := uuid.NewV7()
 	uuidStr := uuid.String()
 	uid := uuidStr[len(uuidStr)-8:]
 	return fmt.Sprintf("gonb_id_%s", uid)
 }
+
+// UniqueID returns a newly created unique id.
+// UniqueID is an alias for UniqueId.
+// Deprecated.
 
 // UpdateMarkdown updates the contents of the output identified by id:
 // the block identified by 'id' is created automatically the first time this function is

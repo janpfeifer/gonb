@@ -167,7 +167,7 @@ func (s *State) InstallJavascript(msg kernel.Message) error {
 		Transient: make(kernel.MIMEMap),
 	}
 	jsData.Data[string(protocol.MIMETextHTML)] = fmt.Sprintf("<script>%s</script>", js)
-	s.TransientDisplayId = gonbui.UniqueID()
+	s.TransientDisplayId = gonbui.UniqueId()
 	jsData.Transient["display_id"] = s.TransientDisplayId
 	err := kernel.PublishUpdateDisplayData(msg, jsData)
 	//err := kernel.PublishJavascript(msg, js)

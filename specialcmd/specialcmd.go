@@ -139,7 +139,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		if err != nil {
 			return errors.WithMessagef(err, "failed to prepare `%%wasm`")
 		}
-		goExec.WasmDivId = gonbui.UniqueID() // Create a unique ID for this cell.
+		goExec.WasmDivId = gonbui.UniqueId() // Create a unique ID for this cell.
 
 	case "widgets":
 		return goExec.Comms.InstallJavascript(msg)

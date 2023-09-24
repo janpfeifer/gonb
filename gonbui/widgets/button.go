@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
+	"github.com/janpfeifer/gonb/gonbui/comms"
 	"github.com/janpfeifer/gonb/gonbui/dom"
 	"text/template"
 )
@@ -73,7 +74,7 @@ func (b *ButtonBuilder) Done() *ButtonBuilder {
 	b.htmlId = gonbui.UniqueId() + "_button"
 
 	// Consume the first incoming button message, with counter == 0.
-	clicks := Listen[int](b.address)
+	clicks := comms.Listen[int](b.address)
 
 	html := fmt.Sprintf(`<button id="%s" type="button">%s</button>`, b.htmlId, b.label)
 	if b.parentHtmlId == "" {
@@ -111,9 +112,9 @@ func (b *ButtonBuilder) Done() *ButtonBuilder {
 // If for any reason you need to listen to clicks before the button is created, create a channel
 // with the function `Listen[int](address)` directly, but you will need to ignore the first
 // counter value sent when the button is created (with value 0).
-func (b *ButtonBuilder) Listen() *AddressChan[int] {
+func (b *ButtonBuilder) Listen() *comms.AddressChan[int] {
 	if !b.built {
 		panicf("ButtonBuilder.Listen can only be called after the button was created with `Done()` method")
 	}
-	return Listen[int](b.address)
+	return comms.Listen[int](b.address)
 }

@@ -14,6 +14,7 @@
 package comms
 
 import (
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
@@ -263,4 +264,63 @@ func dispatchValueUpdates(valueMsg *protocol.CommValue) {
 	for _, s := range subscribers {
 		go s.callback(address, value)
 	}
+}
+
+// AddressChan provides a channel to listen to an Address in the communication between the front-end
+// and GoNB.
+// It can be used to interact with the front-end (the browser) in a notebook.
+//
+// Use Listen to create an AddressChan, and use `C` to receive the updates.
+//
+// It's a common output of widgets, to listen to its updates.
+type AddressChan[T protocol.CommValueTypes] struct {
+	C    chan T
+	done *common.Latch
+}
+
+// IsClosed checks whether this AddressChannel is closed.
+func (c *AddressChan[T]) IsClosed() bool {
+	return !c.done.Test()
+}
+
+// Close closes the channel and unsubscribe from messages on this address, freeing up resources.
+//
+// AddressChan doesn't use many resources, one may just leak these without consequences if only a few thousand.
+func (c *AddressChan[T]) Close() {
+	c.done.Trigger()
+}
+
+// WaitClose waits until the AddressChan.Close is called.
+func (c *AddressChan[T]) WaitClose() {
+	c.done.Wait()
+}
+
+// Listen returns an unbuffered channel (`*AddressChannel[T]`) that listens to incoming updates from
+// the front-end to the incoming address.
+//
+// This can be used to directly get updates to widgets that use those addresses.
+//
+// A few resources are used to subscribe to the address.
+// Use `AddressChan[T].Close()` to release those resources, when done listening.
+func Listen[T protocol.CommValueTypes](address string) *AddressChan[T] {
+	gonbui.Logf("Listen(%q) started", address)
+	c := &AddressChan[T]{
+		C:    make(chan T),
+		done: common.NewLatch(),
+	}
+	var subscriptionId SubscriptionId
+	subscriptionId = Subscribe[T](address, func(_ string, value T) {
+		ok := common.TrySend(c.C, value)
+		if !ok {
+			// User closed channel, we should unsubscribe.
+			gonbui.Logf("Listen(%q) closed", address)
+			Unsubscribe(subscriptionId)
+		}
+	})
+	go func() {
+		// Wait AddressChannel to be closed to unsubscribe from updates.
+		c.WaitClose()
+		Unsubscribe(subscriptionId)
+	}()
+	return c
 }

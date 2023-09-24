@@ -13,6 +13,8 @@ package dom
 import (
 	"fmt"
 	"github.com/janpfeifer/gonb/gonbui"
+	"github.com/janpfeifer/gonb/gonbui/comms"
+	"log"
 	"strings"
 )
 
@@ -29,6 +31,27 @@ func TransientJavascript(js string) {
 	gonbui.Sync()
 	// Remove javascript so it's not left-over to be saved and/or later executed without its full context.
 	gonbui.UpdateHtml(transientJavascriptId, "")
+}
+
+// CreateTransientDiv creates a transient (using `gonbui.UpdateHtml`) empty `<div>` element on the front-ent,
+// with a unique id.
+//
+// It returns the id for the newly created element. This `htmlId` can be used to create new HTML content,
+// for example, using Append, InsertAdjacent or SetInnerHtml defined in the `dom` package.
+//
+// Example:
+//
+//	  rootId := dom.CreateTransientDiv()
+//		 dom.Append(rootId, "<h3>Click On A Buttom</h3>\n")
+//	  bOk := widgets.Button("Ok").AppendTo(rootId).Done()
+//	  bNotOk := widgets.Button("NotOk").AppendTo(rootId).Done()
+//	  dom.Append(rootId, "\n<br/>\n<hr/>\n")
+func CreateTransientDiv() (htmlId string) {
+	uid := gonbui.UniqueId()
+	htmlId = "dom.transient_div_" + uid
+	gonbui.UpdateHtml("gonb_update_"+uid,
+		fmt.Sprintf(`<div id="%s"></div>`, htmlId))
+	return
 }
 
 // escapeForJavascriptSingleQuotes where str will be inserted in single quotes
@@ -116,6 +139,36 @@ func SetInnerHtml(htmlId, html string) {
 	TransientJavascript(js)
 }
 
+// GetInnerHtml returns the html content of an element in the DOM.
+func GetInnerHtml(htmlId string) (html string) {
+	if !gonbui.IsNotebook || gonbui.Error() != nil {
+		return
+	}
+
+	// Make sure we are listening to the reply, before we request.
+	address := fmt.Sprintf("/inner_html/%s", gonbui.UniqueId())
+	htmlChan := comms.Listen[string](address)
+	if gonbui.Error() != nil {
+		return
+	}
+	defer htmlChan.Close()
+
+	// Execute Javascript that will send the HTML content in the front-end.
+	htmlId = escapeForJavascriptSingleQuotes(htmlId)
+	js := fmt.Sprintf(`
+(() => {
+	let element = document.getElementById('%s');
+	let html = element.innerHTML;
+	globalThis.gonb_comm.send('%s', html)
+})();
+`, htmlId, address)
+	TransientJavascript(js)
+
+	// Wait for a reply.
+	html = <-htmlChan.C
+	return
+}
+
 // Remove removes element identified by htmlId from DOM.
 func Remove(htmlId string) {
 	htmlId = escapeForJavascriptSingleQuotes(htmlId)
@@ -126,4 +179,22 @@ func Remove(htmlId string) {
 })();
 `, htmlId)
 	TransientJavascript(js)
+}
+
+// Persist content of the presumably transient element identified by `htmlId` by extracting its `innerHTML` and
+// then displaying it with `gonbui.DisplayHtml`.
+// Finally, it removes the element identified by `htmlId`, leaving only the newly created one.
+//
+// This goes through the JupyterServer, and therefore it can be converted to HTML, and is displayed by GitHub
+// and such.
+//
+// Usually, one does this at the end of a cell execution, when the content is no longer interactive.
+func Persist(htmlId string) {
+	html := GetInnerHtml(htmlId)
+	if html == "" {
+		log.Printf("Warning: dom.Persist(): HTML content was empty, or connection to front-end was down. HTML content not persisted.")
+		return
+	}
+	Remove(htmlId)
+	gonbui.DisplayHtml(html)
 }

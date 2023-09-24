@@ -8,7 +8,6 @@ package websocket
 import (
 	"bytes"
 	_ "embed"
-	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"os"
 	"text/template"
@@ -22,14 +21,9 @@ var tmplWebSocketConnectJs = template.Must(template.New("ws").Parse(
 
 // Javascript returns the javascript required to bootstrap the WebSocket library.
 func Javascript() string {
-	uuid := gonbui.UniqueId()
 	data := struct {
-		FormId, MsgId, LogId string
-		KernelId             string
+		KernelId string
 	}{
-		FormId:   "form_id_" + uuid,
-		MsgId:    "msg_id_" + uuid,
-		LogId:    "log_id_" + uuid,
 		KernelId: os.Getenv(protocol.GONB_JUPYTER_KERNEL_ID_ENV),
 	}
 	var buf bytes.Buffer

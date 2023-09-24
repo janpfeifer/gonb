@@ -14,6 +14,11 @@ import (
 	"sync"
 )
 
+// Panicf panics with an error constructed with the given format and args.
+func Panicf(format string, args ...any) {
+	panic(errors.Errorf(format, args...))
+}
+
 // Set implements a Set for the key type T.
 type Set[T comparable] map[T]struct{}
 
@@ -132,26 +137,24 @@ func ReplaceTildeInDir(dir string) string {
 	return path.Join(homeDir, dir[1+len(userName):])
 }
 
-// Latch implements a "latch" synchronization mechanism, with a value associated with the
-// triggering of the latch.
+// Latch implements a "latch" synchronization mechanism.
 //
-// A Latch is a signal that can be waited for until it is triggered. Once triggered it never
-// changes state, it's forever triggered.
-type Latch[T any] struct {
-	value     T
+// A Latch is a signal that can be waited for until it is triggered.
+// Once triggered it never changes state, it's forever triggered.
+type Latch struct {
 	muTrigger sync.Mutex
 	wait      chan struct{}
 }
 
 // NewLatch returns an un-triggered latch.
-func NewLatch[T any]() *Latch[T] {
-	return &Latch[T]{
+func NewLatch() *Latch {
+	return &Latch{
 		wait: make(chan struct{}),
 	}
 }
 
-// Trigger latch and saves the associated value.
-func (l *Latch[T]) Trigger(value T) {
+// Trigger latch.
+func (l *Latch) Trigger() {
 	l.muTrigger.Lock()
 	defer l.muTrigger.Unlock()
 
@@ -159,22 +162,72 @@ func (l *Latch[T]) Trigger(value T) {
 		// Already triggered, discard value.
 		return
 	}
-	l.value = value
 	close(l.wait)
 }
 
-// Wait waits for the latch to be triggered, and returns the trigger value.
-func (l *Latch[T]) Wait() T {
+// Wait waits for the latch to be triggered.
+func (l *Latch) Wait() {
 	<-l.wait
-	return l.value
 }
 
 // Test checks whether the latch has been triggered.
-func (l *Latch[T]) Test() bool {
+func (l *Latch) Test() bool {
 	select {
 	case <-l.wait:
 		return true
 	default:
 		return false
 	}
+}
+
+// LatchWithValue implements a "latch" synchronization mechanism, with a value associated with the
+// triggering of the latch.
+//
+// A LatchWithValue is a signal that can be waited for until it is triggered. Once triggered it never
+// changes state, it's forever triggered.
+type LatchWithValue[T any] struct {
+	value T
+	latch *Latch
+}
+
+// NewLatchWithValue returns an un-triggered latch.
+func NewLatchWithValue[T any]() *LatchWithValue[T] {
+	return &LatchWithValue[T]{
+		latch: NewLatch(),
+	}
+}
+
+// Trigger latch and saves the associated value.
+func (l *LatchWithValue[T]) Trigger(value T) {
+	l.latch.muTrigger.Lock()
+	defer l.latch.muTrigger.Unlock()
+
+	if l.latch.Test() {
+		// Already triggered, discard value.
+		return
+	}
+	l.value = value
+	close(l.latch.wait)
+}
+
+// Wait waits for the latch to be triggered.
+func (l *LatchWithValue[T]) Wait() T {
+	l.latch.Wait()
+	return l.value
+}
+
+// Test checks whether the latch has been triggered.
+func (l *LatchWithValue[T]) Test() bool {
+	return l.latch.Test()
+}
+
+// TrySend tries to send value through the channel.
+// It returns false if it failed, presumably because the channel is closed.
+func TrySend[T any](c chan T, value T) (ok bool) {
+	defer func() {
+		exception := recover()
+		ok = exception == nil
+	}()
+	c <- value
+	return
 }

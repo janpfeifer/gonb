@@ -150,7 +150,6 @@
         })
     }
 
-
     /** subscribe to receive values sent to the given address.
      *
      * @param address A string, by convention organized hierarchically, separated by "/". E.g.: "/hyperparameters/learning_rate".

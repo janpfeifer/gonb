@@ -151,6 +151,13 @@ type CommSubscription struct {
 	Unsubscribe bool // Set to true to unsubscribe instead.
 }
 
+const (
+	// GonbuiSyncAddress is for internal use -- used to implement `gonbui.Sync`.
+	GonbuiSyncAddress = "#gonbui/sync"
+	// GonbuiSyncAckAddress is for internal use -- used to implement `gonbui.Sync`.
+	GonbuiSyncAckAddress = "#gonbui/sync_ack"
+)
+
 func init() {
 	gob.Register(DisplayData{})
 	gob.Register(InputRequest{})

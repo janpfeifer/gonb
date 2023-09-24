@@ -4,12 +4,17 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
+	"github.com/janpfeifer/gonb/gonbui/dom"
 	"text/template"
 )
 
 //go:embed button.js
 var buttonJs []byte
+
+// panicf is an alias for common.Panicf.
+var panicf = common.Panicf
 
 var tmplButtonJs = template.Must(template.New("buttonJs").Parse(
 	string(buttonJs)))
@@ -45,11 +50,11 @@ func (b *ButtonBuilder) Address(address string) *ButtonBuilder {
 	return b
 }
 
-// AppendToId defines an id of the parent element in the DOM (in the front-end)
+// AppendTo defines an id of the parent element in the DOM (in the front-end)
 // where to insert the button.
 //
-// If not defined it will simply display it as default in the output of the cell.
-func (b *ButtonBuilder) AppendToId(parentHtmlId string) *ButtonBuilder {
+// If not defined, it will simply display it as default in the output of the cell.
+func (b *ButtonBuilder) AppendTo(parentHtmlId string) *ButtonBuilder {
 	if b.built {
 		panicf("ButtonBuilder cannot change parameters after it is built")
 	}
@@ -70,8 +75,12 @@ func (b *ButtonBuilder) Done() *ButtonBuilder {
 	// Consume the first incoming button message, with counter == 0.
 	clicks := Listen[int](b.address)
 
-	gonbui.DisplayHTML(
-		fmt.Sprintf(`<button id="%s" type="button">%s</button>`, b.htmlId, b.label))
+	html := fmt.Sprintf(`<button id="%s" type="button">%s</button>`, b.htmlId, b.label)
+	if b.parentHtmlId == "" {
+		gonbui.DisplayHtml(html)
+	} else {
+		dom.Append(b.parentHtmlId, html)
+	}
 
 	var buf bytes.Buffer
 	data := struct {
@@ -84,24 +93,25 @@ func (b *ButtonBuilder) Done() *ButtonBuilder {
 	if err != nil {
 		panicf("Button template is invalid!? Please report the error to GoNB: %v", err)
 	}
-	gonbui.ScriptJavascript(buf.String())
+	dom.TransientJavascript(buf.String())
 
-	<-clicks // Consume the first incoming button message, with counter == 0.
-	close(clicks)
+	<-clicks.C // Consume the first incoming button message, with counter == 0.
+	clicks.Close()
 	return b
 }
 
-// Listen returns a channel that receives a counter (`int`) each time the button is clicked.
+// Listen returns an `AddressChannel[int]` (a wrapper for a `chan int`) that receives a counter each time the
+// button is clicked.
 // The counter is incremented at every click.
 //
-// Close the returned channel to unsubscribe from these messages and release the resources.
+// Close the returned channel (`Close()` method) to unsubscribe from these messages and release the resources.
 //
 // It can only be called after the Button is created with Done, otherwise it panics.
 //
 // If for any reason you need to listen to clicks before the button is created, create a channel
 // with the function `Listen[int](address)` directly, but you will need to ignore the first
 // counter value sent when the button is created (with value 0).
-func (b *ButtonBuilder) Listen() chan int {
+func (b *ButtonBuilder) Listen() *AddressChan[int] {
 	if !b.built {
 		panicf("ButtonBuilder.Listen can only be called after the button was created with `Done()` method")
 	}

@@ -53,7 +53,7 @@ type State struct {
 	// HeartbeatPongLatch is triggered when we receive a heartbeat reply ("pong"), or when it times out.
 	// A true value means it got the heartbeat, false means it didn't.
 	// It is recreated everytime a HeartbeatPing is sent.
-	HeartbeatPongLatch *common.Latch[bool]
+	HeartbeatPongLatch *common.LatchWithValue[bool]
 
 	// AddressSubscriptions by the program being executed. Needs to be reset at every program
 	// execution.
@@ -167,7 +167,7 @@ func (s *State) InstallJavascript(msg kernel.Message) error {
 		Transient: make(kernel.MIMEMap),
 	}
 	jsData.Data[string(protocol.MIMETextHTML)] = fmt.Sprintf("<script>%s</script>", js)
-	s.TransientDisplayId = gonbui.UniqueId()
+	s.TransientDisplayId = "gonb_websocket_" + gonbui.UniqueId()
 	jsData.Transient["display_id"] = s.TransientDisplayId
 	err := kernel.PublishUpdateDisplayData(msg, jsData)
 	//err := kernel.PublishJavascript(msg, js)
@@ -395,8 +395,8 @@ func (s *State) sendHeartbeatPingLocked(msg kernel.Message, timeout time.Duratio
 
 		// Create latch to receive response, and a timeout trigger for the latch, in case we don't
 		// get the reply in time.
-		s.HeartbeatPongLatch = common.NewLatch[bool]()
-		go func(l *common.Latch[bool]) {
+		s.HeartbeatPongLatch = common.NewLatchWithValue[bool]()
+		go func(l *common.LatchWithValue[bool]) {
 			time.Sleep(timeout)
 			// If latch has already triggered in the meantime, this trigger is discarded automatically.
 			l.Trigger(false)

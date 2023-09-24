@@ -203,6 +203,23 @@ func (exec *Executor) pollNamedPipeReader() {
 						"type, got %T instead", reqAny))
 				continue
 			}
+
+			// Special addresses:
+			if req.Address == protocol.GonbuiSyncAddress {
+				syncId, ok := req.Value.(int)
+				if !ok {
+					klog.Errorf("comms: Receive Sync request with invalid value %+v. Communication with cell program may be left in an unusable state!", req)
+					continue
+				}
+				klog.V(2).Infof("comms: Received Sync(%d) at %q, sending back ack", syncId, req.Address)
+				// Acknowledge with a reply to the special address.
+				exec.PipeWriterFifo <- &protocol.CommValue{
+					Address: protocol.GonbuiSyncAckAddress,
+					Value:   syncId,
+				}
+				continue
+			}
+
 			if exec.commsHandler == nil {
 				klog.V(2).Infof("Received and dropped (no handler registered) CommValue: %+v", req)
 			} else if req.Request {

@@ -1,3 +1,18 @@
+// Package gonbui provides tools to interact with the front-end (the notebook)
+// using HTML and other rich-data.
+//
+// In its simplest form, simply use `DisplayHtml` to display HTML content.
+// But there is much more nuance and powerful types of interactions (including
+// support for widgets, see the `widget` sup-package). Check out the
+// [tutorial]() for details.
+//
+// If using the rich data content, consider adding the following to your `main()`
+// function:
+//
+//	defer gonbui.Sync()
+//
+// This guarantees that no in-transit display content get left behind when a program
+// exits.
 package gonbui
 
 import (
@@ -6,6 +21,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/gofrs/uuid"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
 	"image"
@@ -147,7 +163,7 @@ func closePipesLocked() {
 // SendData to be displayed in the connected Notebook.
 //
 // This is a lower level function, that most end users won't need to use, instead
-// look for the other functions DisplayHTML, DisplayMarkdown, etc.
+// look for the other functions DisplayHtml, DisplayMarkdown, etc.
 //
 // But if you are testing new types of MIME types, this is the way to result
 // messages ("execute_result" message type) directly to the front-end.
@@ -190,20 +206,112 @@ func pollReaderPipe() {
 			break
 		}
 		Logf("pollReaderPipe() received %+v", valueMsg)
-		if OnCommValueUpdate != nil {
+
+		if valueMsg.Address == protocol.GonbuiSyncAckAddress {
+			// Signal arrival of sync_ack.
+			mu.Lock()
+			syncId, ok := valueMsg.Value.(int)
+			var l *common.Latch
+			if ok {
+				l, ok = syncRequestsMap[syncId]
+			}
+			if ok {
+				l.Trigger()
+				Logf("\ttriggered sync(%d) latch.", syncId)
+				delete(syncRequestsMap, syncId)
+			} else {
+				log.Printf("Received invalid sync acknowledgment %+v !? Communication to front-end may have become unstable!", valueMsg)
+			}
+			mu.Unlock()
+
+		} else if OnCommValueUpdate != nil {
+			// Generic Comms update.
+			Logf("dispatching OnCommValueUpdate(%q)", valueMsg.Address)
 			OnCommValueUpdate(valueMsg)
 		}
+
+		Logf("pollReaderPipe() delivered to %q", valueMsg.Address)
 	}
 }
 
-// DisplayHTML will display the given HTML in the notebook, as the output of the cell being executed.
-func DisplayHTML(html string) {
+var (
+	// Control Sync requests/acknowledges.
+	nextSyncId      int
+	syncRequestsMap = make(map[int]*common.Latch)
+)
+
+// Sync synchronizes with GoNB, and can be used to make sure all pending output has been sent.
+//
+// This can be used at the end of a program to make sure that everything that is in the pipe to be
+// displayed is fully displayed (flushed) before a program exits.
+func Sync() {
+	if !IsNotebook || gonbPipesError != nil {
+		return
+	}
+
+	mu.Lock()
+	syncId := nextSyncId
+	nextSyncId++
+	Logf("Sync(id=%d) ...", syncId)
+	l := common.NewLatch()
+	syncRequestsMap[syncId] = l
+	mu.Unlock()
+
+	data := &protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{
+			protocol.MIMECommValue: &protocol.CommValue{
+				Address: "#gonbui/sync",
+				Value:   syncId,
+			}},
+	}
+	SendData(data)
+	Logf("\tsync(%d) request sent, waiting...", syncId)
+
+	// Wait, the latch will trigger when a "#gonbui/sync_ack" is received from GoNB.
+	l.Wait()
+	Logf("\twait for sync(%d) done.", syncId)
+}
+
+// UniqueId returns newly created unique id.
+// It can be used for instance with UpdateHtml.
+func UniqueId() string {
+	uuid, _ := uuid.NewV7()
+	uuidStr := uuid.String()
+	uid := uuidStr[len(uuidStr)-8:]
+	return uid
+}
+
+// UniqueID returns a newly created unique id.
+// UniqueID is an alias for UniqueId.
+//
+// Deprecated: Use UniqueId instead.
+func UniqueID() string {
+	return UniqueId()
+}
+
+// DisplayHtml will display the given HTML in the notebook, as the output of the cell being executed.
+func DisplayHtml(html string) {
 	if !IsNotebook {
 		return
 	}
 	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMETextHTML: html},
 	})
+}
+
+// DisplayHTML is an alias to DisplayHtml.
+func DisplayHTML(html string) {
+	DisplayHtml(html)
+}
+
+// DisplayHtmlf is similar to DisplayHtml, but it takes a format string and its args which
+// are passed to fmt.Sprintf.
+func DisplayHtmlf(htmlFormat string, args ...any) {
+	if !IsNotebook {
+		return
+	}
+	html := fmt.Sprintf(htmlFormat, args...)
+	DisplayHtml(html)
 }
 
 // DisplayMarkdown will display the given markdown content in the notebook, as the output of
@@ -220,7 +328,7 @@ func DisplayMarkdown(markdown string) {
 	})
 }
 
-// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`:
+// UpdateHtml displays the given HTML in the notebook on an output block with the given `id`:
 // the block identified by 'id' is created automatically the first time this function is
 // called, and simply updated thereafter.
 //
@@ -231,15 +339,15 @@ func DisplayMarkdown(markdown string) {
 //
 // ```go
 //
-//	counterDisplayId := gonbui.UniqueId()
+//	counterDisplayId := "counter_"+gonbui.UniqueId()
 //	for ii := 0; ii < 10; ii++ {
-//	  gonbui.UpdateHTML(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
+//	  gonbui.UpdateHtml(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
 //	}
-//	gonbui.UpdateHTML(counterDisplayId, "")  // Erase transient block.
-//	gonbui.DisplayHTML(fmt.Sprintf("Count: <b>%d</b>\n", ii))  // Show on final block.
+//	gonbui.UpdateHtml(counterDisplayId, "")  // Erase transient block.
+//	gonbui.DisplayHtml(fmt.Sprintf("Count: <b>%d</b>\n", ii))  // Show on final block.
 //
 // ```
-func UpdateHTML(id, html string) {
+func UpdateHtml(id, html string) {
 	if !IsNotebook {
 		return
 	}
@@ -249,18 +357,11 @@ func UpdateHTML(id, html string) {
 	})
 }
 
-// UniqueId returns newly created unique id with a "gonb_id" prefix.
-// It can be used for instance with UpdateHTML.
-func UniqueId() string {
-	uuid, _ := uuid.NewV7()
-	uuidStr := uuid.String()
-	uid := uuidStr[len(uuidStr)-8:]
-	return fmt.Sprintf("gonb_id_%s", uid)
+// UpdateHTML is an alias for UpdateHtml.
+// Deprecated: use UpdateHtml instead, it's the same.
+func UpdateHTML(id, html string) {
+	UpdateHtml(id, html)
 }
-
-// UniqueID returns a newly created unique id.
-// UniqueID is an alias for UniqueId.
-// Deprecated.
 
 // UpdateMarkdown updates the contents of the output identified by id:
 // the block identified by 'id' is created automatically the first time this function is
@@ -269,7 +370,7 @@ func UniqueId() string {
 // The contents of these output blocks are considered transient, and intended to live only
 // during a kernel session.
 //
-// See example in UpdateHTML, just instead this used Markdown content.
+// See example in UpdateHtml, just instead this used Markdown content.
 func UpdateMarkdown(id, markdown string) {
 	if !IsNotebook {
 		return
@@ -280,14 +381,20 @@ func UpdateMarkdown(id, markdown string) {
 	})
 }
 
-// DisplayPNG displays the given PNG, given as raw bytes.
-func DisplayPNG(png []byte) {
+// DisplayPng displays the given PNG, given as raw bytes.
+func DisplayPng(png []byte) {
 	if !IsNotebook {
 		return
 	}
 	SendData(&protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{protocol.MIMEImagePNG: png},
 	})
+}
+
+// DisplayPNG is an alias for DisplayPng.
+// Deprecated: use DisplayPng instead.
+func DisplayPNG(png []byte) {
+	DisplayPng(png)
 }
 
 // DisplayImage displays the given image, by converting it to PNG first.
@@ -298,11 +405,11 @@ func DisplayImage(image image.Image) error {
 	if err != nil {
 		return err
 	}
-	DisplayPNG(buf.Bytes())
+	DisplayPng(buf.Bytes())
 	return nil
 }
 
-func DisplaySVG(svg string) {
+func DisplaySvg(svg string) {
 	if !IsNotebook {
 		return
 	}
@@ -314,35 +421,13 @@ func DisplaySVG(svg string) {
 	//SendData(&protocol.DisplayData{
 	//	Data: map[protocol.MIMEType]any{protocol.MIMEImageSVG: svg},
 	//})
-	DisplayHTML(fmt.Sprintf("<div>%s</div>", svg))
+	DisplayHtml(fmt.Sprintf("<div>%s</div>", svg))
 }
 
-// EmbedImageAsPNGSrc returns a string that can be used as in an HTML <img> tag, as its source (it's `src` field).
-// This simplifies embedding an image in HTML without requiring separate files. It embeds it as a PNG file
-// base64 encoded.
-func EmbedImageAsPNGSrc(img image.Image) (string, error) {
-	buf := &bytes.Buffer{}
-	err := png.Encode(buf, img)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to encode image as PNG")
-	}
-	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
-}
-
-// ScriptJavascript executes the given Javascript script in the Notebook.
-//
-// Errors in javascript parsing are sent by Jupyter Server to the stderr -- as opposed to showing
-// to the browser console.
-// These may be harder to debug during development than simply putting the contents inside a
-// `<script>...javascript...</script>` and using `DisplayHTML` instead.
-func ScriptJavascript(js string) {
-	if !IsNotebook {
-		return
-	}
-	SendData(&protocol.DisplayData{
-		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
-	})
+// DisplaySVG is an alias for DisplaySvg.
+// Deprecated: use DisplaySvg instead.
+func DisplaySVG(svg string) {
+	DisplaySvg(svg)
 }
 
 // RequestInput from the Jupyter notebook.
@@ -367,4 +452,36 @@ func RequestInput(prompt string, password bool) {
 			protocol.MIMEJupyterInput: &req,
 		},
 	})
+}
+
+// ScriptJavascript executes the given Javascript script in the Notebook.
+//
+// Errors in javascript parsing are sent by Jupyter Server to the stderr -- as opposed to showing
+// to the browser console, which may be harder to debug.
+//
+// Also, like with DisplayHtml, each execution creates a new `<div>` block in the output area.
+// Even if empty, it uses up a bit of vertical space (Jupyter Notebook thing).
+//
+// If these are an issue, consider using TransientJavascript, which uses a transient area
+// to execute the Javascript, which is re-used for every execution.
+func ScriptJavascript(js string) {
+	if !IsNotebook {
+		return
+	}
+	SendData(&protocol.DisplayData{
+		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
+	})
+}
+
+// EmbedImageAsPNGSrc returns a string that can be used as in an HTML <img> tag, as its source (it's `src` field).
+// This simplifies embedding an image in HTML without requiring separate files. It embeds it as a PNG file
+// base64 encoded.
+func EmbedImageAsPNGSrc(img image.Image) (string, error) {
+	buf := &bytes.Buffer{}
+	err := png.Encode(buf, img)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to encode image as PNG")
+	}
+	encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+	return fmt.Sprintf("data:image/png;base64,%s", encoded), nil
 }

@@ -12,3 +12,7 @@
 // building widgets.
 package widgets
 
+import "github.com/janpfeifer/gonb/common"
+
+// panicf is an alias for common.Panicf.
+var panicf = common.Panicf

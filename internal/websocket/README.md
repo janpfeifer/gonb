@@ -17,6 +17,32 @@ in `gonb/gonbui/comms`. It uses 2 named pipes opened to talk to the executed cel
 There one can send/receive messages keyed
 by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
 
+```mermaid
+flowchart TD;
+   subgraph Browser;
+    A1[JupyterLab App]-->A2[Cell Output];
+   end;
+
+   subgraph B[JupyterServer];
+   end;
+    A1<-->B;
+    A2<-->|WebSocket|B;
+    B<-->|ZeroMQ|G1;
+
+   subgraph GoNB;
+    G1([kernel])---G2([goexec]);
+    G2---G3([jpyexec]);
+    G3---G4([comms]);
+   end;
+    G4<-->|NamedSockets|C1([gonbui]);
+
+   subgraph CellProgram;
+    C1---C2([gonbui/comms]);
+    C2---C3([gonbui/widgets]);
+   end;
+    C3-...-|Address/Value Channel|A2;
+```
+
 ## Examples for End User
 
 ### Go Code Example

@@ -8,8 +8,6 @@ package websocket
 import (
 	"bytes"
 	_ "embed"
-	"github.com/janpfeifer/gonb/gonbui/protocol"
-	"os"
 	"text/template"
 )
 
@@ -20,11 +18,12 @@ var tmplWebSocketConnectJs = template.Must(template.New("ws").Parse(
 	string(webSocketConnectJs)))
 
 // Javascript returns the javascript required to bootstrap the WebSocket library.
-func Javascript() string {
+// It takes as input the kernel id -- provided when the kernel (GoNB) is executed.
+func Javascript(jupyterKernelId string) string {
 	data := struct {
 		KernelId string
 	}{
-		KernelId: os.Getenv(protocol.GONB_JUPYTER_KERNEL_ID_ENV),
+		KernelId: jupyterKernelId,
 	}
 	var buf bytes.Buffer
 	err := tmplWebSocketConnectJs.Execute(&buf, data)

@@ -156,6 +156,8 @@ const (
 	GonbuiSyncAddress = "#gonbui/sync"
 	// GonbuiSyncAckAddress is for internal use -- used to implement `gonbui.Sync`.
 	GonbuiSyncAckAddress = "#gonbui/sync_ack"
+	// GonbuiStartAddress is for internal use -- used to implement `comms.Start`.
+	GonbuiStartAddress = "#comms/start"
 )
 
 func init() {

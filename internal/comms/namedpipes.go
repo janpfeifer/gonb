@@ -36,11 +36,11 @@ func (s *State) ProgramFinished() {
 	s.ProgramExecutor = nil
 }
 
-// ProgramValueUpdateRequest handler, it implements jpyexec.CommsHandler.
-// It sends a message with the update to the front-end.
+// ProgramSendValueRequest handler, it implements jpyexec.CommsHandler.
+// It sends a value to the front-end.
 //
 // It also tries to install the WebSocket, if not yet installed.
-func (s *State) ProgramValueUpdateRequest(address string, value any) {
+func (s *State) ProgramSendValueRequest(address string, value any) {
 	// Notice the program may end while handling this request, so we save the value
 	// of the msg that will be used to complete the request, even if the program ends.
 	msg := s.ProgramExecMsg
@@ -53,10 +53,14 @@ func (s *State) ProgramValueUpdateRequest(address string, value any) {
 	if klog.V(2).Enabled() {
 		klog.Infof("comms: ValueUpdate: address=%q, value=%v", address, value)
 	}
-	err := s.InstallJavascript(msg)
+	err := s.InstallWebSocket(msg)
 	if err != nil {
 		klog.Infof("Failed to install WebSocket in front-end, used to communicate with programs, "+
 			"in particular widgets -- those will not work. Error message: %+v", err)
+		return
+	}
+	if address == protocol.GonbuiStartAddress {
+		klog.V(2).Infof("%q received, JavascriptWebSocket being installed.", protocol.GonbuiStartAddress)
 		return
 	}
 
@@ -73,6 +77,9 @@ func (s *State) ProgramValueUpdateRequest(address string, value any) {
 // ProgramReadValueRequest handler, it implements jpyexec.CommsHandler.
 // It sends a message with a request to read the value from the address to the front-end.
 //
+// This only works if there is a `SyncedVariable` or something similar listening to the address
+// on the front-end.
+//
 // It also tries to install the WebSocket, if not yet installed.
 func (s *State) ProgramReadValueRequest(address string) {
 	// Notice the program may end while handling this request, so we save the value
@@ -87,7 +94,7 @@ func (s *State) ProgramReadValueRequest(address string) {
 	if klog.V(2).Enabled() {
 		klog.Infof("comms: ReadValue: address=%q", address)
 	}
-	err := s.InstallJavascript(msg)
+	err := s.InstallWebSocket(msg)
 	if err != nil {
 		klog.Infof("Failed to install WebSocket in front-end, used to communicate with programs, "+
 			"in particular widgets -- those will not work. Error message: %+v", err)
@@ -126,7 +133,7 @@ func (s *State) ProgramSubscribeRequest(address string) {
 	}
 	s.AddressSubscriptions.Insert(address)
 
-	err := s.InstallJavascript(msg)
+	err := s.InstallWebSocket(msg)
 	if err != nil {
 		klog.Infof("Failed to install WebSocket in front-end, used to communicate with programs, "+
 			"in particular widgets -- those will not work. Error message: %+v", err)

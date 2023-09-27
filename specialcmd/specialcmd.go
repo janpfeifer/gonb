@@ -10,7 +10,6 @@ package specialcmd
 import (
 	_ "embed"
 	"fmt"
-	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"golang.org/x/exp/slices"
 	"os"
@@ -139,10 +138,10 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		if err != nil {
 			return errors.WithMessagef(err, "failed to prepare `%%wasm`")
 		}
-		goExec.WasmDivId = gonbui.UniqueId() // Create a unique ID for this cell.
+		goExec.WasmDivId = UniqueId() // Unique ID for this cell.
 
 	case "widgets":
-		return goExec.Comms.InstallJavascript(msg)
+		return goExec.Comms.InstallWebSocket(msg)
 
 	case "widgets_hb":
 		var hb bool

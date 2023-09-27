@@ -44,6 +44,8 @@ func handleComms(msg kernel.Message, goExec *goexec.State) error {
 		return goExec.Comms.HandleOpen(msg)
 
 	case "comm_close":
+		klog.Warningf("\"comm_close\" received, but not implemented -- likely there is no impact.")
+		return nil
 
 	case "comm_msg":
 		return goExec.Comms.HandleMsg(msg)

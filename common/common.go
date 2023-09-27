@@ -2,6 +2,7 @@
 package common
 
 import (
+	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"io/fs"
@@ -17,6 +18,14 @@ import (
 // Panicf panics with an error constructed with the given format and args.
 func Panicf(format string, args ...any) {
 	panic(errors.Errorf(format, args...))
+}
+
+// UniqueId returns newly created unique id.
+func UniqueId() string {
+	uuid, _ := uuid.NewV7()
+	uuidStr := uuid.String()
+	uid := uuidStr[len(uuidStr)-8:]
+	return uid
 }
 
 // Set implements a Set for the key type T.

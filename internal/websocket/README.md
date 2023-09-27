@@ -1,21 +1,87 @@
 # "Front-End to Go Communication" or "Enabling Interactive Widgets"
 
-The `websockets` package serves the javascript (`websocket.js`) that implements an end-to-end message
-system between the front-end -- cell outputs in the browser -- to the user's Go code.
-The goal is to allow the HTML output in the browser to act not only as a form
-of rich output, but also input, interacting with the user's code.
+The communication from the front-end (browser displaying output of cell execution) to the actual
+executing program (the Go program typed in by the user in the cells) has a straightforward API
+(based on "sending/receiving values to addresses"), but it's implementation uses many hoops,
+and may be very difficult to debug/fix if something changes.
 
-It implements the underlying javascript `WebSocket`, the Jupyter protocol using _custom messages_ (see below), and
-on top of that a minimal simpler API in javascript (it can also be used from WASM) to send/receive messages keyed
-by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
+This document tries to describe what is going on: (1) The final API offered to the users; (2) The various
+modules (in Go and Javascript) implemented by **GoNB** to support the API. 
+It doesn't go into the details of what goes on inside the various Jupyter modules, but in the end
+of the document it includes links to various relevant Jupyter docs.
 
-The corresponding kernel side of the protocol is implemented in `gonb/internal/comms`. 
+## API for Widgets Implementations and End-user
 
-The API for exchanging messages with the front-end from the end-user program is available
-in `gonb/gonbui/comms`. It uses 2 named pipes opened to talk to the executed cell. 
+The API allows one to send / receive values associated to addresses:
 
-There one can send/receive messages keyed
-by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
+* **Address**: Simply a string, but we add a few conventions on top:
+  * Addresses starting with "#" are private to the protocol implementation, please don't
+    use these (except if you are doing internal GoNB development).
+  * Addresses use a hierarchical structure, using "/" as separator, as paths in a (unix) filesystem.
+  * Examples used by default by current widgets: `"/button/" + gonbui.UniqueId()`, `"/slider/" + gonbui.UniqueId()`.
+* **Value**: Supported types: `float64`, `int`, `string` (with automatic conversion in Go if the
+  JSON parser uses something different). Planned future support: (1) map of string to a *Value* type 
+  (`map[string]any`); (2) slices of a *Value* type (`[]any`). The API uses generics to support
+  these basic types.
+
+### Go Code (Cell code)
+
+#### Send a value to an address
+
+```go
+import "github.com/janpfeifer/gonb/gonbui/comms"
+
+…
+   comms.Send("/my/component". 3.1415)
+```
+
+#### Listen to an address
+
+Using the subscription API:
+
+```go
+import "github.com/janpfeifer/gonb/gonbui/comms"
+
+…
+    subId := comms.Subscripe("/my/counter", func (address string, value int) {
+		fmt.Printf("counter=%d\n", value)
+		if value > 10 {
+			// Stop listening when counter reaches 10.
+			comms.Unsubscribe(subId)
+        }
+    })
+```
+
+Or using an `AddressChannel[T]`:
+
+```go
+  counterChan := comms.Listen[int]("/my/counter")
+  for value := range counterChan.C {  // Actual channel in `.C`
+    fmt.Printf("counter=%d\n", value)
+    if value > 10 {
+        // Stop listening when counter reaches 10.
+        break
+    }
+  }
+  counterChan.Close()
+```
+
+### Javascript Code (Running in browser by widgets implementations)
+
+The javascript code is "injected" in the browser by the usual means: Jupyter allows one to
+send HTML code (and many other MIME types) to be "displayed" in the cell output. 
+If one sends Javascript (or HTML with an embeded `<script>` element) it gets executed. 
+See `gonbui/dom` package's `TransientJavascript(js string)` (called from a cell) for a convenient
+way to execute arbitrary Javascript.
+Or the experimental `%wasm` to run WebAssembly instead.
+
+GoNB injects the `gonb_comm` Javacript object when the user uses the `%widgets` special command,
+or at the first use of the `comms` package. so the API below is only available after that.
+
+
+
+
+## Front-End Code Example -- Widget implementation
 
 ```mermaid
 flowchart TD;
@@ -42,6 +108,23 @@ flowchart TD;
    end;
     C3-...-|Address/Value Channel|A2;
 ```
+
+The `websockets` package serves the javascript (`websocket.js`) that implements an end-to-end message
+system between the front-end -- cell outputs in the browser -- to the user's Go code.
+The goal is to allow the HTML output in the browser to act not only as a form
+of rich output, but also input, interacting with the user's code.
+
+It implements the underlying javascript `WebSocket`, the Jupyter protocol using _custom messages_ (see below), and
+on top of that a minimal simpler API in javascript (it can also be used from WASM) to send/receive messages keyed
+by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
+
+The corresponding kernel side of the protocol is implemented in `gonb/internal/comms`.
+
+The API for exchanging messages with the front-end from the end-user program is available
+in `gonb/gonbui/comms`. It uses 2 named pipes opened to talk to the executed cell.
+
+There one can send/receive messages keyed
+by an "address key", as well as "synchronized variables", also keyed by an "address key". More details below.
 
 ## Examples for End User
 

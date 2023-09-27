@@ -10,7 +10,6 @@ package comms
 import (
 	"fmt"
 	"github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"github.com/janpfeifer/gonb/internal/websocket"
@@ -43,6 +42,10 @@ type State struct {
 
 	// Opened indicates whether "comm_open" message has already been received.
 	Opened bool
+
+	// openedLatch is created by InstallWebSocket, and is triggered when it is
+	// finally opened (or failed to open).
+	openLatch *common.Latch
 
 	// CommId created when the channel is opened from the front-end.
 	CommId string
@@ -120,37 +123,51 @@ func getFromJson[T any](values map[string]any, key string) (value T, err error) 
 const (
 	HeartbeatTimeout          = 500 * time.Millisecond
 	HeartbeatRequestThreshold = 1 * time.Second
+
+	WaitForConnectionTimeout = 3 * time.Second
 )
 
-// InstallJavascript in the front end that open websocket for communication.
-// The javascript is output as a transient output, so it's not saved.
+// InstallWebSocket in the front-end, if not already installed.
+// In the browser this is materialized as a global `gonb_comm` object, that handles
+// communication.
+//
+// If it is supposedly installed, but there has been no communication > `HeartbeatRequestThreshold`
+// (~ 1 second), it probes with a heartbeat "ping" to check.
+//
+// To install it sends a javascript is output as a transient output, so it's not saved.
 //
 // If it has already been installed, this does nothing.
-func (s *State) InstallJavascript(msg kernel.Message) error {
+func (s *State) InstallWebSocket(msg kernel.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.installWebSocketLocked(msg)
+}
+
+// installWebSocketLocked implements InstallWebSocket, but assumes `s.mu` lock is
+// already acquired.
+func (s *State) installWebSocketLocked(msg kernel.Message) error {
 	if s.IsWebSocketInstalled {
 		// Already installed: if we haven't heard from the other side in more than HeartbeatRequestThreshold, then
 		// we want to confirm with a ping.
 		if time.Since(s.LastMsgTime) <= HeartbeatRequestThreshold {
-			klog.V(1).Infof("comms.State.InstallJavascript(): already installed")
+			klog.V(1).Infof("comms.State.InstallWebSocket(): already installed")
 			return nil
 		}
 
 		// Send heartbeat to confirm.
 		if s.CommId != "" && s.Opened {
-			klog.V(1).Infof("comms.State.InstallJavascript(): confirm installation with heartbeat")
+			klog.V(1).Infof("comms.State.InstallWebSocket(): confirm installation with heartbeat")
 			heartbeat, err := s.sendHeartbeatPingLocked(msg, HeartbeatTimeout)
 			if err != nil {
 				return err
 			}
 			if heartbeat {
 				// We got a heartbeat: websocket already installed, and connection is established.
-				klog.V(1).Infof("comms.State.InstallJavascript(): heartbeat pong received, all good.")
+				klog.V(1).Infof("comms.State.InstallWebSocket(): heartbeat pong received, all good.")
 				return nil
 			}
-			klog.V(1).Infof("comms.State.InstallJavascript(): heartbeat timed out and not heard back.")
+			klog.V(1).Infof("comms.State.InstallWebSocket(): heartbeat timed out and not heard back.")
 		}
 
 		// Likely we have a stale comms connection (e.g.: if the browser reloaded), we reset it and
@@ -160,25 +177,53 @@ func (s *State) InstallJavascript(msg kernel.Message) error {
 		s.Opened = false
 	}
 
-	js := websocket.Javascript()
-	jsData := kernel.Data{
-		Data:      make(kernel.MIMEMap, 1),
-		Metadata:  make(kernel.MIMEMap),
-		Transient: make(kernel.MIMEMap),
+	if s.openLatch == nil {
+		// Install WebSocked javascript and create openLatch to wait it to open.
+		// Notice if s.openLatch is created already, this is a concurrent call to
+		// InstallWebSocket, and we can simply wait on it.
+		klog.V(1).Infof("comms.State.InstallWebSocket(): running Javascript to install WebSocket...")
+		s.openLatch = common.NewLatch()
+		js := websocket.Javascript(msg.Kernel().JupyterKernelId)
+		jsData := kernel.Data{
+			Data:      make(kernel.MIMEMap, 1),
+			Metadata:  make(kernel.MIMEMap),
+			Transient: make(kernel.MIMEMap),
+		}
+		jsData.Data[string(protocol.MIMETextHTML)] = fmt.Sprintf("<script>%s</script>", js)
+		s.TransientDisplayId = "gonb_websocket_" + common.UniqueId()
+		jsData.Transient["display_id"] = s.TransientDisplayId
+		err := kernel.PublishUpdateDisplayData(msg, jsData)
+		if err != nil {
+			klog.Error("Widgets won't work without a javascript WebSocket connection.")
+			klog.Errorf("Failed to publish javascript to bootstrap GoNB websocket connection: %+v", err)
+			return err
+		}
+		// Timeout for waiting to open.
+		go func(l *common.Latch) {
+			time.Sleep(WaitForConnectionTimeout)
+			l.Trigger() // No-op if already triggered.
+		}(s.openLatch)
 	}
-	jsData.Data[string(protocol.MIMETextHTML)] = fmt.Sprintf("<script>%s</script>", js)
-	s.TransientDisplayId = "gonb_websocket_" + gonbui.UniqueId()
-	jsData.Transient["display_id"] = s.TransientDisplayId
-	err := kernel.PublishUpdateDisplayData(msg, jsData)
-	//err := kernel.PublishJavascript(msg, js)
-	if err == nil {
-		s.IsWebSocketInstalled = true
-		klog.V(1).Infof("Installed WebSocket javascript for GoNB connection (for widgets to work), waiting for connection")
-	} else {
-		klog.Error("Widgets won't work without a javascript WebSocket connection.")
-		klog.Errorf("Failed to publish javascript to bootstrap GoNB websocket connection: %+v", err)
+
+	// Wait for communication to be established.
+	klog.V(2).Infof("comms.State.InstallWebSocket(): waiting for open request...")
+	l := s.openLatch
+	s.mu.Unlock()
+	l.Wait()
+	s.mu.Lock()
+	if s.openLatch == l {
+		s.openLatch = nil
 	}
-	return err
+
+	// Check whether connection opening was successful.
+	if !s.Opened {
+		return errors.Errorf("InstallWebSocket failed: Javascript was sent to execution, but connection was not established. " +
+			"Likely widgets won't work, since connection with front-end (browser can't be installed).")
+	}
+
+	s.IsWebSocketInstalled = true
+	klog.V(1).Infof("Installed WebSocket javascript for GoNB connection (for widgets to work)")
+	return nil
 }
 
 // HandleOpen message, with `msg_type` set to "comm_open".
@@ -188,6 +233,15 @@ func (s *State) InstallJavascript(msg kernel.Message) error {
 func (s *State) HandleOpen(msg kernel.Message) (err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	defer func() {
+		if s.openLatch != nil {
+			// Confirms open was received and possibly replied.
+			// This doesn't mean it succeeded, only that the attempt at establishing
+			// the connection finished. Check `s.Opened` to see if it was correctly opened.
+			s.openLatch.Trigger()
+		}
+	}()
 
 	content, ok := msg.ComposedMsg().Content.(map[string]any)
 	if !ok {
@@ -242,12 +296,18 @@ func (s *State) HandleOpen(msg kernel.Message) (err error) {
 
 	// Mark comms opened.
 	s.CommId = commId
-	s.Opened = true
 	s.LastMsgTime = time.Now()
-	return s.sendDataLocked(msg, map[string]any{
+	err = s.sendDataLocked(msg, map[string]any{
 		"address": CommOpenAckAddress,
 		"value":   true,
 	})
+	if err != nil {
+		klog.Warningf("Failed to acknowledge open connection to front-end, likely widgets won't work!")
+		err = errors.WithMessagef(err, "failed to reply %q to front-end", CommOpenAckAddress)
+		return
+	}
+	s.Opened = true
+	return nil
 }
 
 // HandleMsg is called by the dispatcher whenever a new `comm_msg` arrives from the front-end.
@@ -291,7 +351,7 @@ func (s *State) HandleMsg(msg kernel.Message) (err error) {
 	case HeartbeatPongAddress:
 		return s.handleHeartbeatPongLocked(msg)
 	case HeartbeatPingAddress:
-		return s.handleHeartbeatPongLocked(msg)
+		return s.handleHeartbeatPingLocked(msg)
 	default:
 		var value any
 		value, err = getFromJson[any](content, "data/value")
@@ -425,4 +485,17 @@ func (s *State) handleHeartbeatPongLocked(msg kernel.Message) error {
 		klog.Warningf("comms: heartbeat pong received but no one listening (no associated latch)!?")
 	}
 	return nil
+}
+
+// handleHeartbeatPing when one is received.
+func (s *State) handleHeartbeatPingLocked(msg kernel.Message) (err error) {
+	data := map[string]any{
+		"address": HeartbeatPongAddress,
+		"value":   true,
+	}
+	err = s.sendDataLocked(msg, data)
+	if err != nil {
+		err = errors.WithMessagef(err, "failed to reply a heartbeat pong message, widgets connection may be down")
+	}
+	return
 }

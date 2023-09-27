@@ -42,9 +42,8 @@ type CommsHandler interface {
 	// failed during the creation of the various pipes.
 	ProgramFinished()
 
-	// ProgramValueUpdateRequest is called upon a request to update the value at an address
-	// by the program being executed.
-	ProgramValueUpdateRequest(address string, value any)
+	// ProgramSendValueRequest is called when the program requests a value to be sent to an address.
+	ProgramSendValueRequest(address string, value any)
 
 	// ProgramReadValueRequest handler.
 	ProgramReadValueRequest(address string)
@@ -226,8 +225,8 @@ func (exec *Executor) pollNamedPipeReader() {
 				klog.V(2).Infof("ProgramReadValueRequest(%q) requested", req.Address)
 				exec.commsHandler.ProgramReadValueRequest(req.Address)
 			} else {
-				klog.V(2).Infof("ProgramValueUpdateRequest(%q, %v) requested", req.Address, req.Value)
-				exec.commsHandler.ProgramValueUpdateRequest(req.Address, req.Value)
+				klog.V(2).Infof("ProgramSendValueRequest(%q, %v) requested", req.Address, req.Value)
+				exec.commsHandler.ProgramSendValueRequest(req.Address, req.Value)
 			}
 			continue
 		}

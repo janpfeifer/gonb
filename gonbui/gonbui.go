@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/gob"
 	"fmt"
-	"github.com/gofrs/uuid"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/pkg/errors"
@@ -275,10 +274,7 @@ func Sync() {
 // UniqueId returns newly created unique id.
 // It can be used for instance with UpdateHtml.
 func UniqueId() string {
-	uuid, _ := uuid.NewV7()
-	uuidStr := uuid.String()
-	uid := uuidStr[len(uuidStr)-8:]
-	return uid
+	return common.UniqueId()
 }
 
 // UniqueID returns a newly created unique id.

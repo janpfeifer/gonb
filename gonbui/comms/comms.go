@@ -30,12 +30,24 @@ func init() {
 	gonbui.OnCommValueUpdate = dispatchValueUpdates
 }
 
-// UpdateValue in the front-end, using "comms", a channel used to talk to a
+// Start makes sure that the `gonb_comm` Javascript module, responsible for
+// communication with GoNB, is installed in the front-end.
+//
+// This happens automatically if one uses any of the other functions, but if one
+// is trying to use the Javacript API before that, be sure to call this at the
+// start of your program.
+//
+// This is equivalent of running the special command `%widgets`.
+func Start() {
+	Send(protocol.GonbuiStartAddress, 1)
+}
+
+// Send to the front-end, using "comms", a virtual channel used to talk to a
 // WebSocket in the browser (notebook).
 //
 // This is used to implement widgets, or arbitrary Javascript/Wasm code running
 // in the front-end.
-func UpdateValue[T protocol.CommValueTypes](address string, value T) {
+func Send[T protocol.CommValueTypes](address string, value T) {
 	data := &protocol.DisplayData{
 		Data: map[protocol.MIMEType]any{
 			protocol.MIMECommValue: &protocol.CommValue{
@@ -266,8 +278,9 @@ func dispatchValueUpdates(valueMsg *protocol.CommValue) {
 	}
 }
 
-// AddressChan provides a channel to listen to an Address in the communication between the front-end
-// and GoNB.
+// AddressChan provides a channel to listen to an Address in the communication
+// between the front-end and GoNB.
+//
 // It can be used to interact with the front-end (the browser) in a notebook.
 //
 // Use Listen to create an AddressChan, and use `C` to receive the updates.

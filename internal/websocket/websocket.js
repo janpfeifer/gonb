@@ -312,7 +312,7 @@
             await this._wait_open_ack();
         } catch (err) {
             console.error(`gonb_comm: failed to connect to kernel, communication (and widgets) will not work: ${err.message}`);
-            gonb_comm.close();
+            gonb_comm.close(1000, err);
             return Promise.reject(err)
         }
         debug_log(`gonb_comm: operational using comm_id="${this._comm_id}".`);

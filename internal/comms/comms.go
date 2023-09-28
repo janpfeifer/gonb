@@ -4,7 +4,8 @@
 // This is the counter-part to the `websocket` package, which implements (in
 // javascript) the front-end side.
 //
-// See details in `internal/websockets/README.md` file.
+// See documentation in `gonb/docs/FrontEndCommunication.md` with a diagram and description
+// of what is going on.
 package comms
 
 import (

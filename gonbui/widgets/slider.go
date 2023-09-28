@@ -134,3 +134,9 @@ func (s *SliderBuilder) GetHtmlId() string {
 func (s *SliderBuilder) GetValue() int {
 	return s.value
 }
+
+// SetValue sets the value of the slider, communicating that with the UI.
+func (s *SliderBuilder) SetValue(value int) {
+	comms.Send(s.address, value)
+	s.value = value
+}

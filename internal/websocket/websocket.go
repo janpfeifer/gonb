@@ -2,7 +2,7 @@
 // using WebSockets between the browser (the front-end) to the GoNB kernel -- and that
 // it then bridged in GoNB to the user's Go code.
 //
-// See documentation in InteractiveFrontend.md for the full description of the whole process.
+// See documentation and examples of how to use in gonb/docs/FrontEndCommunication.md.
 package websocket
 
 import (

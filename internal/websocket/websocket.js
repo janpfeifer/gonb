@@ -12,7 +12,7 @@
  * accepts subscriptions to addresses and one can schedule `SendMessage` --> a promise is returned
  * and can be waited on until connection is established and the message is sent.
  *
- * See documentation and examples of how to use in gonb/internal/websockets/README.md.
+ * See documentation and examples of how to use in gonb/docs/FrontEndCommunication.md.
  */
 (() => {
     /**

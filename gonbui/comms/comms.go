@@ -7,7 +7,7 @@
 //
 // Widgets developers can simply use this library as is.
 // For GoNB developers there is a more detailed description of what is going on in
-// [gonb/internal/websocket/README.md]().
+// `gonb/docs/FrontEndCommunication.md`.
 //
 // Errors on the underlying named pipes used to connect to GoNB can be checked with
 // gonbui.Error().

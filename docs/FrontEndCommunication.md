@@ -150,8 +150,12 @@ Otherwise, same observations as in the Example 1.
 
 ## Implementation of Communication
 
-The "behind the scenes" is pretty complex. A summary (as far as my understanding goes) is described 
+The "behind the scenes" is somewhat complex. A summary (as far as my understanding goes) is described 
 by the diagram below. 
+
+The goal is to establish the virtual "Address/Value Channel" (the API described in the first section),
+shown as dashed line in the diagram.
+
 Details on each element of the diagram are given bellow.
 
 ```mermaid

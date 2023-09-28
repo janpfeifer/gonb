@@ -170,7 +170,7 @@ flowchart TD;
     G1([kernel])---G2([goexec]);
     G2---G3([jpyexec]);
     G3---G4([comms]);
-    G1---G3;
+    G1---G4;
     G4---G5([websocket]);
    end;
     G3<-->|NamedSockets|C1([gonbui]);

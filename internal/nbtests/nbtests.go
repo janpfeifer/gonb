@@ -9,7 +9,7 @@ package nbtests
 import (
 	"bufio"
 	"fmt"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
@@ -23,8 +23,8 @@ import (
 const Separator = "----" // String used as separator by `nbconvert` in text mode.
 
 func GoNBRootDir() string {
-	_, rootDir, _, _ := runtime.Caller(0)
-	rootDir = path.Dir(path.Dir(rootDir))
+	_, filePath, _, _ := runtime.Caller(0)
+	rootDir := path.Dir(path.Dir(path.Dir(filePath))) // "../.."
 	return rootDir
 }
 
@@ -65,6 +65,7 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 	cmd.Dir = rootDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	klog.Infof("GoNB root: %q", rootDir)
 	klog.Infof("Executing: %q", cmd)
 	err = cmd.Run()
 	if err != nil {

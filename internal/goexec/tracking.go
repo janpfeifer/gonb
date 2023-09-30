@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
 	"golang.org/x/mod/modfile"
 	"io/fs"

@@ -2,8 +2,8 @@ package specialcmd
 
 import (
 	"fmt"
-	"github.com/janpfeifer/gonb/goexec"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"k8s.io/klog/v2"
 	"strings"
 )

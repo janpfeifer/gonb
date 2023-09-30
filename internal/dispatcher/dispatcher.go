@@ -5,10 +5,10 @@ package dispatcher
 import (
 	"fmt"
 	. "github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/goexec"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
-	"github.com/janpfeifer/gonb/kernel"
-	"github.com/janpfeifer/gonb/specialcmd"
+	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/kernel"
+	"github.com/janpfeifer/gonb/internal/specialcmd"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/slices"
 	"io"

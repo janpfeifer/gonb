@@ -12,8 +12,8 @@ package nbtests
 import (
 	"flag"
 	"fmt"
-	"github.com/janpfeifer/gonb/goexec"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 	"os"
@@ -106,13 +106,20 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 	must(os.Remove(nbconvertOutputName))
 	nbconvertOutputPath := nbconvertOutputName + ".asciidoc" // nbconvert adds this suffix.
 
+	jpyPath, err := exec.LookPath("jupyter")
+	require.NoErrorf(t, err,
+		"Command `jupyter` is not in path. To run integration tests from `nbtests` "+
+			"you need `jupyter` and `nbconvert` installed -- and if installed with Conda "+
+			"you need remember to activate your conda environment -- see conda documentation.")
+	klog.Infof("jupyter: found in %q", jpyPath)
+
 	nbconvert := exec.Command(
-		"jupyter", "nbconvert", "--to", "asciidoc", "--execute",
+		jpyPath, "nbconvert", "--to", "asciidoc", "--execute",
 		"--output", nbconvertOutputName,
 		path.Join(rootDir, "examples", "tests", notebook+".ipynb"))
 	nbconvert.Stdout, nbconvert.Stderr = os.Stderr, os.Stdout
 	klog.Infof("Executing: %q", nbconvert)
-	err := nbconvert.Run()
+	err = nbconvert.Run()
 	require.NoError(t, err)
 	f, err := os.Open(nbconvertOutputPath)
 	require.NoErrorf(t, err, "Failed to open the output of %q", nbconvert)

@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"text/template"
 
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"k8s.io/klog/v2"
 )
 

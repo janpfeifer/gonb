@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	"os"

@@ -1,4 +1,4 @@
-// Package common holds functionality that is common to multiple other packages.
+// Package common holds generic functionality that is common to multiple packages.
 package common
 
 import (
@@ -22,8 +22,8 @@ func Panicf(format string, args ...any) {
 
 // UniqueId returns newly created unique id.
 func UniqueId() string {
-	uuid, _ := uuid.NewV7()
-	uuidStr := uuid.String()
+	v7id, _ := uuid.NewV7()
+	uuidStr := v7id.String()
 	uid := uuidStr[len(uuidStr)-8:]
 	return uid
 }

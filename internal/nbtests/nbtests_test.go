@@ -12,6 +12,7 @@ package nbtests
 import (
 	"flag"
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,8 @@ import (
 	"strings"
 	"testing"
 )
+
+var panicf = common.Panicf
 
 var (
 	flagPrintNotebook = flag.Bool("print_notebook", false, "Print tested notebooks, useful if debugging unexpected results.")
@@ -53,6 +56,8 @@ func mustRemoveAll(dir string) {
 
 var (
 	rootDir, jupyterDir string
+	jupyterExecPath     string
+	tmpGocoverdir       string // Created if {REAL_}GOCOVERDIR is not set at start up.
 )
 
 // setup for integration tests:
@@ -72,7 +77,36 @@ func setup() {
 	// See: https://groups.google.com/g/golang-nuts/c/tg0ZrfpRMSg
 	if goCoverDir := os.Getenv("REAL_GOCOVERDIR"); goCoverDir != "" {
 		must(os.Setenv("GOCOVERDIR", goCoverDir))
+	} else if goCoverDir := os.Getenv("GOCOVERDIR"); goCoverDir != "" {
+		// If running manually, and having set GOCOVERDIR, also set REAL_GOCOVERDIR
+		// for consistency (both are set).
+		must(os.Setenv("REAL_GOCOVERDIR", goCoverDir))
+	} else {
+		klog.Info(
+			"Tests are configured to generate coverage information, but $REAL_GOCOVERDIR or $GOCOVERDIR " +
+				"are not set -- see script `run_coverage.sh` for an example. So we are creating a temporary GOCOVERDIR " +
+				" that will be deleted in the end.")
+		var err error
+		tmpGocoverdir, err = os.MkdirTemp("", "gonb_nbtests_gocoverdir_")
+		if err != nil {
+			panicf("Failed to create a temporary directory for GOCOVERDIR: %+v", err)
+		}
+		klog.Infof("{REAL_}GOCOVERDIR=%s", tmpGocoverdir)
+		must(os.Setenv("GOCOVERDIR", tmpGocoverdir))
+		must(os.Setenv("REAL_GOCOVERDIR", tmpGocoverdir))
+
 	}
+
+	// Find jupyter executable.
+	var err error
+	jupyterExecPath, err = exec.LookPath("jupyter")
+	if err != nil {
+		panicf(
+			"Command `jupyter` is not in path. To run integration tests from `nbtests` "+
+				"you need `jupyter` and `nbconvert` installed -- and if installed with Conda "+
+				"you need remember to activate your conda environment -- see conda documentation. Error: %+v", err)
+	}
+	klog.Infof("jupyter: found in %q", jupyterExecPath)
 
 	// Parse extraInstallArgs.
 	extraInstallArgs := strings.Split(*flagExtraFlags, " ")
@@ -93,6 +127,10 @@ func TestMain(m *testing.M) {
 	if !testing.Short() {
 		mustRemoveAll(jupyterDir)
 	}
+	if tmpGocoverdir != "" {
+		mustRemoveAll(tmpGocoverdir)
+	}
+
 	os.Exit(code)
 }
 
@@ -106,20 +144,13 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 	must(os.Remove(nbconvertOutputName))
 	nbconvertOutputPath := nbconvertOutputName + ".asciidoc" // nbconvert adds this suffix.
 
-	jpyPath, err := exec.LookPath("jupyter")
-	require.NoErrorf(t, err,
-		"Command `jupyter` is not in path. To run integration tests from `nbtests` "+
-			"you need `jupyter` and `nbconvert` installed -- and if installed with Conda "+
-			"you need remember to activate your conda environment -- see conda documentation.")
-	klog.Infof("jupyter: found in %q", jpyPath)
-
 	nbconvert := exec.Command(
-		jpyPath, "nbconvert", "--to", "asciidoc", "--execute",
+		jupyterExecPath, "nbconvert", "--to", "asciidoc", "--execute",
 		"--output", nbconvertOutputName,
 		path.Join(rootDir, "examples", "tests", notebook+".ipynb"))
 	nbconvert.Stdout, nbconvert.Stderr = os.Stderr, os.Stdout
 	klog.Infof("Executing: %q", nbconvert)
-	err = nbconvert.Run()
+	err := nbconvert.Run()
 	require.NoError(t, err)
 	f, err := os.Open(nbconvertOutputPath)
 	require.NoErrorf(t, err, "Failed to open the output of %q", nbconvert)
@@ -510,13 +541,15 @@ func TestGonbui(t *testing.T) {
 		return
 	}
 
+	klog.Infof("GOCOVERDIR=%s", os.Getenv("GOCOVERDIR"))
+
 	require.NoError(t, os.Setenv("GONB_GIT_ROOT", rootDir))
 	f := executeNotebook(t, "gonbui")
 	err := Check(f,
 		Sequence(
 			// Check GONB_GIT_ROOT was recognized.
 			Match(
-				OutputLine(1),
+				OutputLine(2),
 				Separator,
 				"ok",
 				Separator,
@@ -524,7 +557,7 @@ func TestGonbui(t *testing.T) {
 
 			// Check replace rule was created.
 			Match(
-				OutputLine(2),
+				OutputLine(3),
 				Separator,
 				"Added replace rule for module",
 				Separator,
@@ -532,7 +565,7 @@ func TestGonbui(t *testing.T) {
 
 			// Check DisplayHTML.
 			Match(
-				OutputLine(3),
+				OutputLine(4),
 				Separator,
 				"html displayed",
 				Separator,
@@ -540,9 +573,12 @@ func TestGonbui(t *testing.T) {
 
 			// Check DisplayMarkdown.
 			// It doesn't always work on nbconvert (but it works in the Jupyter notebook).
-			// Test disabled for now.
+			// Oddly it used to work earlier. Test disabled for now.
+			// Issue report:
+			// https://github.com/jupyter/nbconvert/issues/2017
+			//
 			//Match(
-			//	OutputLine(4),
+			//	OutputLine(5),
 			//	Separator,
 			//	"markdown displayed",
 			//	Separator,

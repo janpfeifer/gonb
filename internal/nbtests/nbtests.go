@@ -57,7 +57,7 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 
 	// Run installation:
 	rootDir := GoNBRootDir()
-	args := []string{"run", "--cover"}
+	args := []string{"run", "--cover", "--covermode=set"}
 	args = append(args, runArgs...)
 	args = append(args, ".", "--install")
 	args = append(args, extraInstallArgs...)

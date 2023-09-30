@@ -160,17 +160,17 @@ Details on each element of the diagram are given bellow.
 
 ```mermaid
 flowchart TD;
-   subgraph Browser;
+   subgraph Browser/HTML+Javascript;
     A1[JupyterLab App]-->A2[Cell Output];
    end;
 
-   subgraph B[JupyterServer];
+   subgraph B[JupyterServer/Python];
    end;
     A1<-->B;
     A2<-->|WebSocket|B;
     B<-->|ZeroMQ|G1;
 
-   subgraph GoNB;
+   subgraph GoNB/Go;
     G1([kernel])---G2([goexec]);
     G2---G3([jpyexec]);
     G3---G4([comms]);
@@ -179,7 +179,7 @@ flowchart TD;
    end;
     G3<-->|NamedSockets|C1([gonbui]);
 
-   subgraph CellProgram;
+   subgraph Cell_Program/Go;
     C1---C2([gonbui/comms]);
     C2---C3([gonbui/widgets]);
    end;

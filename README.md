@@ -31,9 +31,18 @@
 <img src="docs/GoNB-Demo.png" alt="Demo1" width="50%" height="50%"/>
 
 
+
+## Examples:
+
 ### Example of animating a plot
 
 ![Demo](docs/demo-720.gif)
+
+### Example Screenshotting a Website
+
+![demo-browser](docs/demo-browser.png)
+
+
 
 ## Introduction
 

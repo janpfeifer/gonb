@@ -301,6 +301,7 @@ func (c *AddressChan[T]) IsClosed() bool {
 // AddressChan doesn't use many resources, one may just leak these without consequences if only a few thousand.
 func (c *AddressChan[T]) Close() {
 	c.done.Trigger()
+	close(c.C)
 }
 
 // WaitClose waits until the AddressChan.Close is called.

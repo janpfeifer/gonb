@@ -123,8 +123,21 @@ scripts (`!` and `!*`) and for the Go cells:
   to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
   This is used by the `**GoNB**ui`` functions described above, and doesn't need to be accessed directly.
 
+### Widgets
 
-### Writing for WASM (WebAssembly)
+The package `gonbui/widgets` offers widgets that can be used to interact in a more
+dynamic way, using the HTML element in the browser. E.g.: buttons, sliders.
+
+It's not necessary to do anything, but, to help debug the communication system
+with the front-end, **GoNB** offers a couple of special commands:
+
+- `%widgets` - install the javascript needed to communicate with the frontend.
+  This is usually not needed, since it happens automatically when using Widgets.
+- `%widgets_hb` - send a _heartbeat_ signal to the front-end and wait for the
+  reply.
+  Used for debugging only.
+
+### Writing for WASM (WebAssembly) (Experimental)
 
 **GoNB** can also compile to WASM and run in the notebook. This is experimental, and likely to change
 (feedback is very welcome), and can be used to write interactive widgets in Go, in the notebook.

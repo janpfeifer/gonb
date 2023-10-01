@@ -159,32 +159,39 @@
     gonb_comm.subscribe = function(address, callback) {
         let id = Symbol(`gonb_id_${this._address_subscriptions_next_id}`)
         this._address_subscriptions_next_id++;
-        let l = this._address_subscriptions[address];
-        if (!l) {
-            this._address_subscriptions[address] = {id: callback};
-        } else {
-            this._address_subscriptions[address][id] = callback;
+        if (!this?._address_subscriptions[address]) {
+            this._address_subscriptions[address] = {};
         }
+        this._address_subscriptions[address][id] = callback;
         this._address_subscriptions_id_to_address[id] = address;
+        return id;
     }
 
     /** unsubscribe uses the id returned when subscribing to unsubscribe from new messages. */
     gonb_comm.unsubscribe = function(subscription_id) {
+        let id_str = subscription_id.toString();
         let address = this._address_subscriptions_id_to_address[subscription_id];
         if (!address) {
             // Not (or no longer) subscribed.
+            debug_log(`gonb_comm.unsubscribe(${id_str}): no address associated.`);
             return;
         }
         delete this._address_subscriptions_id_to_address[subscription_id];
         let l = this._address_subscriptions[address];
         if (!l) {
             // No longer subscribed ?
+            debug_log(`gonb_comm.unsubscribe(${id_str}, ${address}): subscriptions list is empty!?`);
             return;
         }
         delete l[subscription_id];
-        if (Object.keys(l).length === 0) {
+        let remaining_subscriptions = Object.keys(l).length;
+        if (remaining_subscriptions === 0) {
             // No more subscriptions to this address.
             delete this._address_subscriptions[address];
+            debug_log(`gonb_comm.unsubscribe(${id_str}, ${address}): done, no one left listening to address.`);
+        } else {
+            this._address_subscriptions[address] = l;
+            debug_log(`gonb_comm.unsubscribe(${id_str}, ${address}): done, ${remaining_subscriptions} still listening to address.`);
         }
     }
 
@@ -245,7 +252,7 @@
         }
         debug_log(`gonb_comm: delivered comm_msg to address \"${address}\" to ${Object.keys(subscribers).length} listener(s).`)
         for (const key of Reflect.ownKeys(subscribers)) {
-            debug_log(`\t> ${key.toString()}.callback(address, value);`);
+            debug_log(`\t> ${key.toString()}::callback(${address}, ${value});`);
             let callback = subscribers[key];
             callback(address, value);
         }

@@ -164,7 +164,7 @@ func TestHello(t *testing.T) {
 	}
 	f := executeNotebook(t, "hello")
 	err := Check(f,
-		Match(OutputLine(1),
+		Match(OutputLine(2),
 			Separator,
 			"Hello World!",
 			Separator),
@@ -183,7 +183,7 @@ func TestFunctions(t *testing.T) {
 	f := executeNotebook(t, "functions")
 	err := Check(f,
 		Match(
-			OutputLine(2),
+			OutputLine(3),
 			Separator,
 			"incr: x=2, y=4.14",
 			Separator,
@@ -203,22 +203,14 @@ func TestInit(t *testing.T) {
 	err := Check(f,
 		Sequence(
 			Match(
-				OutputLine(1),
-				Separator,
-				"init_a",
-				Separator,
-			),
-			Match(
 				OutputLine(2),
 				Separator,
 				"init_a",
-				"init_b",
 				Separator,
 			),
 			Match(
 				OutputLine(3),
 				Separator,
-				"init: v0",
 				"init_a",
 				"init_b",
 				Separator,
@@ -226,7 +218,7 @@ func TestInit(t *testing.T) {
 			Match(
 				OutputLine(4),
 				Separator,
-				"init: v1",
+				"init: v0",
 				"init_a",
 				"init_b",
 				Separator,
@@ -234,11 +226,19 @@ func TestInit(t *testing.T) {
 			Match(
 				OutputLine(5),
 				Separator,
+				"init: v1",
+				"init_a",
+				"init_b",
+				Separator,
+			),
+			Match(
+				OutputLine(6),
+				Separator,
 				"removed func init_a",
 				"removed func init_b",
 				Separator),
 			Match(
-				OutputLine(6),
+				OutputLine(7),
 				Separator,
 				"init: v1",
 				"Done",
@@ -263,13 +263,13 @@ func TestGoWork(t *testing.T) {
 	err := Check(f,
 		Sequence(
 			Match(
-				OutputLine(4),
+				OutputLine(5),
 				Separator,
 				`Added replace rule for module "a.com/a/pkg" to local directory`,
 				Separator,
 			),
 			Match(
-				OutputLine(5),
+				OutputLine(6),
 				Separator,
 				"module gonb_",
 				"",
@@ -279,7 +279,7 @@ func TestGoWork(t *testing.T) {
 				Separator,
 			),
 			Match(
-				OutputLine(6),
+				OutputLine(7),
 				Separator,
 				"List of files/directories being tracked",
 				"",
@@ -287,7 +287,7 @@ func TestGoWork(t *testing.T) {
 				Separator,
 			),
 			Match(
-				OutputLine(8),
+				OutputLine(9),
 				Separator,
 				`Untracked "/tmp/gonb_tests_gowork_..."`,
 				"",
@@ -371,7 +371,7 @@ func TestGoTest(t *testing.T) {
 		Sequence(
 			// Trivial Incr function defined.
 			Match(
-				OutputLine(1),
+				OutputLine(2),
 				Separator,
 				"55",
 				"2178309",
@@ -381,35 +381,35 @@ func TestGoTest(t *testing.T) {
 
 			// TestA checks Incr.
 			Match(
-				OutputLine(2),
+				OutputLine(3),
 				Separator,
 				"RUN   TestA",
 				"Testing A",
 				"PASS: TestA",
 				"PASS",
-				Separator,
+				// There is some output about coverage that follows.
 			),
 
 			// Checks TestA declaration is memorized.
-			Match(OutputLine(3), Separator),
+			Match(OutputLine(4), Separator),
 			Match("TestA"),
-			Match(InputLine(4)),
+			Match(InputLine(5)),
 
 			// If no test is defined in cell, all tests are run (TestA in this case).
 			Match(
-				OutputLine(4),
+				OutputLine(5),
 				Separator,
 				"RUN   TestA",
 				"Testing A",
 				"PASS: TestA",
 				"PASS",
-				Separator,
+				// There is some output about coverage that follows.
 			),
 
 			// If cells are defined in cell, only tests of cell are run, TestA
 			// should be excluded.
 			Match(
-				OutputLine(5),
+				OutputLine(6),
 				Separator,
 				"RUN   TestAB",
 				"Testing AB",
@@ -418,25 +418,27 @@ func TestGoTest(t *testing.T) {
 				"Testing B",
 				"PASS: TestB",
 				"PASS",
-				Separator,
+				// There is some output about coverage that follows.
 			),
 
 			// Passed args to `go test`, so `--test.v` is disabled.
 			Match(
-				OutputLine(6),
+				OutputLine(7),
 				Separator,
 				"Testing A",
 				"Testing AB",
 				"Testing B",
 				"PASS",
-				Separator,
+				// There is some output about coverage that follows.
 			),
 
 			// Check that both benchmarks run.
-			Match(OutputLine(7), Separator),
+			Match(OutputLine(8), Separator),
 			Match("BenchmarkFibonacciA32"),
 			Match("BenchmarkFibonacciB32"),
-			Match("PASS", Separator),
+			Match("PASS"),
+			// There is some output about coverage that follows.
+
 		), *flagPrintNotebook)
 
 	require.NoError(t, err)

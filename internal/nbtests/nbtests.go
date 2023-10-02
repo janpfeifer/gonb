@@ -32,6 +32,9 @@ func GoNBRootDir() string {
 // variable JUPYTER_DATA_DIR to that directory, and compile and install
 // GoNB to that directory, so it will be used by `nbconvert`.
 //
+// It also compiles `nbexec` to the same directory, which is used to controle the
+// execution of the notebooks.
+//
 // Parameters:
 //   - `gonbRunArgs` are passed to `go run --cover <gonbRunArgs> .` command, executed from GoNB's
 //     root directory.
@@ -70,6 +73,21 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 	err = cmd.Run()
 	if err != nil {
 		err = errors.Wrapf(err, "failed to compile and install GoNB with %q", cmd)
+		return
+	}
+
+	// Build nbexec:
+	cmd = exec.Command(
+		"go", "build",
+		"-o", path.Join(tmpJupyterDir, "nbexec"),
+		"-cover", "-covermode=set",
+		"./cmd/nbexec")
+	cmd.Dir = rootDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		err = errors.Wrapf(err, "failed to compile and install `nbexec` with %q", cmd)
 		return
 	}
 	return

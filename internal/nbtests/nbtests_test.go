@@ -27,6 +27,7 @@ import (
 var panicf = common.Panicf
 
 var (
+	flagLogExec       = flag.Bool("log_exec", false, "Log the execution of the notebook")
 	flagPrintNotebook = flag.Bool("print_notebook", false, "Print tested notebooks, useful if debugging unexpected results.")
 	flagExtraFlags    = flag.String("kernel_args", "--logtostderr",
 		"extra arguments passed to `gonb --install` that eventually gets passed to the kernel. "+
@@ -119,6 +120,10 @@ func setup() {
 // TestMain is used to set-up / shutdown needed for these integration tests.
 func TestMain(m *testing.M) {
 	setup()
+	if testing.Short() {
+		fmt.Println("Test running with --short(), not setting up Jupyter.")
+		return
+	}
 
 	// Run tests.
 	code := m.Run()
@@ -137,17 +142,30 @@ func TestMain(m *testing.M) {
 // executeNotebook (in `examples/tests`) and returns a reader to the output of the execution.
 // It executes using `nbconvert` set to `asciidoc` (text) output.
 func executeNotebook(t *testing.T, notebook string) *os.File {
-	// Prepare output file for nbconvert.
+
+	// Execute notebook.
+	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
+	args := []string{"-n=" + notebookRelPath, "-jupyter_dir=" + rootDir}
+	if *flagLogExec {
+		args = append(args, "-jupyter_log", "-console_log", "-vmodule=main=1")
+	}
+	nbexec := exec.Command(
+		path.Join(jupyterDir, "nbexec"), args...)
+	nbexec.Stderr = os.Stderr
+	nbexec.Stdout = os.Stdout
+	require.NoErrorf(t, nbexec.Run(), "Failed to execute notebook %q with %q",
+		path.Join(rootDir, notebookRelPath), nbexec)
+
+	// Convert notebook output.
 	tmpOutput := mustValue(os.CreateTemp("", "gonb_nbtests_output"))
 	nbconvertOutputName := tmpOutput.Name()
 	must(tmpOutput.Close())
 	must(os.Remove(nbconvertOutputName))
 	nbconvertOutputPath := nbconvertOutputName + ".asciidoc" // nbconvert adds this suffix.
-
 	nbconvert := exec.Command(
-		jupyterExecPath, "nbconvert", "--to", "asciidoc", "--execute",
+		jupyterExecPath, "nbconvert", "--to", "asciidoc",
 		"--output", nbconvertOutputName,
-		path.Join(rootDir, "examples", "tests", notebook+".ipynb"))
+		path.Join(rootDir, notebookRelPath))
 	nbconvert.Stdout, nbconvert.Stderr = os.Stderr, os.Stdout
 	klog.Infof("Executing: %q", nbconvert)
 	err := nbconvert.Run()
@@ -155,6 +173,18 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 	f, err := os.Open(nbconvertOutputPath)
 	require.NoErrorf(t, err, "Failed to open the output of %q", nbconvert)
 	return f
+}
+
+func clearNotebook(t *testing.T, notebook string) {
+	// Execute notebook.
+	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
+	nbexec := exec.Command(
+		path.Join(jupyterDir, "nbexec"), "-n="+notebookRelPath,
+		"-jupyter_dir="+rootDir, "-clear")
+	nbexec.Stderr = os.Stderr
+	nbexec.Stdout = os.Stdout
+	require.NoErrorf(t, nbexec.Run(), "Failed to clear notebook %q with %q",
+		path.Join(rootDir, notebookRelPath), nbexec)
 }
 
 func TestHello(t *testing.T) {
@@ -173,6 +203,7 @@ func TestHello(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, "hello")
 }
 
 func TestFunctions(t *testing.T) {
@@ -180,7 +211,8 @@ func TestFunctions(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "functions")
+	notebook := "functions"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Match(
 			OutputLine(3),
@@ -192,6 +224,7 @@ func TestFunctions(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 func TestInit(t *testing.T) {
@@ -199,7 +232,8 @@ func TestInit(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "init")
+	notebook := "init"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 			Match(
@@ -250,6 +284,7 @@ func TestInit(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 // TestGoWork tests support for `go.work` and `%goworkfix` as well as management

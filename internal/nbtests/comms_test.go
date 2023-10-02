@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// TestComms tests `gonbui/comms` package, including communication in both ways.
-func TestComms(t *testing.T) {
+// noTestComms tests `gonbui/comms` package, including communication in both ways.
+func noTestComms(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return

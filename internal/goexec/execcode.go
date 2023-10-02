@@ -18,6 +18,16 @@ import (
 	"strings"
 )
 
+// cellExecParams are the parameters of ExecuteCell, packaged so they
+// can be serialized in the channel `state.cellExecChan`.
+type cellExecParams struct {
+	msg       kernel.Message
+	cellId    int
+	lines     []string
+	skipLines Set[int]
+	done      *LatchWithValue[error]
+}
+
 // ExecuteCell takes the contents of a cell, parses it, merges new declarations with the ones
 // from previous definitions, render a final main.go code with the whole content,
 // compiles and runs it.
@@ -25,6 +35,47 @@ import (
 // skipLines are Lines that should not be considered as Go code. Typically, these are the special
 // commands (like `%%`, `%args`, `%reset`, or bash Lines starting with `!`).
 func (s *State) ExecuteCell(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+	params := &cellExecParams{
+		msg:       msg,
+		cellId:    cellId,
+		lines:     lines,
+		skipLines: skipLines,
+		done:      NewLatchWithValue[error](),
+	}
+	s.cellExecChan <- params
+	return params.done.Wait()
+}
+
+// serializeExecuteCell loops indefinitely waiting for cells to be executed.
+// It exits only when the kernel stops.
+func (s *State) serializeExecuteCell() {
+	var stopC <-chan struct{}
+	if s.Kernel != nil {
+		stopC = s.Kernel.StoppedChan()
+	} else {
+		stopC = make(chan struct{})
+	}
+	for {
+		select {
+		case params := <-s.cellExecChan:
+			// Received new execution request.
+			params.done.Trigger(s.executeCellImpl(
+				params.msg, params.cellId, params.lines, params.skipLines))
+
+		case <-stopC:
+			// Kernel stopped, exit.
+			return
+		}
+	}
+}
+
+// executeCellImpl executes the cell and returns the error.
+// See documentation of parameters in `State.ExecuteCell`.
+// It is not reentrant, and calls to it should be serialized.
+// ExecuteCell serializes the calls to this method.
+func (s *State) executeCellImpl(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+	klog.V(1).Infof("ExecuteCell: %q", lines)
+
 	defer s.PostExecuteCell()
 	klog.V(2).Infof("ExecuteCell(): CellIsTest=%v, CellIsWasm=%v", s.CellIsTest, s.CellIsWasm)
 	if s.CellIsTest && s.CellIsWasm {
@@ -128,11 +179,6 @@ func (s *State) AlternativeDefinitionsPath() string {
 }
 
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
-	// Makes sure there is only one execution of cell at a time.
-	// Concurrent requests will wait -- there is no order guarantee.
-	s.muExecution.Lock()
-	defer s.muExecution.Unlock()
-
 	if s.CellIsWasm {
 		return s.ExecuteWasm(msg)
 	}

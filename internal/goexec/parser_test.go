@@ -21,7 +21,7 @@ func newEmptyStateWithRawError(t *testing.T, rawError bool) *State {
 	uuidTmp, _ := uuid.NewV7()
 	uuidStr := uuidTmp.String()
 	uniqueID := uuidStr[len(uuidStr)-8:]
-	s, err := New(uniqueID, false, rawError)
+	s, err := New(nil, uniqueID, false, rawError)
 	if err != nil {
 		t.Fatalf("Failed to create goexec.State: %+v", err)
 	}

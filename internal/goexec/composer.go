@@ -5,6 +5,7 @@ import (
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/pkg/errors"
 	"io"
+	"k8s.io/klog/v2"
 	"os"
 	"sort"
 	"strings"
@@ -324,7 +325,10 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 	w := NewWriterWithCursor(f)
 	defer func() {
 		if f != nil {
-			_ = f.Close()
+			err = f.Close()
+			if err != nil {
+				klog.Errorf("Failed to close main.go when generating it: %v", err)
+			}
 		}
 	}()
 

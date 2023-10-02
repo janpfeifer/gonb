@@ -102,8 +102,7 @@ func main() {
 	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
 
 	// Create a Go executor.
-	goExec, err := goexec.New(UniqueID, *flagWork, *flagRawError)
-	goExec.Kernel = k
+	goExec, err := goexec.New(k, UniqueID, *flagWork, *flagRawError)
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}

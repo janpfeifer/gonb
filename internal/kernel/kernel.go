@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/go-zeromq/zmq4"
 )
@@ -102,7 +103,7 @@ type Kernel struct {
 	ExecCounter int
 
 	// Channel where interruption is received.
-	sigintC chan os.Signal
+	sigintC, sighupC chan os.Signal
 
 	// Interrupted indicates whether shell currently being executed was Interrupted.
 	Interrupted atomic.Bool
@@ -170,6 +171,8 @@ func (k *Kernel) Stop() {
 // So instead of the kernel dying, it will recover, and where appropriate
 // interrupt other subprocesses it may have spawned.
 func (k *Kernel) HandleInterrupt() {
+	// Handle Sigint: Control+C, Jupyter uses it to ask for the kernel
+	// to interrupt execution of a program.
 	if k.sigintC == nil {
 		k.sigintC = make(chan os.Signal, 1)
 		signal.Notify(k.sigintC, os.Interrupt)
@@ -184,6 +187,29 @@ func (k *Kernel) HandleInterrupt() {
 				case <-k.sigintC:
 					k.Interrupted.Store(true)
 					klog.Infof("INTERRUPT received.")
+				case <-k.stop:
+					klog.Infof("Kernel stopped.")
+					return // kernel stopped.
+				}
+			}
+		}()
+	}
+
+	// Handle Sighup: sent when parent process dies.
+	if k.sighupC == nil {
+		k.sighupC = make(chan os.Signal, 1)
+		signal.Notify(k.sighupC, syscall.SIGHUP)
+		go func() {
+			// At exit reset notification.
+			defer func() {
+				signal.Reset(syscall.SIGHUP)
+				k.sighupC = nil
+			}()
+			for {
+				select {
+				case <-k.sighupC:
+					klog.Infof("SIGHUP received, stopping kernel.")
+					k.Stop()
 				case <-k.stop:
 					klog.Infof("Kernel stopped.")
 					return // kernel stopped.

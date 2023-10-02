@@ -2,6 +2,7 @@
 package common
 
 import (
+	"fmt"
 	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
@@ -18,6 +19,14 @@ import (
 // Panicf panics with an error constructed with the given format and args.
 func Panicf(format string, args ...any) {
 	panic(errors.Errorf(format, args...))
+}
+
+var pauseChan = make(chan struct{})
+
+// Pause the current goroutine, it waits forever on a channel.
+// Used for testing.
+func Pause() {
+	<-pauseChan
 }
 
 // UniqueId returns newly created unique id.
@@ -189,6 +198,13 @@ func (l *Latch) Test() bool {
 	}
 }
 
+// WaitChan returns the channel that one can use on a `select` to check when
+// the latch triggers.
+// The returned channel is closed when the latch is triggered.
+func (l *Latch) WaitChan() <-chan struct{} {
+	return l.wait
+}
+
 // LatchWithValue implements a "latch" synchronization mechanism, with a value associated with the
 // triggering of the latch.
 //
@@ -239,4 +255,22 @@ func TrySend[T any](c chan T, value T) (ok bool) {
 	}()
 	c <- value
 	return
+}
+
+// ArrayFlag implements a flag type that append repeated settings into an array (slice).
+// TODO: make it generic and accept `float64` and `int`.
+type ArrayFlag []string
+
+// String representation.
+func (f *ArrayFlag) String() string {
+	if f == nil || len(*f) == 0 {
+		return "(empty)"
+	}
+	return fmt.Sprintf("%v", f)
+}
+
+// Set new value, by appending to the end of the string.
+func (f *ArrayFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
 }

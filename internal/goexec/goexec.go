@@ -17,7 +17,6 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
-	"sync"
 )
 
 const (
@@ -79,11 +78,9 @@ type State struct {
 	// rawError indicates no HTML context to compilation errors should be added.
 	rawError bool
 
-	// muExecution makes sure only one cell is executed at a time.
-	// Notice GoNB is able to handle multiple requests simultaneously, but it will
-	// only execute one cell at a time -- many parts of the code assumes there is
-	// no more than one execution simultaneously.
-	muExecution sync.Mutex
+	// cellExecChan serializes requests to `ExecuteCell`, since requests come from
+	// Jupyter before previous cell execution finishes, and we want to keep the order.
+	cellExecChan chan *cellExecParams
 
 	// CellIsTest indicates whether the current cell is to be compiled with `go test` (as opposed to `go build`).
 	// This also triggers writing the code to `main_test.go` as opposed to `main.go`.
@@ -116,8 +113,12 @@ type Declarations struct {
 //
 // If rawError is true, the parsing of compiler errors doesn't generate HTML, instead it
 // uses only text.
-func New(uniqueID string, preserveTempDir, rawError bool) (*State, error) {
+//
+// The kernel object passed in `k` can be nil for testing, but this may lead to some leaking
+// goroutines, that stop when the kernel stops.
+func New(k *kernel.Kernel, uniqueID string, preserveTempDir, rawError bool) (*State, error) {
 	s := &State{
+		Kernel:          k,
 		UniqueID:        uniqueID,
 		Package:         "gonb_" + uniqueID,
 		Definitions:     NewDeclarations(),
@@ -126,7 +127,12 @@ func New(uniqueID string, preserveTempDir, rawError bool) (*State, error) {
 		preserveTempDir: preserveTempDir,
 		rawError:        rawError,
 		Comms:           comms.New(),
+		cellExecChan:    make(chan *cellExecParams),
 	}
+
+	// Goroutine that processes incoming ExecuteCell requests.
+	// It stops when the kernel stops.
+	go s.serializeExecuteCell()
 
 	// Create directory.
 	s.TempDir = path.Join(os.TempDir(), s.Package)

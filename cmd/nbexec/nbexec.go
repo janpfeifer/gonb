@@ -42,6 +42,9 @@ var (
 	flagScreenshot = flag.String("screenshot", "",
 		"PNG file where to save a screenshot of the page after the notebook is executed. "+
 			"If left empty no screenshots are made.")
+
+	flagClear = flag.Bool("clear", false,
+		"If set to true, it will only clear all the cell outputs and not execute them.")
 )
 
 func main() {
@@ -263,16 +266,24 @@ func executeNotebook(url string) {
 		})()
 	}
 
-	time.Sleep(3 * time.Second)
 	page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
 	jupyterapp.commandLinker._commands.execute("editmenu:clear-all", null).
-		then(() => { jupyterapp.commandLinker._commands.execute("runmenu:run-all", null); }).
+		then(() => { console.log("Finished clearing all outputs!"); });
+}`)
+	page.MustWaitStable()
+
+	if !*flagClear {
+		// Execute all cells (if --clear is not set)
+		page.MustEval(`() => {
+	let jupyterapp = globalThis.jupyterapp;
+	jupyterapp.commandLinker._commands.execute("runmenu:run-all", null).
 		then(() => { console.log("Finished executing!"); });
 }`)
-	klog.V(1).Infof("Started Javascript to execute cells, waiting to stabilize.")
-	page.MustWaitStable()
-	klog.V(1).Infof("page.MustWaitStable() finished.")
+		klog.V(1).Infof("Started Javascript to execute cells, waiting to stabilize.")
+		page.MustWaitStable()
+		klog.V(1).Infof("page.MustWaitStable() finished.")
+	}
 
 	page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;

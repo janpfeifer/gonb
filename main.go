@@ -23,6 +23,7 @@ var (
 	flagForceCopy = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")
 	flagRawError  = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
 	flagWork      = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
+	flagCommsLog  = flag.Bool("comms_log", false, "Enable verbose logging from communication library in Javascript console.")
 )
 
 var (
@@ -93,6 +94,9 @@ func main() {
 		if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
 			extraArgs = append(extraArgs, "--work")
 		}
+		if glogFlag := flag.Lookup("comms_log"); glogFlag != nil && glogFlag.Value.String() != "false" {
+			extraArgs = append(extraArgs, "--comms_log")
+		}
 		err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)
@@ -129,6 +133,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}
+	goExec.Comms.LogWebSocket = *flagCommsLog
 
 	// Orchestrate dispatching of messages.
 	dispatcher.RunKernel(k, goExec)

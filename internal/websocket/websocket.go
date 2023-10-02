@@ -19,11 +19,16 @@ var tmplWebSocketConnectJs = template.Must(template.New("ws").Parse(
 
 // Javascript returns the javascript required to bootstrap the WebSocket library.
 // It takes as input the kernel id -- provided when the kernel (GoNB) is executed.
-func Javascript(jupyterKernelId string) string {
+//
+// If `verbose` is set, it enables verbose logging in the Javascript console on
+// the status of the communication -- useful for debugging.
+func Javascript(jupyterKernelId string, verbose bool) string {
 	data := struct {
 		KernelId string
+		Verbose  bool
 	}{
 		KernelId: jupyterKernelId,
+		Verbose:  verbose,
 	}
 	var buf bytes.Buffer
 	err := tmplWebSocketConnectJs.Execute(&buf, data)

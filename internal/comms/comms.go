@@ -71,6 +71,10 @@ type State struct {
 	// ProgramExecMsg is the kernel.Message used to start the program.
 	// This is set at the start of every cell execution, and reset to nil when the execution finishes.
 	ProgramExecMsg kernel.Message
+
+	// LogWebsocket controls whether to turn verbose logging (on the Javascript console) of the
+	// WebSocket Javascript library, when it is installed.
+	LogWebSocket bool
 }
 
 const (
@@ -184,7 +188,7 @@ func (s *State) installWebSocketLocked(msg kernel.Message) error {
 		// InstallWebSocket, and we can simply wait on it.
 		klog.V(1).Infof("comms.State.InstallWebSocket(): running Javascript to install WebSocket...")
 		s.openLatch = common.NewLatch()
-		js := websocket.Javascript(msg.Kernel().JupyterKernelId)
+		js := websocket.Javascript(msg.Kernel().JupyterKernelId, s.LogWebSocket)
 		jsData := kernel.Data{
 			Data:      make(kernel.MIMEMap, 1),
 			Metadata:  make(kernel.MIMEMap),

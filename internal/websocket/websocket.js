@@ -41,7 +41,7 @@
     // Create gonb_comm, the communication object to GoNB.
     // The `comm` abbreviation comes from Jupyter `comm` protocol used by it.
     let gonb_comm = {
-        debug: true,  // Set to true to see verbose debugging messages in the console.
+        debug: {{.Verbose}},  // Set to true to see verbose debugging messages in the console.
         websocket_is_opened: false,
         _kernel_id: "{{.KernelId}}",
         _ws_url: "ws://" + document.location.host + "/api/kernels/{{.KernelId}}/channels",

@@ -325,9 +325,9 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 	w := NewWriterWithCursor(f)
 	defer func() {
 		if f != nil {
-			err = f.Close()
-			if err != nil {
-				klog.Errorf("Failed to close main.go when generating it: %v", err)
+			closeErr := f.Close()
+			if closeErr != nil {
+				klog.Errorf("Failed to close main.go when generating it: %v", closeErr)
 			}
 		}
 	}()

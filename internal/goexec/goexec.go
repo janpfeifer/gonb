@@ -189,7 +189,7 @@ with:
 	// Try to find out Jupyter root's directory.
 	jupyterRoot, err := JupyterRootDirectory()
 	if err != nil {
-		klog.Errorf("Could not find Jupyter root directory, %%wasm will not work: %+v", err)
+		klog.Warningf("Could not find Jupyter root directory, %%wasm will not work: %v", err)
 	} else {
 		err = os.Setenv(protocol.GONB_JUPYTER_ROOT_ENV, jupyterRoot)
 		if err != nil {

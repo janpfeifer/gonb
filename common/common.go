@@ -266,7 +266,7 @@ func (f *ArrayFlag) String() string {
 	if f == nil || len(*f) == 0 {
 		return "(empty)"
 	}
-	return fmt.Sprintf("%v", f)
+	return fmt.Sprintf("%v", []string(*f))
 }
 
 // Set new value, by appending to the end of the string.

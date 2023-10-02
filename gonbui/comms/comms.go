@@ -272,7 +272,7 @@ func dispatchValueUpdates(valueMsg *protocol.CommValue) {
 	}
 	subscribers = slices.Clone(subscribers)
 	muSubscriptions.Unlock()
-	gonbui.Logf("dispatchValueUpdates(%q) -> %d subscribers", valueMsg.Address)
+	gonbui.Logf("dispatchValueUpdates(%q) -> %d subscribers", valueMsg.Address, len(subscribers))
 	for _, s := range subscribers {
 		go s.callback(address, value)
 	}

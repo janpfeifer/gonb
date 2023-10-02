@@ -69,6 +69,6 @@ func TestCreateGoFileFromLines(t *testing.T) {
 	skipLines = MakeSet[int]()
 	cursorInCell = NoCursor
 	_, _, err = s.createGoFileFromLines(s.CodePath(), 1, cellLines, skipLines, cursorInCell)
-	assert.Errorf(t, err, "Expected error for unnecessary setting of package.")
+	require.Errorf(t, err, "Expected error for unnecessary setting of `package`.")
 	assert.Contains(t, err.Error(), "Please don't set a `package`")
 }

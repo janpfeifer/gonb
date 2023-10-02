@@ -350,7 +350,7 @@
                     debug_log("gonb_comm: comm_open_ack not received in time.");
                     reject(Error("comm_open_ack not received in time"));
                 },
-                100, // milliseconds
+                500, // milliseconds
             )
             this._onopen_ack = () => {
                 clearTimeout(timeoutId);

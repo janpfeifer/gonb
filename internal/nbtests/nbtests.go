@@ -58,8 +58,10 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 		return
 	}
 
-	// Run installation:
+	// Find root dir of GoNB being tested.
 	rootDir := GoNBRootDir()
+
+	// Run installation:
 	args := []string{"run", "--cover", "--covermode=set"}
 	args = append(args, runArgs...)
 	args = append(args, ".", "--install")
@@ -93,7 +95,7 @@ func InstallTmpGonbKernel(runArgs, extraInstallArgs []string) (tmpJupyterDir str
 	return
 }
 
-// ExpectFn is a function that checks for expectations of a line of input.
+// ExpectFn is a function that checks for expectations of an input line.
 // It should return true, if the expectation was matched, false if not yet, or
 // return an error if there was something wrong with the line and it the testing
 // should fail immediately.

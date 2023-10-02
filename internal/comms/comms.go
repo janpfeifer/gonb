@@ -369,7 +369,8 @@ func (s *State) HandleMsg(msg kernel.Message) (err error) {
 	}
 }
 
-// Close connection with front-end. It sends a "comm_close" message.
+// Close connection with front-end.
+// If `msg != nil`, It sends a "comm_close" message.
 func (s *State) Close(msg kernel.Message) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -383,10 +384,13 @@ func (s *State) closeLocked(msg kernel.Message) error {
 		return nil
 	}
 	klog.V(1).Infof("comms.State.Close()")
-	content := map[string]any{
-		"comm_id": s.CommId,
+	var err error
+	if msg != nil {
+		content := map[string]any{
+			"comm_id": s.CommId,
+		}
+		err = msg.Reply("comm_close", content)
 	}
-	err := msg.Reply("comm_close", content)
 	s.CommId = "" // Erase comm_id.
 	s.Opened = false
 	s.IsWebSocketInstalled = false

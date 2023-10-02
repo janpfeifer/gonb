@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 )
 
 var (
@@ -31,6 +32,8 @@ var (
 	UniqueID string
 
 	coloredUniqueID string
+
+	logWriter io.Writer
 )
 
 func init() {
@@ -46,6 +49,26 @@ func main() {
 	defer klog.Flush()
 
 	flag.Parse()
+
+	// Setup logging.
+	if *flagExtraLog != "" {
+		logFile, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
+		}
+		_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
+		logWriter = logFile
+		flag.VisitAll(func(f *flag.Flag) {
+			if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
+				if f.Value.String() == "true" {
+					fmt.Printf("Hmmm: %s\n", f.Name)
+					logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
+					_ = f.Value.Set("false")
+				}
+			}
+		})
+		defer func() { _ = logFile.Close() }()
+	}
 	SetUpLogging() // "log" package.
 	SetUpKlog()    // "github.com/golang/klog" package
 
@@ -109,12 +132,14 @@ func main() {
 
 	// Orchestrate dispatching of messages.
 	dispatcher.RunKernel(k, goExec)
+	klog.V(1).Infof("Dispatcher exited.")
 
 	// Stop gopls.
 	err = goExec.Stop()
 	if err != nil {
 		klog.Warningf("Error during shutdown: %+v", err)
 	}
+	klog.V(1).Infof("goExec stopped.")
 
 	// Wait for all polling goroutines.
 	k.ExitWait()
@@ -131,14 +156,8 @@ var (
 // requested.
 func SetUpLogging() {
 	log.SetPrefix(coloredUniqueID)
-	if *flagExtraLog != "" {
-		f, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-		if err != nil {
-			log.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
-		}
-		_, _ = f.Write([]byte("\n\n"))
-		w := io.MultiWriter(f, os.Stderr) // Write to STDERR and the newly open f.
-		log.SetOutput(w)
+	if logWriter != nil {
+		log.SetOutput(logWriter)
 	}
 }
 
@@ -172,5 +191,8 @@ func (_ UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string
 
 // SetUpKlog to include prefix with kernel's UniqueID.
 func SetUpKlog() {
+	if logWriter != nil {
+		klog.SetOutput(logWriter)
+	}
 	klog.SetLogFilter(UniqueIDFilter{})
 }

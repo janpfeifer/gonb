@@ -162,6 +162,10 @@ func (k *Kernel) Stop() {
 	if err != nil {
 		klog.Errorf("Failed to close IOPub socket: %v", err)
 	}
+	err = k.sockets.HBSocket.Socket.Close()
+	if err != nil {
+		klog.Errorf("Failed to close Heartbeat socket: %v", err)
+	}
 }
 
 // HandleInterrupt will configure the kernel to listen to the system SIGINT,
@@ -188,14 +192,13 @@ func (k *Kernel) HandleInterrupt() {
 					k.Interrupted.Store(true)
 					klog.Infof("INTERRUPT received.")
 				case <-k.stop:
-					klog.Infof("Kernel stopped.")
 					return // kernel stopped.
 				}
 			}
 		}()
 	}
 
-	// Handle Sighup: sent when parent process dies.
+	// Handle Sighup: sent when the parent process dies.
 	if k.sighupC == nil {
 		k.sighupC = make(chan os.Signal, 1)
 		signal.Notify(k.sighupC, syscall.SIGHUP)
@@ -211,7 +214,6 @@ func (k *Kernel) HandleInterrupt() {
 					klog.Infof("SIGHUP received, stopping kernel.")
 					k.Stop()
 				case <-k.stop:
-					klog.Infof("Kernel stopped.")
 					return // kernel stopped.
 				}
 			}
@@ -333,8 +335,9 @@ func New(connectionFile string) (*Kernel, error) {
 func (k *Kernel) pollCommonSocket(msgChan chan Message, sck zmq4.Socket, socketName string) {
 	k.pollingWait.Add(1)
 	go func() {
+		klog.V(1).Infof("Polling of %q socket started.", socketName)
 		defer func() {
-			klog.V(1).Infof("Polling of socket %q finished.", socketName)
+			klog.V(1).Infof("Polling of %q socket finished.", socketName)
 			k.pollingWait.Done()
 			close(msgChan)
 		}()
@@ -360,19 +363,20 @@ func (k *Kernel) pollCommonSocket(msgChan chan Message, sck zmq4.Socket, socketN
 func (k *Kernel) pollHeartbeat() {
 	// Start the handler that will echo any received messages back to the sender.
 	k.pollingWait.Add(1)
+	klog.V(1).Infof("Polling of heartbeat socket started.")
 	go func() {
 		defer func() {
-			klog.Infof("Heartbeat done.")
+			klog.Infof("Polling of heartbeat socket finished.")
 			k.pollingWait.Done()
 		}()
 		var err error
 		var msg zmq4.Msg
 		for err == nil {
 			msg, err = k.sockets.HBSocket.Socket.Recv()
-			klog.V(1).Infof("Heartbeat received.")
 			if k.IsStopped() {
 				return
 			}
+			klog.V(1).Infof("Heartbeat received.")
 			if err != nil {
 				err = errors.WithMessagef(err, "error reading heartbeat ping bytes")
 				break

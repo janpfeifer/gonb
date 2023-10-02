@@ -234,6 +234,11 @@ func (s *State) Stop() error {
 		}
 		s.TempDir = "/"
 	}
+	if s.Comms != nil {
+		// Close without a message (no sending back a comm_close message),
+		// if not yet closed.
+		s.Comms.Close(nil)
+	}
 	return nil
 }
 

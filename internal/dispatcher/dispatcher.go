@@ -112,7 +112,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	}
 	msgType := msg.ComposedMsg().Header.MsgType
 	defer func() {
-		klog.Infof("Message %q dispatched.", msgType)
+		klog.V(2).Infof("Message %q dispatched.", msgType)
 	}()
 
 	if !slices.Contains(BusyMessageTypes, msgType) {
@@ -132,6 +132,11 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		case "is_complete_request":
 			klog.V(2).Infof("Received is_complete_request: ignoring, since it's not a console like kernel.")
 
+		case "shutdown_request":
+			if err = handleShutdownRequest(msg, goExec); err != nil {
+				err = errors.WithMessagef(err, "replying 'shutdown_request'")
+			}
+
 		default:
 			// Log, ignore, and hope for the best.
 			klog.Infof("Unhandled shell-socket message %q", msg.ComposedMsg().Header.MsgType)
@@ -139,7 +144,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		return
 	}
 
-	// Start processing of queue of requests.
+	// Start processing of requests queue.
 	busyMessagesOnce.Do(func() {
 		go func() {
 			for params := range busyMessagesChan {
@@ -192,10 +197,6 @@ func handleBusyMessage(msg kernel.Message, goExec *goexec.State) (err error) {
 			err = errors.WithMessagef(err, "replying to 'kernel_info_request'")
 		}
 
-	case "shutdown_request":
-		if err = handleShutdownRequest(msg, goExec); err != nil {
-			err = errors.WithMessagef(err, "replying 'shutdown_request'")
-		}
 	case "execute_request":
 		if err = handleExecuteRequest(msg, goExec); err != nil {
 			err = errors.WithMessagef(err, "replying to 'execute_request'")
@@ -224,26 +225,25 @@ func handleBusyMessage(msg kernel.Message, goExec *goexec.State) (err error) {
 
 // handleShutdownRequest sends a "shutdown" message.
 func handleShutdownRequest(msg kernel.Message, goExec *goexec.State) error {
-	content := msg.ComposedMsg().Content.(map[string]any)
-	restart := content["restart"].(bool)
-	type shutdownReply struct {
-		Restart bool `json:"restart"`
-	}
-	reply := shutdownReply{
-		Restart: restart,
-	}
-	if err := msg.Reply("shutdown_reply", reply); err != nil {
-		return errors.WithMessagef(err, "replying shutdown_reply")
-	}
-	klog.Infof("Shutting down in response to shutdown_request")
+	klog.Info("Shutting down in response to shutdown_request")
 
-	// Shutdown comms with front-end first.
+	content := msg.ComposedMsg().Content.(map[string]any)
+	replyContent := make(map[string]any)
+	replyContent["status"] = "ok"
+	replyContent["restart"] = content["restart"]
+	err := msg.Reply("shutdown_reply", replyContent)
+	if err != nil {
+		err = errors.WithMessagef(err, "publish 'shutdown_reply`")
+	}
+
+	// Shutdown comms with front-end first -- this allows sending of
+	// "comm_close" message.
 	if err := goExec.Comms.Close(msg); err != nil {
 		klog.Warningf("comms: failure closing connection to front-end: %+v", err)
 	}
 
 	msg.Kernel().Stop()
-	return nil
+	return err
 }
 
 type OutErr struct {

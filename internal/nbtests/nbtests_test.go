@@ -15,6 +15,7 @@ import (
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
+	"github.com/janpfeifer/must"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
 	"os"
@@ -37,22 +38,11 @@ var (
 	gonbRunArgs []string
 )
 
-func must(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func mustValue[T any](v T, err error) T {
-	must(err)
-	return v
-}
-
 func mustRemoveAll(dir string) {
 	if dir == "" || dir == "/" {
 		return
 	}
-	must(os.RemoveAll(dir))
+	must.M(os.RemoveAll(dir))
 }
 
 var (
@@ -61,27 +51,30 @@ var (
 	tmpGocoverdir       string // Created if {REAL_}GOCOVERDIR is not set at start up.
 )
 
-// setup for integration tests:
+// setup integration tests.
 //
-//	. Build a gonb binary with --cover (and set GOCOVERDIR).
-//	. Set up a temporary jupyter kernel configuration, so that `nbconvert` will use it.
+// 1. It builds a gonb binary with --cover (and set GOCOVERDIR).
+// 2. It sets up a temporary jupyter kernel configuration, so that `nbconvert` will use it.
 func setup() {
 	flag.Parse()
-	rootDir = GoNBRootDir()
 	if testing.Short() {
 		fmt.Println("Test running with --short(), not setting up Jupyter.")
 		return
 	}
 
+	// Set GONB_ROOT_DIR.
+	rootDir = GoNBRootDir()
+	must.M(os.Setenv("GONB_GIT_ROOT", rootDir))
+
 	// Overwrite GOCOVERDIR if $REAL_GOCOVERDIR is given, because
 	// -test.gocoverdir value is not propagated.
 	// See: https://groups.google.com/g/golang-nuts/c/tg0ZrfpRMSg
 	if goCoverDir := os.Getenv("REAL_GOCOVERDIR"); goCoverDir != "" {
-		must(os.Setenv("GOCOVERDIR", goCoverDir))
+		must.M(os.Setenv("GOCOVERDIR", goCoverDir))
 	} else if goCoverDir := os.Getenv("GOCOVERDIR"); goCoverDir != "" {
 		// If running manually, and having set GOCOVERDIR, also set REAL_GOCOVERDIR
 		// for consistency (both are set).
-		must(os.Setenv("REAL_GOCOVERDIR", goCoverDir))
+		must.M(os.Setenv("REAL_GOCOVERDIR", goCoverDir))
 	} else {
 		klog.Info(
 			"Tests are configured to generate coverage information, but $REAL_GOCOVERDIR or $GOCOVERDIR " +
@@ -93,8 +86,8 @@ func setup() {
 			panicf("Failed to create a temporary directory for GOCOVERDIR: %+v", err)
 		}
 		klog.Infof("{REAL_}GOCOVERDIR=%s", tmpGocoverdir)
-		must(os.Setenv("GOCOVERDIR", tmpGocoverdir))
-		must(os.Setenv("REAL_GOCOVERDIR", tmpGocoverdir))
+		must.M(os.Setenv("GOCOVERDIR", tmpGocoverdir))
+		must.M(os.Setenv("REAL_GOCOVERDIR", tmpGocoverdir))
 
 	}
 
@@ -113,7 +106,7 @@ func setup() {
 	extraInstallArgs := strings.Split(*flagExtraFlags, " ")
 
 	// Compile and install gonb binary as a local jupyter kernel.
-	jupyterDir = mustValue(InstallTmpGonbKernel(gonbRunArgs, extraInstallArgs))
+	jupyterDir = must.M1(InstallTmpGonbKernel(gonbRunArgs, extraInstallArgs))
 	fmt.Printf("%s=%s\n", kernel.JupyterDataDirEnv, jupyterDir)
 }
 
@@ -139,10 +132,9 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// executeNotebook (in `examples/tests`) and returns a reader to the output of the execution.
+// executeNotebook (in `examples/tests`), converts do text and returns a reader to the output of the execution.
 // It executes using `nbconvert` set to `asciidoc` (text) output.
 func executeNotebook(t *testing.T, notebook string) *os.File {
-
 	// Execute notebook.
 	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
 	args := []string{"-n=" + notebookRelPath, "-jupyter_dir=" + rootDir}
@@ -156,11 +148,11 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 	require.NoErrorf(t, nbexec.Run(), "Failed to execute notebook %q with %q",
 		path.Join(rootDir, notebookRelPath), nbexec)
 
-	// Convert notebook output.
-	tmpOutput := mustValue(os.CreateTemp("", "gonb_nbtests_output"))
+	// Convert notebook output to text ("asciidoc").
+	tmpOutput := must.M1(os.CreateTemp("", "gonb_nbtests_output"))
 	nbconvertOutputName := tmpOutput.Name()
-	must(tmpOutput.Close())
-	must(os.Remove(nbconvertOutputName))
+	must.M(tmpOutput.Close())
+	must.M(os.Remove(nbconvertOutputName))
 	nbconvertOutputPath := nbconvertOutputName + ".asciidoc" // nbconvert adds this suffix.
 	nbconvert := exec.Command(
 		jupyterExecPath, "nbconvert", "--to", "asciidoc",
@@ -170,6 +162,8 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 	klog.Infof("Executing: %q", nbconvert)
 	err := nbconvert.Run()
 	require.NoError(t, err)
+
+	// Open converted output:
 	f, err := os.Open(nbconvertOutputPath)
 	require.NoErrorf(t, err, "Failed to open the output of %q", nbconvert)
 	return f
@@ -520,6 +514,7 @@ func TestBashScript(t *testing.T) {
 				rootDir+"/examples/tests", // subdirectory where it is executed.
 				"/gonb_",                  // within a temporary directory.
 				rootDir,                   // root directory where jupyter (nbconvert) was executed.
+				rootDir,                   // Git root directory used for testing.
 				Separator,
 			),
 		), *flagPrintNotebook)

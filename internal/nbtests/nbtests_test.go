@@ -294,7 +294,8 @@ func TestGoWork(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "gowork")
+	notebook := "gowork"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 			Match(
@@ -334,6 +335,7 @@ func TestGoWork(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 // TestGoFlags tests `%goflags` special command support.
@@ -342,7 +344,8 @@ func TestGoFlags(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "goflags")
+	notebook := "goflags"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 			// Check `%goflags` is correctly keeping/erasing state.
@@ -393,6 +396,7 @@ func TestGoFlags(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 // TestGoTest tests support for `%test` to run cells with `go test`.
@@ -401,7 +405,8 @@ func TestGoTest(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "gotest")
+	notebook := "gotest"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 			// Trivial Incr function defined.
@@ -479,6 +484,7 @@ func TestGoTest(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 func TestBashScript(t *testing.T) {
@@ -486,7 +492,8 @@ func TestBashScript(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "bash_script")
+	notebook := "bash_script"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 
@@ -510,9 +517,9 @@ func TestBashScript(t *testing.T) {
 			Match(
 				OutputLine(3),
 				Separator,
-				"/examples/tests", // subdirectory where it is executed.
-				"/gonb_",          // within a temporary directory.
-				"/nbtests",        // root directory where jupyter (nbconvert) was executed.
+				rootDir+"/examples/tests", // subdirectory where it is executed.
+				"/gonb_",                  // within a temporary directory.
+				rootDir,                   // root directory where jupyter (nbconvert) was executed.
 				Separator,
 			),
 		), *flagPrintNotebook)
@@ -520,6 +527,7 @@ func TestBashScript(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 // TestWasm checks that the environment variables are created.
@@ -533,7 +541,8 @@ func disabledTestWasm(t *testing.T) {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")
 		return
 	}
-	f := executeNotebook(t, "wasm")
+	notebook := "wasm"
+	f := executeNotebook(t, notebook)
 	var wasmPath string
 	err := Check(f,
 		Sequence(
@@ -569,6 +578,7 @@ func disabledTestWasm(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }
 
 // TestGonbui tests that `Gonbui` library is able to reach the kernel.
@@ -581,7 +591,8 @@ func TestGonbui(t *testing.T) {
 	klog.Infof("GOCOVERDIR=%s", os.Getenv("GOCOVERDIR"))
 
 	require.NoError(t, os.Setenv("GONB_GIT_ROOT", rootDir))
-	f := executeNotebook(t, "gonbui")
+	notebook := "gonbui"
+	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
 			// Check GONB_GIT_ROOT was recognized.
@@ -625,4 +636,5 @@ func TestGonbui(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }

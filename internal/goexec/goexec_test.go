@@ -11,6 +11,10 @@ import (
 func TestDirEnv(t *testing.T) {
 	// Create an empty state.
 	s := newEmptyState(t)
+	defer func() {
+		err := s.Stop()
+		require.NoError(t, err, "Failed to finalized state")
+	}()
 	assert.Equal(t, s.TempDir, os.Getenv(protocol.GONB_TMP_DIR_ENV))
 
 	pwd, err := os.Getwd()

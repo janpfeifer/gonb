@@ -59,4 +59,5 @@ func TestDirEnv(t *testing.T) {
 	err = Parse(msg, s, true, []string{"%cd /tmp"}, usedLines)
 	require.NoError(t, err)
 	assert.Equal(t, "/tmp", os.Getenv(protocol.GONB_DIR_ENV))
+	require.NoError(t, s.Stop())
 }

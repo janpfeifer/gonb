@@ -3,11 +3,16 @@ package goexec
 import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 func getError(t *testing.T, rawError bool) (string, error) {
 	s := newEmptyStateWithRawError(t, rawError)
+	defer func() {
+		err := s.Stop()
+		require.NoError(t, err, "Failed to finalized state")
+	}()
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)
 	errorMsg := "THIS_IS_ERROR"

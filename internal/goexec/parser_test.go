@@ -126,6 +126,10 @@ fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 
 func TestState_Parse(t *testing.T) {
 	s := newEmptyState(t)
+	defer func() {
+		err := s.Stop()
+		require.NoError(t, err, "Failed to finalized state")
+	}()
 	fileToCellLine := createTestGoMain(t, s, sampleCellCode)
 	fmt.Printf("Code:\t%s\n", s.CodePath())
 	fileToCellIdAndLine := MakeFileToCellIdAndLine(-1, fileToCellLine)

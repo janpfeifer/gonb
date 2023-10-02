@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## Next -- Widgets, Wasm, Front-end communication, `nbexec` 
 
 * Added **widgets** support (experimental): 
   * a websocket opened from the front-end that communicates
@@ -9,10 +9,13 @@
   * API to communicate with front-end in `gonb/gonbui/comms`.
     * `Listen[T](address)` function added to create a channel listening
       to front-end updates.
+    * Added `--comms_log` flag to add verbose logging to the Javascript console.
   * API to manipulate the DOM in `gonb/gonbui/dom`. 
     * `Persist()` added to persist transient changes to the DOM -- meaning
       dynamically generated HTML and widgets will show up when exporting
       to HTML or when running `nbconvert`.
+* Added `gonb/cmd/nbexec` to execute notebooks for integration testing --
+  `nbconvert --execute` was not working.
 * Added "%wasm" support (experimental): 
   * Allows compiling cell to WASM and running that in the notebook. One
     can write widgets like this. **Experimental**: there are some use cases are not 100% clear. See
@@ -23,6 +26,8 @@
 * Improved logging of errors; pre-checking for duplicate `package`, with improved error message.
 * Handle incoming messages in a separated goroutine, so asynchronous/concurrent messages can be
   handled. Specially important when executing cells that take a long time.
+  * Serialize "execute_request" and other "busy" type of requests, so they are executed in the order
+    they are received.
 * Added support for `%env VAR=VALUE` syntax as well (like ipython uses).
 
 ## 0.8.0 -- Tests and Benchmarks, 2023/08/24

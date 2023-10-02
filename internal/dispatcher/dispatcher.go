@@ -90,8 +90,10 @@ var BusyMessageTypes = []string{
 	//"kernel_info_request", "shutdown_request",
 }
 
+const MaxExecuteRequestQueue = 10000
+
 var (
-	busyMessagesChan = make(chan *shellMsgParams)
+	busyMessagesChan = make(chan *shellMsgParams, 10000)
 	busyMessagesOnce sync.Once
 )
 
@@ -109,7 +111,9 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		return errors.WithMessagef(msg.Error(), "shell message error")
 	}
 	msgType := msg.ComposedMsg().Header.MsgType
-	klog.V(1).Infof("Dispatcher: handling %q", msgType)
+	defer func() {
+		klog.Infof("Message %q dispatched.", msgType)
+	}()
 
 	if !slices.Contains(BusyMessageTypes, msgType) {
 		// Messages that are handled asynchronously and don't block kernel
@@ -117,6 +121,7 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		case "comm_open", "comm_msg", "comm_comm_close", "comm_info_request":
 			// Handle in a separate goroutine.
 			go func() {
+				klog.V(1).Infof("Dispatcher: handling %q", msgType)
 				err = handleComms(msg, goExec)
 				if err != nil {
 					klog.Errorf("Failed to handle %q, this may affect communication with the front-end "+
@@ -138,9 +143,10 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	busyMessagesOnce.Do(func() {
 		go func() {
 			for params := range busyMessagesChan {
+				msgType := msg.ComposedMsg().Header.MsgType
+				klog.V(1).Infof("Dispatcher: handling %q", msgType)
 				err := handleBusyMessage(params.msg, params.goExec)
 				if err != nil {
-					msgType := msg.ComposedMsg().Header.MsgType
 					klog.Errorf("Failed to handle %q, this may indicate that the kernel is in an "+
 						"unstable state, it would be safer to restart the kernel. "+
 						"If you know how to reproduce the issue pls report to GoNB. Error: %+v", msgType, err)
@@ -149,7 +155,13 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 		}()
 	})
 
-	TrySend(busyMessagesChan, &shellMsgParams{msg: msg, goExec: goExec})
+	sentStatus := SendNoBlock(busyMessagesChan, &shellMsgParams{msg: msg, goExec: goExec})
+	if sentStatus == 1 {
+		err := errors.Errorf("Execution queue (with %d elements) is full!? Something must be going wrong with the notebook (too many cells?) or Jupyter, please check.",
+			len(busyMessagesChan))
+		klog.Errorf("%v", err)
+		return err
+	}
 	return nil
 }
 

@@ -257,6 +257,25 @@ func TrySend[T any](c chan T, value T) (ok bool) {
 	return
 }
 
+// SendNoBlock tries to send value through the channel.
+// It returns 0 if value sent, 1 if it would block (channel buffer full)
+// or 2 if the channel `c` was closed.
+func SendNoBlock[T any](c chan T, value T) (status int) {
+	defer func() {
+		exception := recover()
+		if exception != nil {
+			status = 2
+		}
+	}()
+	select {
+	case c <- value:
+		status = 0
+	default:
+		status = 1
+	}
+	return
+}
+
 // ArrayFlag implements a flag type that append repeated settings into an array (slice).
 // TODO: make it generic and accept `float64` and `int`.
 type ArrayFlag []string

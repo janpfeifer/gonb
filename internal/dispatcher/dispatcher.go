@@ -35,16 +35,14 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 				case <-kernelStop:
 					return
 				case msg := <-ch:
-					go func(msg kernel.Message) {
-						err := fn(msg, goExec)
-						if err != nil {
-							if !k.IsStopped() {
-								klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
-								k.Stop()
-							}
-							return
+					err := fn(msg, goExec)
+					if err != nil {
+						if !k.IsStopped() {
+							klog.Errorf("*** Failed to process incoming message, stopping kernel: %+v", err)
+							k.Stop()
 						}
-					}(msg)
+						return
+					}
 				}
 			}
 		}()
@@ -54,7 +52,17 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 		if !msg.Ok() {
 			return errors.WithMessagef(msg.Error(), "stdin message error")
 		}
-		return msg.DeliverInput()
+		go func() {
+			err := msg.DeliverInput()
+			if err != nil {
+				if !k.IsStopped() {
+					klog.Errorf("*** Failed to deliver input, stopping kernel: %+v", err)
+					k.Stop()
+				}
+				return
+			}
+		}()
+		return nil
 	})
 	poll(k.Shell(), handleShellMsg)
 	poll(k.Control(), func(msg kernel.Message, goExec *goexec.State) error {
@@ -68,14 +76,28 @@ func RunKernel(k *kernel.Kernel, goExec *goexec.State) {
 	})
 
 	wg.Wait()
+	close(busyMessagesChan)
 }
 
 // BusyMessageTypes are messages that triggers setting the kernel status to busy
 // while they are being handled.
+//
+// Also, they are serialized, and not handled in parallel (if more than one request
+// is sent before previous one finishes).
 var BusyMessageTypes = []string{
 	"execute_request", "inspect_request", "complete_request",
 	"kernel_info_request",
 	//"kernel_info_request", "shutdown_request",
+}
+
+var (
+	busyMessagesChan = make(chan *shellMsgParams)
+	busyMessagesOnce sync.Once
+)
+
+type shellMsgParams struct {
+	msg    kernel.Message
+	goExec *goexec.State
 }
 
 // handleShellMsg responds to a message on the shell or control ROUTER socket.
@@ -89,24 +111,68 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 	msgType := msg.ComposedMsg().Header.MsgType
 	klog.V(1).Infof("Dispatcher: handling %q", msgType)
 
-	if slices.Contains(BusyMessageTypes, msgType) {
-		// Tell the front-end that the kernel is working and when finished, notify the
-		// front-end that the kernel is idle again.
-		if err = kernel.PublishKernelStatus(msg, kernel.StatusBusy); err != nil {
-			err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
-			return
-		}
-		klog.V(2).Infof("> kernel status set to busy.")
+	if !slices.Contains(BusyMessageTypes, msgType) {
+		// Messages that are handled asynchronously and don't block kernel
+		switch msgType {
+		case "comm_open", "comm_msg", "comm_comm_close", "comm_info_request":
+			// Handle in a separate goroutine.
+			go func() {
+				err = handleComms(msg, goExec)
+				if err != nil {
+					klog.Errorf("Failed to handle %q, this may affect communication with the front-end "+
+						"(widgets may stop working): %+v", msgType, err)
+				}
+			}()
 
-		// Defer publishing of status idle again, before returning.
-		defer func() {
-			newErr := kernel.PublishKernelStatus(msg, kernel.StatusIdle)
-			if err == nil && newErr != nil {
-				err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusIdle)
-			}
-			klog.V(2).Infof("> kernel status set to idle.")
-		}()
+		case "is_complete_request":
+			klog.V(2).Infof("Received is_complete_request: ignoring, since it's not a console like kernel.")
+
+		default:
+			// Log, ignore, and hope for the best.
+			klog.Infof("Unhandled shell-socket message %q", msg.ComposedMsg().Header.MsgType)
+		}
+		return
 	}
+
+	// Start processing of queue of requests.
+	busyMessagesOnce.Do(func() {
+		go func() {
+			for params := range busyMessagesChan {
+				err := handleBusyMessage(params.msg, params.goExec)
+				if err != nil {
+					msgType := msg.ComposedMsg().Header.MsgType
+					klog.Errorf("Failed to handle %q, this may indicate that the kernel is in an "+
+						"unstable state, it would be safer to restart the kernel. "+
+						"If you know how to reproduce the issue pls report to GoNB. Error: %+v", msgType, err)
+				}
+			}
+		}()
+	})
+
+	TrySend(busyMessagesChan, &shellMsgParams{msg: msg, goExec: goExec})
+	return nil
+}
+
+// handleBusyMessage handles Shell messages that need to be serialized.
+func handleBusyMessage(msg kernel.Message, goExec *goexec.State) (err error) {
+	msgType := msg.ComposedMsg().Header.MsgType
+
+	// Tell the front-end that the kernel is working and when finished, notify the
+	// front-end that the kernel is idle again.
+	if err = kernel.PublishKernelStatus(msg, kernel.StatusBusy); err != nil {
+		err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusBusy)
+		return
+	}
+	klog.V(2).Infof("> kernel status set to busy.")
+
+	// Defer publishing of status idle again, before returning.
+	defer func() {
+		newErr := kernel.PublishKernelStatus(msg, kernel.StatusIdle)
+		if err == nil && newErr != nil {
+			err = errors.WithMessagef(err, "publishing kernel status %q", kernel.StatusIdle)
+		}
+		klog.V(2).Infof("> kernel status set to idle.")
+	}()
 
 	switch msgType {
 	case "kernel_info_request":

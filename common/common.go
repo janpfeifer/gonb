@@ -1,7 +1,9 @@
-// Package common holds functionality that is common to multiple other packages.
+// Package common holds generic functionality that is common to multiple packages.
 package common
 
 import (
+	"fmt"
+	"github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"io/fs"
@@ -11,7 +13,29 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
+
+// Panicf panics with an error constructed with the given format and args.
+func Panicf(format string, args ...any) {
+	panic(errors.Errorf(format, args...))
+}
+
+var pauseChan = make(chan struct{})
+
+// Pause the current goroutine, it waits forever on a channel.
+// Used for testing.
+func Pause() {
+	<-pauseChan
+}
+
+// UniqueId returns newly created unique id.
+func UniqueId() string {
+	v7id, _ := uuid.NewV7()
+	uuidStr := v7id.String()
+	uid := uuidStr[len(uuidStr)-8:]
+	return uid
+}
 
 // Set implements a Set for the key type T.
 type Set[T comparable] map[T]struct{}
@@ -73,9 +97,10 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 	}
 	visited.Insert(current)
 
-	return filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
+	err := filepath.WalkDir(current, func(entryPath string, info fs.DirEntry, err error) error {
 		if info == nil {
-			return errors.Errorf("file %q does not exist!?", entryPath)
+			// This happens when a linked file/dir does not exist, ignoring.
+			return nil
 		}
 		if info.Type() == os.ModeSymlink {
 			// Recursively follow symbolic links.
@@ -84,12 +109,20 @@ func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, 
 				err = errors.Wrapf(err, "WalkDirWithSymbolicLinks failed to resolve symlink %q", entryPath)
 				return err
 			}
-			return walkDirWithSymbolicLinksImpl(root, linkedPath, dirFunc, visited)
+			err = walkDirWithSymbolicLinksImpl(root, linkedPath, dirFunc, visited)
+			if err != nil {
+				err = errors.WithMessagef(err, "while traversing symlink %q -> %q", entryPath, linkedPath)
+				return err
+			}
 		}
 
 		// If not a symbolic link, call the user's function.
 		return dirFunc(entryPath, info, err)
 	})
+	if err != nil {
+		err = errors.WithMessagef(err, "while traversing dir %q", current)
+	}
+	return err
 }
 
 // ReplaceTildeInDir by the user's home directory. Returns dir if it doesn't start with "~".
@@ -120,4 +153,143 @@ func ReplaceTildeInDir(dir string) string {
 	}
 	homeDir := usr.HomeDir
 	return path.Join(homeDir, dir[1+len(userName):])
+}
+
+// Latch implements a "latch" synchronization mechanism.
+//
+// A Latch is a signal that can be waited for until it is triggered.
+// Once triggered it never changes state, it's forever triggered.
+type Latch struct {
+	muTrigger sync.Mutex
+	wait      chan struct{}
+}
+
+// NewLatch returns an un-triggered latch.
+func NewLatch() *Latch {
+	return &Latch{
+		wait: make(chan struct{}),
+	}
+}
+
+// Trigger latch.
+func (l *Latch) Trigger() {
+	l.muTrigger.Lock()
+	defer l.muTrigger.Unlock()
+
+	if l.Test() {
+		// Already triggered, discard value.
+		return
+	}
+	close(l.wait)
+}
+
+// Wait waits for the latch to be triggered.
+func (l *Latch) Wait() {
+	<-l.wait
+}
+
+// Test checks whether the latch has been triggered.
+func (l *Latch) Test() bool {
+	select {
+	case <-l.wait:
+		return true
+	default:
+		return false
+	}
+}
+
+// WaitChan returns the channel that one can use on a `select` to check when
+// the latch triggers.
+// The returned channel is closed when the latch is triggered.
+func (l *Latch) WaitChan() <-chan struct{} {
+	return l.wait
+}
+
+// LatchWithValue implements a "latch" synchronization mechanism, with a value associated with the
+// triggering of the latch.
+//
+// A LatchWithValue is a signal that can be waited for until it is triggered. Once triggered it never
+// changes state, it's forever triggered.
+type LatchWithValue[T any] struct {
+	value T
+	latch *Latch
+}
+
+// NewLatchWithValue returns an un-triggered latch.
+func NewLatchWithValue[T any]() *LatchWithValue[T] {
+	return &LatchWithValue[T]{
+		latch: NewLatch(),
+	}
+}
+
+// Trigger latch and saves the associated value.
+func (l *LatchWithValue[T]) Trigger(value T) {
+	l.latch.muTrigger.Lock()
+	defer l.latch.muTrigger.Unlock()
+
+	if l.latch.Test() {
+		// Already triggered, discard value.
+		return
+	}
+	l.value = value
+	close(l.latch.wait)
+}
+
+// Wait waits for the latch to be triggered.
+func (l *LatchWithValue[T]) Wait() T {
+	l.latch.Wait()
+	return l.value
+}
+
+// Test checks whether the latch has been triggered.
+func (l *LatchWithValue[T]) Test() bool {
+	return l.latch.Test()
+}
+
+// TrySend tries to send value through the channel.
+// It returns false if it failed, presumably because the channel is closed.
+func TrySend[T any](c chan T, value T) (ok bool) {
+	defer func() {
+		exception := recover()
+		ok = exception == nil
+	}()
+	c <- value
+	return
+}
+
+// SendNoBlock tries to send value through the channel.
+// It returns 0 if value sent, 1 if it would block (channel buffer full)
+// or 2 if the channel `c` was closed.
+func SendNoBlock[T any](c chan T, value T) (status int) {
+	defer func() {
+		exception := recover()
+		if exception != nil {
+			status = 2
+		}
+	}()
+	select {
+	case c <- value:
+		status = 0
+	default:
+		status = 1
+	}
+	return
+}
+
+// ArrayFlag implements a flag type that append repeated settings into an array (slice).
+// TODO: make it generic and accept `float64` and `int`.
+type ArrayFlag []string
+
+// String representation.
+func (f *ArrayFlag) String() string {
+	if f == nil || len(*f) == 0 {
+		return "(empty)"
+	}
+	return fmt.Sprintf("%v", []string(*f))
+}
+
+// Set new value, by appending to the end of the string.
+func (f *ArrayFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
 }

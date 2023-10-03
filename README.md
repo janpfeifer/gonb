@@ -28,12 +28,21 @@
 * Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out. Alternatively, there is a [Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing), that bootstraps **GoNB** and can be used online.
 * Online help and much more, see `%help`.
 
-<img src="docs/GoNB-Demo.png" alt="Demo1" width="50%" height="50%"/>
+## Examples:
 
+### Auto-complete and Contextual Help
+
+<img src="docs/GoNB-Demo.png" alt="Demo1" width="50%" height="50%"/>
 
 ### Example of animating a plot
 
 ![Demo](docs/demo-720.gif)
+
+### Example Screenshotting Wikipedia
+
+![demo-browser](docs/demo-browser.png)
+
+
 
 ## Introduction
 
@@ -85,16 +94,27 @@ docker run -it --rm -p 8888:8888 -v "${PWD}":/home/jovyan/work janpfeifer/gonb_j
 Then copy&paste the URL that it outputs in your browser.
 
 
-## Linux and macOS installation
+## Linux and macOS Installation Using Standard Go Tools
+
+The [official tutorial on how to install go programs here](https://go.dev/doc/tutorial/compile-install) --
+it is pretty simple, go maintains a `GOBIN` directory (that you can set) and `go install` will compile
+programs and put it there. You should add the `GOBIN` directory to your `PATH` (the default list of directories
+to search for executables).
 
 You need to install (if not yet there), **GoNB**, `goimports` and `gopls` (for auto-complete), and then run 
-`gonb --install`. 
+`gonb --install`. To install them in your `GOBIN` directory:
 
 ```bash
 go install github.com/janpfeifer/gonb@latest && \
   go install golang.org/x/tools/cmd/goimports@latest && \
   go install golang.org/x/tools/gopls@latest && \
-  gonb --install
+```
+
+And if `GOBIN` is in your `PATH`, run the following to install **GoNB** as a kernel in the Jupyter configuration
+(works for both JupyterLab and Jupyter Notebook).
+
+```bash
+gonb --install
 ```
 
 And then (re-)start Jupyter (if it is already running).

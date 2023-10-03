@@ -4,23 +4,26 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gofrs/uuid"
-	"github.com/janpfeifer/gonb/dispatcher"
-	"github.com/janpfeifer/gonb/goexec"
-	"github.com/janpfeifer/gonb/kernel"
+	"github.com/janpfeifer/gonb/internal/dispatcher"
+	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/kernel"
 	"io"
 	klog "k8s.io/klog/v2"
 	"log"
 	"os"
 	"os/exec"
+	"time"
 )
 
 var (
-	flagInstall  = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
-	flagKernel   = flag.String("kernel", "", "Exec kernel using given path for the `connection_file` provided by Jupyter client")
-	flagExtraLog = flag.String("extra_log", "", "Extra file to include in the log.")
-	flagForce    = flag.Bool("force", false, "Force install even if goimports and/or gopls are missing.")
-	flagRawError = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
-	flagWork     = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
+	flagInstall   = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
+	flagKernel    = flag.String("kernel", "", "ProgramExecutor kernel using given path for the `connection_file` provided by Jupyter client")
+	flagExtraLog  = flag.String("extra_log", "", "Extra file to include in the log.")
+	flagForceDeps = flag.Bool("force_deps", false, "Force install even if goimports and/or gopls are missing.")
+	flagForceCopy = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")
+	flagRawError  = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
+	flagWork      = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
+	flagCommsLog  = flag.Bool("comms_log", false, "Enable verbose logging from communication library in Javascript console.")
 )
 
 var (
@@ -30,6 +33,8 @@ var (
 	UniqueID string
 
 	coloredUniqueID string
+
+	logWriter io.Writer
 )
 
 func init() {
@@ -45,6 +50,26 @@ func main() {
 	defer klog.Flush()
 
 	flag.Parse()
+
+	// Setup logging.
+	if *flagExtraLog != "" {
+		logFile, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
+		}
+		_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
+		logWriter = logFile
+		flag.VisitAll(func(f *flag.Flag) {
+			if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
+				if f.Value.String() == "true" {
+					fmt.Printf("Hmmm: %s\n", f.Name)
+					logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
+					_ = f.Value.Set("false")
+				}
+			}
+		})
+		defer func() { _ = logFile.Close() }()
+	}
 	SetUpLogging() // "log" package.
 	SetUpKlog()    // "github.com/golang/klog" package
 
@@ -69,7 +94,10 @@ func main() {
 		if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
 			extraArgs = append(extraArgs, "--work")
 		}
-		err := kernel.Install(extraArgs, *flagForce)
+		if glogFlag := flag.Lookup("comms_log"); glogFlag != nil && glogFlag.Value.String() != "false" {
+			extraArgs = append(extraArgs, "--comms_log")
+		}
+		err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
 		if err != nil {
 			log.Fatalf("Installation failed: %+v\n", err)
 		}
@@ -93,7 +121,7 @@ func main() {
 	}
 
 	// Create a kernel.
-	k, err := kernel.NewKernel(*flagKernel)
+	k, err := kernel.New(*flagKernel)
 	klog.Infof("kernel created\n")
 	if err != nil {
 		log.Fatalf("Failed to start kernel: %+v", err)
@@ -101,16 +129,22 @@ func main() {
 	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
 
 	// Create a Go executor.
-	goExec, err := goexec.New(UniqueID, *flagWork, *flagRawError)
+	goExec, err := goexec.New(k, UniqueID, *flagWork, *flagRawError)
 	if err != nil {
 		log.Fatalf("Failed to create go executor: %+v", err)
 	}
+	goExec.Comms.LogWebSocket = *flagCommsLog
 
 	// Orchestrate dispatching of messages.
 	dispatcher.RunKernel(k, goExec)
+	klog.V(1).Infof("Dispatcher exited.")
 
 	// Stop gopls.
-	goExec.Stop()
+	err = goExec.Stop()
+	if err != nil {
+		klog.Warningf("Error during shutdown: %+v", err)
+	}
+	klog.V(1).Infof("goExec stopped.")
 
 	// Wait for all polling goroutines.
 	k.ExitWait()
@@ -127,14 +161,8 @@ var (
 // requested.
 func SetUpLogging() {
 	log.SetPrefix(coloredUniqueID)
-	if *flagExtraLog != "" {
-		f, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-		if err != nil {
-			log.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
-		}
-		_, _ = f.Write([]byte("\n\n"))
-		w := io.MultiWriter(f, os.Stderr) // Write to STDERR and the newly open f.
-		log.SetOutput(w)
+	if logWriter != nil {
+		log.SetOutput(logWriter)
 	}
 }
 
@@ -168,5 +196,8 @@ func (_ UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string
 
 // SetUpKlog to include prefix with kernel's UniqueID.
 func SetUpKlog() {
+	if logWriter != nil {
+		klog.SetOutput(logWriter)
+	}
 	klog.SetLogFilter(UniqueIDFilter{})
 }

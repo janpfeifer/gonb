@@ -15,7 +15,13 @@ go test --cover --covermode=set --coverpkg=./... ./... -test.count=1 \
 
 echo
 echo "(2) Generating docs/coverage.txt"
-go tool covdata func -i "${REAL_GOCOVERDIR}" > docs/coverage.txt
+go tool covdata func -i "${REAL_GOCOVERDIR}" > docs/coverage_raw.txt
+
+# Filter out spurious coverage on cell code and remove line number
+# (which won't match after changes)
+cat docs/coverage_raw.txt | \
+  egrep '^(github.com/janpfeifer/gonb|total)' \
+  > docs/coverage.txt && rm docs/converage_raw.txt
 
 echo
 echo "(3) Cleaning up REAL_GOCOVERDIR"

@@ -28,6 +28,7 @@ import (
 var panicf = common.Panicf
 
 var (
+	flagClear         = flag.Bool("clear", false, "Clear test notebooks output after test")
 	flagLogExec       = flag.Bool("log_exec", false, "Log the execution of the notebook")
 	flagPrintNotebook = flag.Bool("print_notebook", false, "Print tested notebooks, useful if debugging unexpected results.")
 	flagExtraFlags    = flag.String("kernel_args", "--logtostderr",
@@ -170,6 +171,10 @@ func executeNotebook(t *testing.T, notebook string) *os.File {
 }
 
 func clearNotebook(t *testing.T, notebook string) {
+	if !*flagClear {
+		// Keep outputs.
+		return
+	}
 	// Execute notebook.
 	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
 	nbexec := exec.Command(

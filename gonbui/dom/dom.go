@@ -41,11 +41,11 @@ func TransientJavascript(js string) {
 //
 // Example:
 //
-//	  rootId := dom.CreateTransientDiv()
-//		 dom.Append(rootId, "<h3>Click On A Buttom</h3>\n")
-//	  bOk := widgets.Button("Ok").AppendTo(rootId).Done()
-//	  bNotOk := widgets.Button("NotOk").AppendTo(rootId).Done()
-//	  dom.Append(rootId, "\n<br/>\n<hr/>\n")
+//	rootId := dom.CreateTransientDiv()
+//	dom.Append(rootId, "<h3>Click On A Buttom</h3>\n")
+//	bOk := widgets.Button("Ok").AppendTo(rootId).Done()
+//	bNotOk := widgets.Button("NotOk").AppendTo(rootId).Done()
+//	dom.Append(rootId, "\n<br/>\n<hr/>\n")
 func CreateTransientDiv() (htmlId string) {
 	uid := gonbui.UniqueId()
 	htmlId = "dom.transient_div_" + uid
@@ -87,6 +87,7 @@ const (
 // Important considerations:
 //   - Output generated in this format is not saved or convertable to HTML.
 //     It is generated dynamically with Javascript, which is not captured by Jupyter.
+//     Use `Persist` to repost content such that it can be saved.
 //   - This prevents adding extra vertical space for each call of DisplayHtml,
 //     which allows one to better tailor the output.
 func InsertAdjacent(referenceId string, pos RelativePositionId, html string) {
@@ -108,6 +109,7 @@ func InsertAdjacent(referenceId string, pos RelativePositionId, html string) {
 // Important considerations:
 //   - Output generated in this format is not saved or convertable to HTML.
 //     It is generated dynamically with Javascript, which is not captured by Jupyter.
+//     Use `Persist` to repost content such that it can be saved.
 //   - This prevents adding extra vertical space for each call of DisplayHtml,
 //     which allows one to better tailor the output.
 //

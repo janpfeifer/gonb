@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next -- Widgets, Wasm, Front-end communication, `nbexec` 
+## 0.9.0 -- Widgets, DOM, Wasm, Front-end communication, `nbexec`,  2023/10/03
 
 * Added **widgets** support (experimental): 
   * a websocket opened from the front-end that communicates

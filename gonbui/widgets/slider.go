@@ -4,10 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/comms"
 	"github.com/janpfeifer/gonb/gonbui/dom"
-	"k8s.io/klog/v2"
 	"text/template"
 )
 
@@ -28,6 +28,7 @@ type SliderBuilder struct {
 
 	// listenUpdates is the channel used to keep tabs of the updates.
 	listenUpdates *comms.AddressChan[int]
+	firstUpdate   *common.Latch // If first update received.
 }
 
 // Slider returns a builder object that builds a new slider with the range
@@ -36,11 +37,24 @@ type SliderBuilder struct {
 // Call `Done` method when you finish configuring the SliderBuilder.
 func Slider(min, max, value int) *SliderBuilder {
 	return &SliderBuilder{
-		min:    min,
-		max:    max,
-		value:  value,
-		htmlId: "gonb_slider_" + gonbui.UniqueId(),
+		min:         min,
+		max:         max,
+		value:       value,
+		htmlId:      "gonb_slider_" + gonbui.UniqueId(),
+		firstUpdate: common.NewLatch(),
 	}
+}
+
+// HtmlId allows one to set the id for the `<button>` tag in the DOM.
+// If not set, a unique one will be generated, and can be read with GetHtmlId.
+//
+// This can only be set before call to Done. If called afterward, it panics.
+func (s *SliderBuilder) HtmlId(htmlId string) *SliderBuilder {
+	if s.built {
+		panicf("SliderBuilder cannot change parameters after it is built")
+	}
+	s.htmlId = htmlId
+	return s
 }
 
 // Address configures the slider to use the given address to communicate its state
@@ -83,7 +97,8 @@ func (s *SliderBuilder) Done() *SliderBuilder {
 	s.listenUpdates = comms.Listen[int](s.address)
 	go func() {
 		for newValue := range s.listenUpdates.C {
-			klog.V(2).Infof("Slider(%s): new value is %d", s.htmlId, newValue)
+			s.firstUpdate.Trigger() // First update received, we are ready for business.
+			gonbui.Logf("Slider(%s): new value is %d", s.htmlId, newValue)
 			s.value = newValue
 		}
 	}()
@@ -108,6 +123,8 @@ func (s *SliderBuilder) Done() *SliderBuilder {
 		panicf("Slider template is invalid!? Please report the error to GoNB: %v", err)
 	}
 	dom.TransientJavascript(buf.String())
+
+	s.firstUpdate.Wait()
 	return s
 }
 

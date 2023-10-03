@@ -34,6 +34,18 @@ func Button(label string) *ButtonBuilder {
 	}
 }
 
+// HtmlId allows one to set the id for the `<button>` tag in the DOM.
+// If not set, a unique one will be generated, and can be read with GetHtmlId.
+//
+// This can only be set before call to Done. If called afterward, it panics.
+func (b *ButtonBuilder) HtmlId(htmlId string) *ButtonBuilder {
+	if b.built {
+		panicf("ButtonBuilder cannot change parameters after it is built")
+	}
+	b.htmlId = htmlId
+	return b
+}
+
 // Address configures the button to use the given address to communicate its state
 // with the front-end.
 // The state is an int value that is incremented every time the button is pressed.

@@ -20,7 +20,8 @@ go tool covdata func -i "${REAL_GOCOVERDIR}" > docs/coverage_raw.txt
 # Filter out spurious coverage on cell code and remove line number
 # (which won't match after changes)
 cat docs/coverage_raw.txt | \
-  egrep '^(github.com/janpfeifer/gonb|total)' \
+  egrep '^(github.com/janpfeifer/gonb|total)' | \
+  sed 's/:[0-9]*://g' \
   > docs/coverage.txt && rm docs/converage_raw.txt
 
 echo

@@ -291,6 +291,19 @@ type AddressChan[T protocol.CommValueTypes] struct {
 	done *common.Latch
 }
 
+// WithBuffer recreates the underlying channel `AddressChan[T].C` with one
+// with the given buffer.
+//
+// This should be called just after the creation of the AddressChan, since anything
+// received in between the creation and this call will be dropped.
+//
+// It returns itself, to allow cascaded settings.
+func (c *AddressChan[T]) WithBuffer(n int) *AddressChan[T] {
+	close(c.C)
+	c.C = make(chan T, n)
+	return c
+}
+
 // IsClosed checks whether this AddressChannel is closed.
 func (c *AddressChan[T]) IsClosed() bool {
 	return !c.done.Test()
@@ -327,8 +340,14 @@ func Listen[T protocol.CommValueTypes](address string) *AddressChan[T] {
 		ok := common.TrySend(c.C, value)
 		if !ok {
 			// User closed channel, we should unsubscribe.
-			gonbui.Logf("Listen(%q) closed", address)
-			Unsubscribe(subscriptionId)
+			if c.IsClosed() {
+				gonbui.Logf("Listen(%q) closed", address)
+				Unsubscribe(subscriptionId)
+			} else {
+				gonbui.Logf("Failed to write to Listen(%q) channel, but it's not closed!? "+
+					"This could be a race condition where WithBuffer(n) was called after a message "+
+					"was received.", address)
+			}
 		}
 	})
 	go func() {

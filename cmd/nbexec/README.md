@@ -1,7 +1,7 @@
 # `nbexec` Executing a Jupyter Notebook with Chromium
 
-`nbexec` executes Jupyter Notebook saves it.
-It can then be used by `nbconvert` to convert to various formats.
+`nbexec` executes a Jupyter Notebook and then saves it.
+The saved notebook can then be used by `nbconvert` and converted to various formats (html, text, pdf, etc.).
 
 ## How to use it?
 
@@ -29,6 +29,9 @@ nbexec --jupyter_log --console_log  --vmodule=nbexec=1 \
    --jupyter_dir=${MY_PROJECT_DIR} -n=notebooks/integration_test.ipynb
 ```
 
+[GoNB](https://github.com/janpfeifer/gonb) does this all in tests for integration tests. 
+See [`internal/nbtests` package](https://github.com/janpfeifer/gonb).
+It also compiles everything with `--coverage` to get full coverage report in the end (see [`run_coverage.sh`](https://github.com/janpfeifer/gonb/blob/main/run_coverage.sh))
 
 ## How to install it?
 

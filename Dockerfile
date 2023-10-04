@@ -30,7 +30,7 @@ RUN apt-get install --yes --no-install-recommends git
 # Go and GoNB Libraries
 #######################################################################################################
 ENV GO_VERSION=1.21.0
-ENV GONB_VERSION="v0.9.0"
+ENV GONB_VERSION="v0.9.1"
 ENV GOROOT=/usr/local/go
 ENV GOPATH=${HOME}/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin

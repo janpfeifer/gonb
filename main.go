@@ -62,7 +62,6 @@ func main() {
 		flag.VisitAll(func(f *flag.Flag) {
 			if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
 				if f.Value.String() == "true" {
-					fmt.Printf("Hmmm: %s\n", f.Name)
 					logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
 					_ = f.Value.Set("false")
 				}

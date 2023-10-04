@@ -1,6 +1,11 @@
 # GoNB Changelog
 
-## 0.9.0 -- Widgets, DOM, Wasm, Front-end communication, `nbexec`,  2023/10/03
+## 0.9.1, 2023/10/04
+
+* Removed left-over debugging messages.
+* Removed left-over replace rule from tutorial.
+
+## 0.9.0 -- Widgets, DOM, Wasm, Front-end communication, `nbexec`, 2023/10/04
 
 * Added **widgets** support (experimental): 
   * a websocket opened from the front-end that communicates
@@ -29,6 +34,7 @@
   * Serialize "execute_request" and other "busy" type of requests, so they are executed in the order
     they are received.
 * Added support for `%env VAR=VALUE` syntax as well (like ipython uses).
+* Refactored internal packages to `internal/` subdirectory.
 
 ## 0.8.0 -- Tests and Benchmarks, 2023/08/24
 

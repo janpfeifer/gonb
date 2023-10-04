@@ -424,7 +424,7 @@ func (s *State) sendDataLocked(msg kernel.Message, data map[string]any) error {
 		"comm_id": s.CommId,
 		"data":    data,
 	}
-	klog.Infof("comms: sendData %+v", content)
+	klog.V(2).Infof("comms: sendData %+v", content)
 	return msg.Publish("comm_msg", content)
 	//return msg.Reply("comm_msg", content)
 }

@@ -16,9 +16,7 @@ func TestComms(t *testing.T) {
 	f := executeNotebook(t, notebook)
 	err := Check(f,
 		Sequence(
-			Match(
-				OutputLine(5),
-				Separator),
+			Match(OutputLine(5), Separator),
 			// Some empty lines in between (empty transient outputs).
 			Match(
 				"sent 1",
@@ -30,8 +28,11 @@ func TestComms(t *testing.T) {
 				"sent 4",
 				"closed",
 				"done",
-				Separator)),
-		*flagPrintNotebook)
+				Separator),
+
+			Match(OutputLine(6), Separator),
+			Match("ok", Separator),
+		), *flagPrintNotebook)
 
 	require.NoError(t, err)
 	require.NoError(t, f.Close())

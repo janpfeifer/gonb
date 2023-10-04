@@ -50,7 +50,7 @@ github.com/janpfeifer/gonb/common/common.go				NewLatchWithValue				100.0%
 github.com/janpfeifer/gonb/common/common.go				Trigger						100.0%
 github.com/janpfeifer/gonb/common/common.go				Wait						100.0%
 github.com/janpfeifer/gonb/common/common.go				Test						0.0%
-github.com/janpfeifer/gonb/common/common.go				TrySend						100.0%
+github.com/janpfeifer/gonb/common/common.go				TrySend						0.0%
 github.com/janpfeifer/gonb/common/common.go				SendNoBlock					75.0%
 github.com/janpfeifer/gonb/common/common.go				*ArrayFlag.String				66.7%
 github.com/janpfeifer/gonb/common/common.go				*ArrayFlag.Set					0.0%
@@ -89,16 +89,18 @@ github.com/janpfeifer/gonb/gonbui/comms/comms.go				ConvertTo					42.9%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				Unsubscribe					88.2%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				dispatchValueUpdates				76.5%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				WithBuffer					100.0%
+github.com/janpfeifer/gonb/gonbui/comms/comms.go				LatestOnly					100.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				IsClosed					0.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				Close						100.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				WaitClose					100.0%
-github.com/janpfeifer/gonb/gonbui/comms/comms.go				Listen						71.4%
+github.com/janpfeifer/gonb/gonbui/comms/comms.go				Listen						81.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				TransientJavascript				100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				CreateTransientDiv				100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				escapeForJavascriptSingleQuotes			100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				InsertAdjacent					100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				Append						100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				SetInnerHtml					100.0%
+github.com/janpfeifer/gonb/gonbui/dom/dom.go				SetInnerText					100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				GetInnerHtml					83.3%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				Remove						100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				Persist						66.7%
@@ -387,4 +389,4 @@ github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execUntrack					54.5%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			showTrackedList					91.7%
 github.com/janpfeifer/gonb/internal/websocket/websocket.go			Javascript					83.3%
-total										(statements)					61.3%
+total										(statements)					61.5%

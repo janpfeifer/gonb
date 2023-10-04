@@ -258,7 +258,7 @@ func TrySend[T any](c chan T, value T) (ok bool) {
 }
 
 // SendNoBlock tries to send value through the channel.
-// It returns 0 if value sent, 1 if it would block (channel buffer full)
+// It returns 0 if the value was sent, 1 if sending it would block (channel buffer full)
 // or 2 if the channel `c` was closed.
 func SendNoBlock[T any](c chan T, value T) (status int) {
 	defer func() {

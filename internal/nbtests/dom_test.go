@@ -23,17 +23,18 @@ func TestDom(t *testing.T) {
 				Separator,
 			),
 
-			Match(
-				OutputLine(4),
-				Separator),
+			Match(OutputLine(4), Separator),
 			// Some empty lines in between (empty transient outputs).
 			Match(
 				"This is a test!",
 				"And a second test.",
 				"This is a test!",
 				"And a second test.",
-				Separator)),
-		*flagPrintNotebook)
+				Separator),
+
+			Match(OutputLine(5), Separator),
+			Match("ok", Separator),
+		), *flagPrintNotebook)
 
 	require.NoError(t, err)
 	require.NoError(t, f.Close())

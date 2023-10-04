@@ -124,6 +124,7 @@ func Append(parentHtmlId, html string) {
 // Important considerations:
 //   - Output generated in this format is not saved or convertable to HTML.
 //     It is generated dynamically with Javascript, which is not captured by Jupyter.
+//     Use `Persist` to repost content such that it can be saved.
 //   - This prevents adding extra vertical space for each call of DisplayHtml,
 //     which allows one to better tailor the output.
 //
@@ -138,6 +139,29 @@ func SetInnerHtml(htmlId, html string) {
 	element.innerHTML = '%s';
 })();
 `, htmlId, html)
+	TransientJavascript(js)
+}
+
+// SetInnerText sets the text contents of a DOM element identified by `htmlId`.
+//
+// Important considerations:
+//   - Output generated in this format is not saved or convertable to HTML.
+//     It is generated dynamically with Javascript, which is not captured by Jupyter.
+//     Use `Persist` to repost content such that it can be saved.
+//   - This prevents adding extra vertical space for each call of DisplayHtml,
+//     which allows one to better tailor the output.
+//
+// For specialized control where the `html` is inserted, check
+// InsertAdjacent call.
+func SetInnerText(htmlId, text string) {
+	htmlId = escapeForJavascriptSingleQuotes(htmlId)
+	text = escapeForJavascriptSingleQuotes(text)
+	js := fmt.Sprintf(`
+(() => {
+	let element = document.getElementById('%s');
+	element.innerText = '%s';
+})();
+`, htmlId, text)
 	TransientJavascript(js)
 }
 

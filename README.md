@@ -14,6 +14,7 @@
 
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
+* (**NEW**) Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
@@ -32,17 +33,15 @@
 
 ### Auto-complete and Contextual Help
 
-<img src="docs/GoNB-Demo.png" alt="Demo1" width="50%" height="50%"/>
+<img src="docs/GoNB-Demo.png" alt="Auto-complete Demo" width="50%" height="50%"/>
 
-### Example of animating a plot
+### Sine Plot Connected to Slider
 
-![Demo](docs/demo-720.gif)
+<img src="docs/demo-widgets.gif" alt="Widgets Demo" width="50%" height="50%"/>
 
 ### Example Screenshotting Wikipedia
 
-![demo-browser](docs/demo-browser.png)
-
-
+<img src="docs/demo-browser.png" alt="Browser Screenshot Demo" width="50%" height="50%"/>
 
 ## Introduction
 

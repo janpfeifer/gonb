@@ -23,7 +23,7 @@ cat docs/coverage_raw.txt | \
   egrep '^(github.com/janpfeifer/gonb|total)' | \
   sed 's/:[0-9]*://g' \
   > docs/coverage.txt
-rm docs/converage_raw.txt
+rm docs/coverage_raw.txt
 
 echo
 echo "(3) Cleaning up REAL_GOCOVERDIR"

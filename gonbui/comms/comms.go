@@ -287,12 +287,13 @@ func dispatchValueUpdates(valueMsg *protocol.CommValue) {
 //
 // It's a common output of widgets, to listen to its updates.
 type AddressChan[T protocol.CommValueTypes] struct {
-	C    chan T
-	done *common.Latch
+	C          chan T
+	done       *common.Latch
+	latestOnly bool
 }
 
-// WithBuffer recreates the underlying channel `AddressChan[T].C` with one
-// with the given buffer.
+// WithBuffer replaces the underlying channel `AddressChan[T].C` with one
+// with buffer size `n`.
 //
 // This should be called just after the creation of the AddressChan, since anything
 // received in between the creation and this call will be dropped.
@@ -301,6 +302,27 @@ type AddressChan[T protocol.CommValueTypes] struct {
 func (c *AddressChan[T]) WithBuffer(n int) *AddressChan[T] {
 	close(c.C)
 	c.C = make(chan T, n)
+	return c
+}
+
+// LatestOnly replaces the underlying channel `AddressChan[T].C` with one
+// with buffer size 1.
+//
+// This channel drops results if they are not read often enough -- when values
+// are generated faster in the channel than one is reading from the channel.
+// But the reader will always read the latest incoming value -- so always the
+// freshest value.
+//
+// This is useful, for instance, when one is doing a slow drawing in response
+// to some UI element (like a slider), where one only wishes to redraw the
+// latest value received, where there is one.
+//
+// To achieve this, when writing new incoming values to the channel,
+// if the channel buffer is full, it consumes it and then writes the new value.
+func (c *AddressChan[T]) LatestOnly() *AddressChan[T] {
+	close(c.C)
+	c.C = make(chan T, 1)
+	c.latestOnly = true
 	return c
 }
 
@@ -337,17 +359,37 @@ func Listen[T protocol.CommValueTypes](address string) *AddressChan[T] {
 	}
 	var subscriptionId SubscriptionId
 	subscriptionId = Subscribe[T](address, func(_ string, value T) {
-		ok := common.TrySend(c.C, value)
-		if !ok {
-			// User closed channel, we should unsubscribe.
-			if c.IsClosed() {
-				gonbui.Logf("Listen(%q) closed", address)
-				Unsubscribe(subscriptionId)
-			} else {
-				gonbui.Logf("Failed to write to Listen(%q) channel, but it's not closed!? "+
-					"This could be a race condition where WithBuffer(n) was called after a message "+
-					"was received.", address)
+		// Capture panic if c.C is closed.
+		defer func() {
+			exception := recover()
+			if exception != nil {
+				if c.IsClosed() {
+					gonbui.Logf("Listen(%q) closed", address)
+					Unsubscribe(subscriptionId)
+				} else {
+					gonbui.Logf("Failed to write to Listen(%q) channel, but it's not closed!? "+
+						"This could be a race condition where WithBuffer(n) was called after a message "+
+						"was received.", address)
+				}
 			}
+		}()
+
+		if c.latestOnly {
+			// c.C has a buffer of 1, and if it's full, we want to consume
+			// the value and then rewrite the new one.
+		sendLoop:
+			for {
+				select {
+				case c.C <- value:
+					break sendLoop
+				case <-c.C: // Consume stale result
+					continue sendLoop
+				}
+			}
+
+		} else {
+			// Simply write to channel.
+			c.C <- value
 		}
 	})
 	go func() {

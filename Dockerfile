@@ -30,7 +30,7 @@ RUN apt-get install --yes --no-install-recommends git
 # Go and GoNB Libraries
 #######################################################################################################
 ENV GO_VERSION=1.21.0
-ENV GONB_VERSION="v0.9.1"
+ENV GONB_VERSION="v0.9.2"
 ENV GOROOT=/usr/local/go
 ENV GOPATH=${HOME}/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -43,7 +43,8 @@ RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-am
 # Install GoNB (https://github.com/janpfeifer/gonb) in the jovyan's user account (default user)
 USER $NB_USER
 WORKDIR ${HOME}
-RUN go install "github.com/janpfeifer/gonb@${GONB_VERSION}" && \
+RUN export GOPROXY=direct && \
+    go install "github.com/janpfeifer/gonb@${GONB_VERSION}" && \
     go install golang.org/x/tools/cmd/goimports@latest && \
     go install golang.org/x/tools/gopls@latest && \
     gonb --install

@@ -1,9 +1,9 @@
 # GoNB Changelog
 
-## Next
+## 0.9.2, 2023/10/07
 
-* Fixed Darwin (and other non-linux, that are unix-like) build.
-* Added cross-compilation test in `run-coverage.sh`
+* Fixed Darwin (and other non-linux, that are unix-like) build -- see #74.
+  * Added cross-compilation to darwin/arm64 test in `run-coverage.sh`
 
 ## 0.9.1, 2023/10/04
 

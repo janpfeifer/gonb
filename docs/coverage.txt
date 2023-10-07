@@ -1,5 +1,5 @@
 github.com/janpfeifer/gonb/main.go						init						100.0%
-github.com/janpfeifer/gonb/main.go						main						59.1%
+github.com/janpfeifer/gonb/main.go						main						60.0%
 github.com/janpfeifer/gonb/main.go						SetUpLogging					66.7%
 github.com/janpfeifer/gonb/main.go						prepend						100.0%
 github.com/janpfeifer/gonb/main.go						UniqueIDFilter.Filter				100.0%
@@ -9,7 +9,7 @@ github.com/janpfeifer/gonb/main.go						SetUpKlog					66.7%
 github.com/janpfeifer/gonb/cache/cache.go					New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go					AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					68.2%
+github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					72.7%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go					NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewHidden					100.0%
@@ -144,7 +144,7 @@ github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.ProgramSubscrib
 github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.ProgramUnsubscribeRequest		57.1%
 github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.deliverProgramSubscriptionsLocked	62.5%
 github.com/janpfeifer/gonb/internal/dispatcher/comms.go			handleComms					55.6%
-github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		RunKernel					65.7%
+github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		RunKernel					62.9%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShellMsg					71.0%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleBusyMessage				47.8%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShutdownRequest				83.3%

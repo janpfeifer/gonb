@@ -3,6 +3,12 @@
 package goexec
 
 import (
+	"k8s.io/klog/v2"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+
 	"github.com/pkg/errors"
 )
 

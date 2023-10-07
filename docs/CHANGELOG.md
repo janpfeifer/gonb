@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Fixed Darwin (and other non-linux, that are unix-like) build.
+* Added cross-compilation test in `run-coverage.sh`
+
 ## 0.9.1, 2023/10/04
 
 * Removed left-over debugging messages.

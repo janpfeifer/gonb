@@ -26,19 +26,23 @@ type ButtonBuilder struct {
 // Button returns a builder object that configures and builds a new button with
 // the given `label`.
 //
+// One can use `Listen` to get updates (button clicks) -- the value returned
+// is an int that is incremented at every click.
+//
 // Call `Done` method when you finish configuring the ButtonBuilder.
 func Button(label string) *ButtonBuilder {
 	return &ButtonBuilder{
-		label:  label,
-		htmlId: "gonb_button_" + gonbui.UniqueId(),
+		label:   label,
+		address: "/button/" + gonbui.UniqueId(),
+		htmlId:  "gonb_button_" + gonbui.UniqueId(),
 	}
 }
 
-// HtmlId allows one to set the id for the `<button>` tag in the DOM.
-// If not set, a unique one will be generated, and can be read with GetHtmlId.
+// WithHtmlId sets the id to use when creating the HTML element in the DOM.
+// If not set, a unique one will be generated, and can be read with HtmlId.
 //
 // This can only be set before call to Done. If called afterward, it panics.
-func (b *ButtonBuilder) HtmlId(htmlId string) *ButtonBuilder {
+func (b *ButtonBuilder) WithHtmlId(htmlId string) *ButtonBuilder {
 	if b.built {
 		panicf("ButtonBuilder cannot change parameters after it is built")
 	}
@@ -46,14 +50,13 @@ func (b *ButtonBuilder) HtmlId(htmlId string) *ButtonBuilder {
 	return b
 }
 
-// Address configures the button to use the given address to communicate its state
+// WithAddress configures the widget to use the given address to communicate its state
 // with the front-end.
-// The state is an int value that is incremented every time the button is pressed.
 //
-// The default is to use randomly created unique address.
+// The default is to use a randomly created unique address.
 //
-// It panics if called after the button is built.
-func (b *ButtonBuilder) Address(address string) *ButtonBuilder {
+// It panics if called after the widget is built.
+func (b *ButtonBuilder) WithAddress(address string) *ButtonBuilder {
 	if b.built {
 		panicf("ButtonBuilder cannot change parameters after it is built")
 	}
@@ -78,9 +81,6 @@ func (b *ButtonBuilder) Done() *ButtonBuilder {
 		panicf("ButtonBuilder.Done already called!?")
 	}
 	b.built = true
-	if b.address == "" {
-		b.address = "/button/" + gonbui.UniqueId()
-	}
 
 	// Consume the first incoming button message, with counter == 0.
 	clicks := comms.Listen[int](b.address)
@@ -128,8 +128,12 @@ func (b *ButtonBuilder) Listen() *comms.AddressChan[int] {
 	return comms.Listen[int](b.address)
 }
 
-// GetHtmlId returns the `id` used in the button element created when
-// `Done` is called.
-func (b *ButtonBuilder) GetHtmlId() string {
+// HtmlId returns the `id` used in the widget HTML element created.
+func (b *ButtonBuilder) HtmlId() string {
 	return b.htmlId
+}
+
+// Address returns the address used to communicate to the widgets HTML element.
+func (b *ButtonBuilder) Address() string {
+	return b.address
 }

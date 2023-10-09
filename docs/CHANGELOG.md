@@ -1,5 +1,17 @@
 # GoNB Changelog
 
+## Next
+
+* New widgets demo, using [GoMLX](https://github.com/gomlx/gomlx)'s [Flowers Diffusion demo](https://github.com/gomlx/gomlx/blob/main/examples/oxfordflowers102/OxfordFlowers102_Diffusion.ipynb)
+
+## 0.9.3, 2023/10/09
+
+* Widgets:
+  * Normalized API across widgets, so they all look the same -- breaks the API, apologies.
+  * Added `widget.Select` for a drop-down menu.
+  * Improved integration tests.
+* nbexec: changed javascript code to use the public API `jupyterapp.commands.execute` instead.
+
 ## 0.9.2, 2023/10/07
 
 * Fixed Darwin (and other non-linux, that are unix-like) build -- see #74.

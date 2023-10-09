@@ -268,7 +268,7 @@ func executeNotebook(url string) {
 
 	page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
-	jupyterapp.commandLinker._commands.execute("editmenu:clear-all", null).
+	jupyterapp.commands.execute("editmenu:clear-all", null).
 		then(() => { console.log("Finished clearing all outputs!"); });
 }`)
 	page.MustWaitStable()
@@ -277,7 +277,7 @@ func executeNotebook(url string) {
 		// Execute all cells (if --clear is not set)
 		page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
-	jupyterapp.commandLinker._commands.execute("runmenu:run-all", null).
+	jupyterapp.commands.execute("runmenu:run-all", null).
 		then(() => { console.log("Finished executing!"); });
 }`)
 		klog.V(1).Infof("Started Javascript to execute cells, waiting to stabilize.")
@@ -287,7 +287,7 @@ func executeNotebook(url string) {
 
 	page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
-	jupyterapp.commandLinker._commands.execute("docmanager:save", null).
+	jupyterapp.commands.execute("docmanager:save", null).
 		then(() => { console.log("Finished saving!"); });
 }`)
 	klog.V(1).Infof("Started Javascript to save notebook, waiting to stabilize.")

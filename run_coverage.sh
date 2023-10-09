@@ -19,7 +19,7 @@ export REAL_GOCOVERDIR
 echo "REAL_GOCOVERDIR=${REAL_GOCOVERDIR}"
 
 echo
-echo "(1) Cross-compilation for darwin"
+echo "(1) Cross-compilation for darwin/arm64"
 xbuild="$(mktemp /tmp/gonb_darwin_arm64_XXXXXXXX)"
 env GOOS=darwin GOARCH=arm64 go build -o "${xbuild}" .
 rm -f "${xbuild}"

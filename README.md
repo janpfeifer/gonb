@@ -37,7 +37,7 @@
 
 ### Flowers Diffusion Model Demo
 
-<img src="docs/demo-flowers.mp4" alt="Auto-complete Demo" width="50%" height="50%"/>
+https://github.com/janpfeifer/gonb/assets/7460115/f1187dad-4c10-4d21-a73e-9090019680ae
 
 ### Sine Plot Connected to Slider
 

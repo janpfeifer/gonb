@@ -2,6 +2,7 @@
 
 ## Next
 
+* Cache is by-passed if cache key is set to empty ("").
 * New widgets demo, using [GoMLX](https://github.com/gomlx/gomlx)'s [Flowers Diffusion demo](https://github.com/gomlx/gomlx/blob/main/examples/oxfordflowers102/OxfordFlowers102_Diffusion.ipynb)
 
 ## 0.9.3, 2023/10/09

@@ -3,16 +3,12 @@
 //
 // Example, you may have a line like this:
 //
-// ```
-// var lotsOfData = LoadOverTheInternet("https://.....")
-// ```
+//	var lotsOfData = LoadOverTheInternet("https://.....")
 //
 // Instead of every time any cell is run in GoNB having to load the data,
 // you can do the following:
 //
-// ```
-// var lotsOfData = cache.Cache("my_data", func() *Data { return LoadOverTheInternet("https://.....") })
-// ```
+//	var lotsOfData = cache.Cache("my_data", func() *Data { return LoadOverTheInternet("https://.....") })
 //
 // This will save the results of `LoadOverTheInternet` in the first call, and re-use
 // it later.
@@ -34,20 +30,16 @@
 //
 // Example where one uses a hidden subdirectory in the current subdirectory as storage.
 //
-//	 var (
+//	var (
 //		myCache = cache.MustNewHidden()
 //		lotsOfData = cache.CacheWith(myCache, "my_data", func() *Data { return LoadOverTheInternet("https://.....") })
-//	 )
+//	)
 //
 // Example: if in a GoNB notebook one wants to reset the data to force it to be re-generated, one
 // can write a small cell like:
 //
-// ```
-//
 //	%%
 //	cache.ResetKey("my_data")
-//
-// ```
 //
 // This will reset the value associated with the `my_data` key, so next execution it will be generated
 // again.
@@ -344,8 +336,16 @@ var Default = MustNewInTmp()
 // in which case it is deserialized and returned. if not, `fn` is called, its result
 // is first saved using `key` and then returned.
 //
+// The special case when `key` is empty ("") will not use any cache, and `fn` will always
+// be called
+//
 // The saving and loading is implemented by the given Storage object.
 func CacheWith[T any](s *Storage, key string, fn func() T) T {
+	if key == "" {
+		// Bypass cache.
+		return fn()
+	}
+
 	r, err := s.Reader(key)
 	var value T
 	if err == nil {
@@ -365,6 +365,9 @@ func CacheWith[T any](s *Storage, key string, fn func() T) T {
 // Cache first checks if a value for `key` has already been saved at previous time,
 // in which case it is deserialized and returned. if not, `fn` is called, its result
 // is first saved using `key` and then returned.
+//
+// The special case when `key` is empty ("") will not use any cache, and `fn` will always
+// be called
 //
 // It uses Default for caching, it's equivalent to calling `CacheWith(Default, key, fn)`.
 func Cache[T any](key string, fn func() T) T {

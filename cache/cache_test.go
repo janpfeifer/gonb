@@ -117,6 +117,14 @@ func testCacheForStorage(t *testing.T, s *Storage) {
 	assert.Equal(t, 9, callCount)
 	assert.Equal(t, int64(9), gotForG.X)
 
+	// Test that cache is by-passed when key == "".
+	gotForEmpty := CacheWith(s, "", gen1)
+	assert.Equal(t, 10, gotForEmpty)
+	assert.Equal(t, 10, callCount)
+	gotForEmpty = CacheWith(s, "", gen1)
+	assert.Equal(t, 11, gotForEmpty)
+	assert.Equal(t, 11, callCount)
+
 	// Check ListKeys.
 	keys, err = s.ListKeys()
 	require.NoError(t, err)

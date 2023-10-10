@@ -35,7 +35,7 @@
 
 <img src="docs/GoNB-Demo.png" alt="Auto-complete Demo" width="50%" height="50%"/>
 
-### Flowers Diffusion Model Demo
+### [Flowers Diffusion Model Demo](https://github.com/gomlx/gomlx/blob/main/examples/oxfordflowers102/OxfordFlowers102_Diffusion.ipynb)
 
 https://github.com/janpfeifer/gonb/assets/7460115/f1187dad-4c10-4d21-a73e-9090019680ae
 

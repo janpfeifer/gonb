@@ -35,6 +35,10 @@
 
 <img src="docs/GoNB-Demo.png" alt="Auto-complete Demo" width="50%" height="50%"/>
 
+### Flowers Diffusion Model Demo
+
+<img src="docs/demo-flowers.mp4" alt="Auto-complete Demo" width="50%" height="50%"/>
+
 ### Sine Plot Connected to Slider
 
 <img src="docs/demo-widgets.gif" alt="Widgets Demo" width="50%" height="50%"/>

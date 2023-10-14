@@ -74,6 +74,9 @@ There is also
 that one can interact with (make a copy first) — if the link doesn't work (Google Drive sharing publicly
 is odd), [download it from GitHub](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
 
+Finally, because it's compiled and not intepreted, it has a slightly different "semantic" than the Python kernels.
+It's highly recommended quickly browsing through the [**tutorial**](examples/tutorial.ipynb).
+
 # Installation
 
 **Only for Linux and macOS. In Windows, it works in WSL or inside a Docker**
@@ -152,13 +155,15 @@ details.
 
 # FAQ
 
+* Is there are reference documentation ?
+  * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up-to-date and
+    is comprehensive -- it includes every GoNB feature.
 * What is the `%%` symbol seen everywhere?
   * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
-    There are many other special commands, see `%help` for the complete list, 
-    or check out the [**tutorial**](examples/tutorial.ipynb).
 * Go error handling is verbose and annoying for things interactive as a notebook. Can we do something ?
   * Yes! Error handling for small scripts in a notebook can get in the way at times. There are various
-    solutions to this, one simple one is to use [this simple package ("must")](https://github.com/janpfeifer/must)
+    solutions to this. Often folks create a series of `Must()` functions, or simply use
+    [this trivial `must` package](https://github.com/janpfeifer/must)
 
 # TODOs
 
@@ -175,9 +180,19 @@ Contributions are welcome!
   * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
   * https://discourse.jupyter.org/c/jupyterlab/extensions/43
 
-# Implementation
+# Thanks
 
-The Jupyter kernel started from [gophernotes](https://github.com/gopherdata/gophernotes)
-implementation, but was heavily modified and little from it is left. Also, the
-execution loop and mechanisms are completely different and new: GoNB compiles and 
-executes on-the-fly, instead of using a REPL engine.
+* [Go](golang.org)
+* [Jupyter](https://jupyter.org/), what an awesome project.
+* [gophernotes](https://github.com/gopherdata/gophernotes), from which this is a highly modified fork, little from the original code exists.
+
+# Contributing
+
+Contributions are very welcome. The code is generally well documented -- not always, but mostly. There are a also a couple of guides worth reading if contributing in the [`docs/`](https://github.com/janpfeifer/gonb/tree/main/docs) subdirectory.
+
+There are two parts of the project:
+
+1. The kernel itself: that builds the binary package. Most subpackages are under `internal/`.
+2. The UI library in the packages under `github.com/janpfeifer/gonb/gonbui`.
+
+

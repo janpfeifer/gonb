@@ -88,13 +88,13 @@ GoNB offers a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyte
 that includes JupyterLab and GoNB. 
 To use it, go to a directory that you want to make available to the Jupyter notebook 
 (your home directory, or a directory where to store the notebook files).
-It will be mounted on the `work/` subdirectory in JupyterLab.
+It will be mounted on the `host/` subdirectory in JupyterLab.
 
 To start it:
 
 ```shell
 docker pull janpfeifer/gonb_jupyterlab:latest
-docker run -it --rm -p 8888:8888 -v "${PWD}":/home/jovyan/work janpfeifer/gonb_jupyterlab:latest
+docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jupyterlab:latest
 ```
 
 Then copy&paste the URL that it outputs in your browser.

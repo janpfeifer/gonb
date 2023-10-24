@@ -139,31 +139,19 @@ Install there as if it were in a linux machine.
 
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
-
-# Rich display: HTML, Images, Markdown, SVG, Videos, manipulating javascript, etc.
-
-**GoNB** opens a named pipe (set in environment variable `GONB_PIPE`) that a program can use to directly
-display any type of HTML content. 
-
-For most cases though, one can simply use the 
-[`github.com/janpfeifer/gonb/gonbui`](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui):
-library, it offers a convenient API to everything available. Examples of use in the
-[tutorial](examples/tutorial.ipynb). 
-
-If implementing some new mime type (or some other form of interaction), see `kernel/display.go` for the protocol
-details.
-
 # FAQ
 
 * Is there are reference documentation ?
   * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up-to-date and
     is comprehensive -- it includes every GoNB feature.
+  * The libraries that are used or UI, Widgets and manipulating the DOM in the notebook's browser, are all under the package `gonbui`.
+    They are described in the [**tutorial**](examples/tutorial.ipynb), but also documented in [pkg.go.dev](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui?tab=doc).
 * What is the `%%` symbol seen everywhere?
   * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
 * Go error handling is verbose and annoying for things interactive as a notebook. Can we do something ?
   * Yes! Error handling for small scripts in a notebook can get in the way at times. There are various
     solutions to this. Often folks create a series of `Must()` functions, or simply use
-    [this trivial `must` package](https://github.com/janpfeifer/must)
+    [this trivial `must` package](https://github.com/janpfeifer/must).
 
 # TODOs
 

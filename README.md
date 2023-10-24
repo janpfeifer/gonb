@@ -172,13 +172,6 @@ Contributions are welcome!
 * Windows version: 
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
-* Create a JupyterLab extension to allow the Go code to create and interact with widgets. 
-  Alternatively, open a WebSocket from the widget to the kernel.
-  Some links:
-  * https://github.com/jupyterlab/extension-examples
-  * https://jupyter-notebook.readthedocs.io/en/4.x/comms.html
-  * https://jupyter-client.readthedocs.io/en/latest/api/jupyter_client.asynchronous.html#jupyter_client.asynchronous.client.AsyncKernelClient.comm_info
-  * https://discourse.jupyter.org/c/jupyterlab/extensions/43
 
 # Thanks
 

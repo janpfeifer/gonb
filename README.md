@@ -40,6 +40,7 @@
 https://github.com/janpfeifer/gonb/assets/7460115/f1187dad-4c10-4d21-a73e-9090019680ae
 
 ### Sine Plot Connected to Slider
+(See full code in the [**tutorial**](examples/tutorial.ipynb))
 
 <img src="docs/demo-widgets.gif" alt="Widgets Demo" width="50%" height="50%"/>
 

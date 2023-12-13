@@ -182,12 +182,14 @@ func (exec *Executor) pollNamedPipeReader() {
 		// Special case for a request for input:
 		if reqAny, found := data.Data[protocol.MIMEJupyterInput]; found {
 			klog.V(2).Infof("Received InputRequest: %v", reqAny)
-			req, ok := reqAny.(*protocol.InputRequest)
+			req, ok := reqAny.(protocol.InputRequest)
 			if !ok {
-				exec.reportCellError(errors.New("A MIMEJupyterInput sent to GONB_PIPE without an associated protocol.InputRequest!?"))
+				exec.reportCellError(errors.Errorf(
+					"A MIMEJupyterInput sent to GONB_PIPE without an associated protocol.InputRequest!? -- got (%T) %#v",
+					reqAny, reqAny))
 				continue
 			}
-			exec.dispatchInputRequest(req)
+			exec.dispatchInputRequest(&req)
 			continue
 		}
 

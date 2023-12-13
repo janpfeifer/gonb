@@ -1,11 +1,12 @@
 # GoNB Changelog
 
-## Next
+## 0.9.4, 2023/12/13
 
 * Cache is by-passed if cache key is set to empty ("").
 * New widgets demo, using [GoMLX](https://github.com/gomlx/gomlx)'s [Flowers Diffusion demo](https://github.com/gomlx/gomlx/blob/main/examples/oxfordflowers102/OxfordFlowers102_Diffusion.ipynb)
 * Updated Dockerfile to start from `/notebooks` directory, and with instructions to mount the
   host current directory in the `host/` subdirectory. More in #78
+* Fixed `gonbui.RequestInput`.
 
 ## 0.9.3, 2023/10/09
 

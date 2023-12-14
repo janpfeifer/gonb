@@ -3,6 +3,10 @@
 `nbexec` executes a Jupyter Notebook and then saves it.
 The saved notebook can then be used by `nbconvert` and converted to various formats (html, text, pdf, etc.).
 
+It requires Jupyter Notebook and optionally `nbconvert` and `pandoc` installed.
+Typically, in Ubuntu, with `sudo apt install pandoc` and `pip install notebook nbconvert`.
+But it may vary on different systems.
+
 ## How to use it?
 
 Assuming you already installed it (see next question), you can do something like:
@@ -28,6 +32,9 @@ nbexec --jupyter_log --console_log  --vmodule=nbexec=1 \
    --screenshot="${MY_PROJECT_DIR}/notebooks/integration_test.png" \
    --jupyter_dir=${MY_PROJECT_DIR} -n=notebooks/integration_test.ipynb
 ```
+
+Inputs to input boxes (created by the `%with_inputs` special command or with `gonbui.RequestInput()`)
+can also be instrumented with `--input_boxes`.  
 
 [GoNB](https://github.com/janpfeifer/gonb) does this all in tests for integration tests. 
 See [`internal/nbtests` package](https://github.com/janpfeifer/gonb).

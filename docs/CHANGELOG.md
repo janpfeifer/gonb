@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Added instrumentation to Jupyter input boxes in `nbexec`
+* Added functional tests for input boxes created with `%with_inputs`, `%with_password` or `gonbui.RequestInput`.
+
 ## 0.9.4, 2023/12/13
 
 * Cache is by-passed if cache key is set to empty ("").

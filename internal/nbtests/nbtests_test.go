@@ -136,11 +136,27 @@ func TestMain(m *testing.M) {
 // executeNotebook (in `examples/tests`), converts do text and returns a reader to the output of the execution.
 // It executes using `nbconvert` set to `asciidoc` (text) output.
 func executeNotebook(t *testing.T, notebook string) *os.File {
+	return executeNotebookWithInputBoxes(t, notebook, nil)
+}
+
+// executeNotebookWithInputBoxes is like executeNotebook, but takes a list of values to be used
+// in input boxes.
+func executeNotebookWithInputBoxes(t *testing.T, notebook string, inputBoxValues []string) *os.File {
 	// Execute notebook.
 	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
-	args := []string{"-n=" + notebookRelPath, "-jupyter_dir=" + rootDir}
+	args := []string{"-n=" + notebookRelPath, "-jupyter_dir=" + rootDir, "-logtostderr"}
 	if *flagLogExec {
-		args = append(args, "-jupyter_log", "-console_log", "-vmodule=main=1")
+		args = append(args, "-jupyter_log", "-console_log", "-vmodule=main=1,nbexec=1")
+	}
+	if len(inputBoxValues) > 0 {
+		// Check there are no commas in the values.
+		for ii, v := range inputBoxValues {
+			if strings.Index(v, ",") != -1 {
+				panicf("executeNotebookWithInputBoxes: inputBoxValues[%d]=%q has a comma in it, this won't work",
+					ii, v)
+			}
+		}
+		args = append(args, fmt.Sprintf("-input_boxes=%s", strings.Join(inputBoxValues, ",")))
 	}
 	nbexec := exec.Command(
 		path.Join(jupyterDir, "nbexec"), args...)

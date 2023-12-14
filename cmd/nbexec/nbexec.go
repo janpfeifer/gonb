@@ -45,6 +45,11 @@ var (
 
 	flagClear = flag.Bool("clear", false,
 		"If set to true, it will only clear all the cell outputs and not execute them.")
+
+	flagJupyterInputs = flag.String("input_boxes", "",
+		"List of inputs to feed input boxes created for Stdin in Jupyter. In GoNB these "+
+			"are created by `%with_input` special command and with `gonbui.RequestInput()`. The "+
+			"comma-separated list of values will be fed everytime such an input box is created. ")
 )
 
 func main() {
@@ -56,6 +61,7 @@ func main() {
 			"`nbexec` always sets the following arguments: "+
 			"`--no-browser --expose-app-in-browser --ServerApp.port=<port>`.")
 	flag.Parse()
+	klog.V(1).Info("Starting")
 
 	// Sanity checking.
 	if strings.Index(*flagNotebook, "/../") >= 0 ||
@@ -70,6 +76,12 @@ func main() {
 	notebookPath = path.Join(notebookPath, *flagNotebook)
 	if _, err := os.Stat(notebookPath); err != nil {
 		klog.Fatalf("The notebook given -n=%q resolves to %q, and I can't access it!? Error: %v")
+	}
+
+	// Values for input boxes.
+	var inputBoxes []string
+	if *flagJupyterInputs != "" {
+		inputBoxes = strings.Split(*flagJupyterInputs, ",")
 	}
 
 	// Start Jupyter Notebook
@@ -98,7 +110,7 @@ func main() {
 				panic(e)
 			}
 		}()
-		executeNotebook(url)
+		executeNotebook(url, inputBoxes)
 	}()
 
 	// Wait for `jupyter notebook` to finish.
@@ -255,8 +267,9 @@ func startJupyterNotebook() {
 
 // Notebook instrumenting using go-rod.
 
-func executeNotebook(url string) {
+func executeNotebook(url string, inputBoxes []string) {
 	page := rod.New().MustConnect().MustPage(url)
+	klog.V(1).Infof("Waiting for opening of page %q", url)
 	page.MustWaitStable()
 
 	if *flagConsoleLog {
@@ -266,6 +279,7 @@ func executeNotebook(url string) {
 		})()
 	}
 
+	klog.V(1).Info("Executing clear-all")
 	page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
 	jupyterapp.commands.execute("editmenu:clear-all", null).
@@ -275,14 +289,15 @@ func executeNotebook(url string) {
 
 	if !*flagClear {
 		// Execute all cells (if --clear is not set)
+		klog.V(1).Info("Executing run-all")
 		page.MustEval(`() => {
 	let jupyterapp = globalThis.jupyterapp;
 	jupyterapp.commands.execute("runmenu:run-all", null).
 		then(() => { console.log("Finished executing!"); });
 }`)
-		klog.V(1).Infof("Started Javascript to execute cells, waiting to stabilize.")
-		page.MustWaitStable()
-		klog.V(1).Infof("page.MustWaitStable() finished.")
+		klog.V(1).Infof("Started Javascript to execute cells.")
+		checkForInputBoxes(page, inputBoxes)
+		klog.V(1).Infof("Notebook execution finished.")
 	}
 
 	page.MustEval(`() => {
@@ -300,4 +315,69 @@ func executeNotebook(url string) {
 	}
 
 	//common.Pause()
+}
+
+const maxInputBoxes = 20 // After those many repeats, give up.
+
+// checkForInputBoxes checks whether an input box is created, and if created, feed
+// the next value in `valuesToFeed`, or an empty value if no more values are given.
+//
+// Input boxes are created by the `%with_inputs` special command or with `gonbui.RequestInput()`
+func checkForInputBoxes(page *rod.Page, valuesToFeed []string) {
+	// Concurrently check for page being done.
+	done := common.NewLatch()
+	go func() {
+		defer done.Trigger()
+		page.MustWaitStable()
+	}()
+
+	// Poll for input boxes.
+	for count := maxInputBoxes; count > 0; count-- {
+
+		var nextInputValue string
+		if len(valuesToFeed) > 0 {
+			nextInputValue = valuesToFeed[0]
+			valuesToFeed = valuesToFeed[1:]
+		}
+
+		inputBoxEntered := common.NewLatch()
+		go func() {
+			for {
+				// Interrupt if already done.
+				if done.Test() {
+					return
+				}
+				time.Sleep(time.Second) // Poll every second.
+				klog.V(1).Infof("Checking for input boxes")
+				if page.MustEval(fmt.Sprintf(`() => {
+	let inputBox = globalThis.document.querySelector('input.jp-Stdin-input');
+	if (inputBox === null) {
+		return false;
+	} else {
+		inputBox.value = %q;
+		let enterEvent = new Event('keydown');
+		enterEvent.keycode=13;
+		enterEvent.key="Enter";
+		inputBox.dispatchEvent(enterEvent)
+		console.log("Found input box!");
+		return true;
+	}
+}`, nextInputValue)).Bool() {
+					// Input box filled successfully.
+					klog.V(1).Infof("Value %q filled in input box", nextInputValue)
+					inputBoxEntered.Trigger()
+					return
+				}
+			}
+		}() // Concurrently poll for input boxes.
+
+		select {
+		case <-done.WaitChan():
+			// Page finished.
+			return
+		case <-inputBoxEntered.WaitChan():
+			// Input box value fed, simply continue the loop.
+		}
+	}
+	panicf("Max number of input box values %d fed, assuming an infinite loop, and stopping!", maxInputBoxes)
 }

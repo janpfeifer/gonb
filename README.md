@@ -167,6 +167,9 @@ Contributions are welcome!
 * [Go](golang.org)
 * [Jupyter](https://jupyter.org/), what an awesome project.
 * [gophernotes](https://github.com/gopherdata/gophernotes), from which this is a highly modified fork, little from the original code exists.
+* The Go gopher logo (`internal/kernel`) used in the installation of the Jupyter kernel was designed by Renee French
+  (http://reneefrench.blogspot.com/), see Creative Commons 3.0 Attributions license in
+  [Wikimedia](https://commons.wikimedia.org/wiki/File:Go_gopher_favicon.svg).
 
 # Contributing
 

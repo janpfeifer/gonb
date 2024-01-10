@@ -73,7 +73,7 @@ func main() {
 	SetUpKlog()    // "github.com/golang/klog" package
 
 	if *flagInstall {
-		// Simply install kernel in Jupyter configuration.
+		// Install kernel in Jupyter configuration.
 		var extraArgs []string
 		if *flagExtraLog != "" {
 			extraArgs = []string{"--extra_log", *flagExtraLog}

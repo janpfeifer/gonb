@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	_ "embed"
 	"encoding/json"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
@@ -15,6 +16,12 @@ import (
 // the data files for Jupyter, including kernel configuration.
 const JupyterDataDirEnv = "JUPYTER_DATA_DIR"
 
+// Logo file, to install with kernel.
+// See image copyright in bottom of README.md file.
+
+//go:embed Go_gopher_favicon.svg
+var logoSVG []byte
+
 // jupyterKernelConfig is the Jupyter configuration to be
 // converted to a `kernel.json` file under `~/.local/share/jupyter/kernels/gonb`
 // (or `${HOME}/Library/Jupyter/kernels/` in Macs)
@@ -26,7 +33,7 @@ type jupyterKernelConfig struct {
 }
 
 // Install gonb in users local Jupyter configuration, making it available. It assumes
-// the kernel is implemented by the same binary that is calling this function (os.Args[0])
+// the kernel is implemented by the same binary calling this function (os.Args[0])
 // and that the flag to pass the `connection_file` is `--kernel`.
 //
 // If the binary is under `/tmp` (or if forceCopy is true), it is copied to the location of
@@ -66,9 +73,9 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 		return errors.WithMessagef(err, "failed to create configuration directory %q", kernelDir)
 	}
 
-	// If binary is in /tmp, presumably temporary compilation of Go binary,
-	// make a copy of the binary (since it will be deleted) to the configuration
-	// directory.
+	// If binary is in /tmp, then presumably it is a temporary compilation of Go binary,
+	// and we make a copy of the binary (since it will be deleted) to the configuration
+	// directory -- otherwise we just point to the current binary.
 	if strings.HasPrefix(os.Args[0], "/tmp/") || forceCopy {
 		newBinary := path.Join(kernelDir, "gonb")
 		// Move the previous version out of the way.
@@ -106,6 +113,14 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	}
 	klog.Infof("Go (gonb) kernel configuration installed in %q.\n", configPath)
 
+	// Create `logo-svg.svg`.
+	logoPath := path.Join(kernelDir, "logo-svg.svg")
+	err = os.WriteFile(logoPath, logoSVG, 0755)
+	if err != nil {
+		return errors.WithMessagef(err, "failed to install logo file %q", logoPath)
+	}
+
+	// Check that goimports and gopls are installed.
 	_, err = exec.LookPath("goimports")
 	if err == nil {
 		_, err = exec.LookPath("gopls")

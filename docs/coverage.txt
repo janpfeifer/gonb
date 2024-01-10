@@ -9,7 +9,7 @@ github.com/janpfeifer/gonb/main.go						SetUpKlog					66.7%
 github.com/janpfeifer/gonb/cache/cache.go					New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go					AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					72.7%
+github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					68.2%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go					NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewHidden					100.0%
@@ -336,7 +336,7 @@ github.com/janpfeifer/gonb/internal/jpyexec/namedpipes.go			*Executor.openPipeWr
 github.com/janpfeifer/gonb/internal/jpyexec/namedpipes.go			*Executor.pollPipeWriterFifo			66.7%
 github.com/janpfeifer/gonb/internal/kernel/encoding.go			JupyterCursorPosToBytePos			0.0%
 github.com/janpfeifer/gonb/internal/kernel/encoding.go			JupyterToLinesAndCursor				0.0%
-github.com/janpfeifer/gonb/internal/kernel/install.go			Install						58.3%
+github.com/janpfeifer/gonb/internal/kernel/install.go			Install						59.6%
 github.com/janpfeifer/gonb/internal/kernel/install.go			copyFile					80.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*SyncSocket.RunLocked				100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.IsStopped				66.7%
@@ -403,4 +403,4 @@ github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execUntrack					54.5%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			showTrackedList					91.7%
 github.com/janpfeifer/gonb/internal/websocket/websocket.go			Javascript					83.3%
-total										(statements)					64.2%
+total										(statements)					64.1%

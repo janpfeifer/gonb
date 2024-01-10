@@ -1,9 +1,10 @@
 # GoNB Changelog
 
-## Next
+## 0.9.5, 2023/01/10
 
-* Added instrumentation to Jupyter input boxes in `nbexec`
+* Added instrumentation to Jupyter input boxes in `nbexec`.
 * Added functional tests for input boxes created with `%with_inputs`, `%with_password` or `gonbui.RequestInput`.
+* Added logo to installation.
 
 ## 0.9.4, 2023/12/13
 

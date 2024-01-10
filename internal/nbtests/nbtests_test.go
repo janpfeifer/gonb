@@ -202,6 +202,13 @@ func clearNotebook(t *testing.T, notebook string) {
 		path.Join(rootDir, notebookRelPath), nbexec)
 }
 
+func TestInstallation(t *testing.T) {
+	jupyterInstallDir, err := InstallTmpGonbKernel(nil, nil)
+	require.NoError(t, err)
+	require.FileExists(t, path.Join(jupyterInstallDir, "kernels/gonb/kernel.json"))
+	require.FileExists(t, path.Join(jupyterInstallDir, "kernels/gonb/logo-svg.svg"))
+}
+
 func TestHello(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration (nbconvert) test for short tests.")

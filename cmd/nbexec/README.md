@@ -4,7 +4,8 @@
 The saved notebook can then be used by `nbconvert` and converted to various formats (html, text, pdf, etc.).
 
 It requires Jupyter Notebook and optionally `nbconvert` and `pandoc` installed.
-Typically, in Ubuntu, with `sudo apt install pandoc` and `pip install notebook nbconvert`.
+
+Typically, in Ubuntu, with `sudo apt install pandoc` and `pip install jupyterlab notebook nbconvert`.
 But it may vary on different systems.
 
 ## How to use it?
@@ -42,8 +43,17 @@ It also compiles everything with `--coverage` to get full coverage report in the
 
 ## How to install it?
 
-Using Go package manager (see details in [Go tutorial](https://go.dev/doc/tutorial/compile-install)).
-It will install in the directory `GOBIN` (try `go env GOBIN` to find it if not set), that should be in your `PATH`. 
+Using Go package manager `go install github.com/janpfeifer/gonb/cmd/nbexec@latest`.
+It will install in the directory `GOBIN` (try `go env GOBIN` to find it if not set), that should be in your `PATH`.
+
+It requires Jupyter Notebook and optionally `nbconvert` and `pandoc` installed.
+
+Typically, in Ubuntu, with `sudo apt install pandoc` and `pip install notebook nbconvert`.
+But it may vary on different systems.
+
+
+You will need the following 
+`sudo apt install pandoc` and `pip install notebook nbconvert`.
 
 ```bash
 go install github.com/janpfeifer/gonb/cmd/nbexec

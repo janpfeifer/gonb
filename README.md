@@ -114,7 +114,7 @@ You need to install (if not yet there), **GoNB**, `goimports` and `gopls` (for a
 ```bash
 go install github.com/janpfeifer/gonb@latest && \
   go install golang.org/x/tools/cmd/goimports@latest && \
-  go install golang.org/x/tools/gopls@latest && \
+  go install golang.org/x/tools/gopls@latest
 ```
 
 And if `GOBIN` is in your `PATH`, run the following to install **GoNB** as a kernel in the Jupyter configuration

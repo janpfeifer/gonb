@@ -4,6 +4,7 @@
 
 * Fixed some typos in klog formatting.
 * Updated dependencies.
+* Updated gopls dependencies: new jsonrpc2 API.
 
 ## 0.9.5, 2023/01/10
 

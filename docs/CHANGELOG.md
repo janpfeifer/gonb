@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Fixed some typos in klog formatting.
+* Updated dependencies.
+
 ## 0.9.5, 2023/01/10
 
 * Added instrumentation to Jupyter input boxes in `nbexec`.

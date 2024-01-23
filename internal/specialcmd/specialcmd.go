@@ -224,7 +224,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		//_ = kernel.PublishWriteStream(msg, kernel.StreamStdout, HelpMessage)
 		err := kernel.PublishMarkdown(msg, HelpMessage)
 		if err != nil {
-			klog.Errorf("Failed publishing %help contents: %+v", err)
+			klog.Errorf("Failed publishing help contents: %+v", err)
 		}
 
 		// Definitions management.

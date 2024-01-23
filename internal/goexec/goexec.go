@@ -141,7 +141,7 @@ func New(k *kernel.Kernel, uniqueID string, preserveTempDir, rawError bool) (*St
 		return nil, errors.Wrapf(err, "failed to create temporary directory %q", s.TempDir)
 	}
 	if s.preserveTempDir {
-		klog.Info("Temporary work directory: %s", s.TempDir)
+		klog.Infof("Temporary work directory: %s", s.TempDir)
 	}
 
 	// Set environment variables with currently used GoNB directories.

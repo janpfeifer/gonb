@@ -67,7 +67,7 @@ func main() {
 	if strings.Index(*flagNotebook, "/../") >= 0 ||
 		strings.Index(*flagNotebook, "../") == 0 ||
 		strings.Index(*flagNotebook, "/..") == len(*flagNotebook)-3 {
-		klog.Fatalf("Invalid value for notebook -n=%q: cannot use \"..\" in path")
+		klog.Fatalf("Invalid value for notebook -n=%q: cannot use \"..\" in path", *flagNotebook)
 	}
 	notebookPath := *flagJupyterDir
 	if notebookPath == "" {
@@ -75,7 +75,8 @@ func main() {
 	}
 	notebookPath = path.Join(notebookPath, *flagNotebook)
 	if _, err := os.Stat(notebookPath); err != nil {
-		klog.Fatalf("The notebook given -n=%q resolves to %q, and I can't access it!? Error: %v")
+		klog.Fatalf("The notebook given -n=%q resolves to %q, and I can't access it!? Error: %v",
+			*flagNotebook, notebookPath, err)
 	}
 
 	// Values for input boxes.

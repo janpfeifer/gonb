@@ -68,6 +68,6 @@ func showTrackedList(msg kernel.Message, goExec *goexec.State) {
 	}
 	err := kernel.PublishHtml(msg, strings.Join(htmlParts, "\n")+"\n")
 	if err != nil {
-		klog.Errorf("Failed to publish %track results back to jupyter: %+v", err)
+		klog.Errorf("Failed to publish track results back to jupyter: %+v", err)
 	}
 }

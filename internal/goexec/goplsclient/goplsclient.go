@@ -28,10 +28,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-language-server/jsonrpc2"
 	lsp "github.com/go-language-server/protocol"
 	"github.com/go-language-server/uri"
 	"github.com/pkg/errors"
+	"go.lsp.dev/jsonrpc2"
 )
 
 type Client struct {
@@ -43,8 +43,7 @@ type Client struct {
 
 	// Connection attributes.
 	conn            net.Conn
-	jsonConn        *jsonrpc2.Conn
-	jsonHandler     *jsonrpc2Handler
+	jsonConn        jsonrpc2.Conn
 	lspCapabilities lsp.ServerCapabilities
 
 	// gopls execution

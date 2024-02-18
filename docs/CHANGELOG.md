@@ -7,6 +7,7 @@
 * Updated gopls dependencies: new jsonrpc2 API.
 * Added `LoadScriptModuleAndRun`.
 * Added [Plotly Javascript](https://plotly.com/javascript/) support, in `gonbui.plotly` package. Also added example in tutorial.
+* During installation, consider `/var/folders` also a temporary directory.
 
 ## 0.9.5, 2024/01/10
 

@@ -73,10 +73,12 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 		return errors.WithMessagef(err, "failed to create configuration directory %q", kernelDir)
 	}
 
-	// If binary is in /tmp, then presumably it is a temporary compilation of Go binary,
+	// If binary is in `/tmp` or `/var/folders`, then presumably it is a temporary compilation of Go binary,
 	// and we make a copy of the binary (since it will be deleted) to the configuration
 	// directory -- otherwise we just point to the current binary.
-	if strings.HasPrefix(os.Args[0], "/tmp/") || forceCopy {
+	if forceCopy ||
+		strings.HasPrefix(os.Args[0], "/tmp/") ||
+		strings.HasPrefix(os.Args[0], "/var/folders") {
 		newBinary := path.Join(kernelDir, "gonb")
 		// Move the previous version out of the way.
 		if _, err := os.Stat(newBinary); err == nil {

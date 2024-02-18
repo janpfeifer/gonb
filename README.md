@@ -14,13 +14,13 @@
 
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
-* (**NEW**) Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
+  * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
+  * [Plotly integration](https://plotly.com/javascript/), using [go-plotly](https://github.com/MetalBlueberry/go-plotly) (see example in [tutorial](examples/tutorial.ipynb))
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
   start up, since each cell is compiled.
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
-* Compile and execute the Go code as WASM: allows one to do interactive widgets in notebooks. See `%wasm` (EXPERIMENTAL).
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Shell command executions with `!` -- handy at times, for instance to install packages.
 * Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.
@@ -28,6 +28,7 @@
 * Great for data-science, testing, writing reports, live demos, etc.
 * Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out. Alternatively, there is a [Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing), that bootstraps **GoNB** and can be used online.
 * Online help and much more, see `%help`.
+* Compile and execute the Go code as WASM: allows one to do interactive widgets in notebooks. See `%wasm` (EXPERIMENTAL).
 
 ## Examples:
 

@@ -79,8 +79,9 @@ github.com/janpfeifer/gonb/gonbui/gonbui.go				DisplayImage					0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				DisplaySvg					0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				DisplaySVG					0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				RequestInput					75.0%
-github.com/janpfeifer/gonb/gonbui/gonbui.go				ScriptJavascript				0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				EmbedImageAsPNGSrc				0.0%
+github.com/janpfeifer/gonb/gonbui/javascript.go				ScriptJavascript				0.0%
+github.com/janpfeifer/gonb/gonbui/javascript.go				LoadScriptModuleAndRun				0.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				init						100.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				Start						0.0%
 github.com/janpfeifer/gonb/gonbui/comms/comms.go				Send						100.0%
@@ -158,7 +159,7 @@ github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.ProgramSubscrib
 github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.ProgramUnsubscribeRequest		57.1%
 github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.deliverProgramSubscriptionsLocked	62.5%
 github.com/janpfeifer/gonb/internal/dispatcher/comms.go			handleComms					55.6%
-github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		RunKernel					77.1%
+github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		RunKernel					80.0%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShellMsg					71.0%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleBusyMessage				47.8%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShutdownRequest				83.3%
@@ -253,7 +254,7 @@ github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.SetCellTests				10
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.DefaultCellTestArgs			100.0%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			newTrackingInfo					100.0%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.Track					100.0%
-github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.lockedTrack				54.8%
+github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.lockedTrack				69.4%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.Untrack					85.7%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.lockedUntrackEntry			66.7%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.ListTracked				80.0%
@@ -396,4 +397,4 @@ github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execUntrack					54.5%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			showTrackedList					91.7%
 github.com/janpfeifer/gonb/internal/websocket/websocket.go			Javascript					83.3%
-total										(statements)					64.1%
+total										(statements)					64.2%

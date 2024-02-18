@@ -79,12 +79,12 @@ is odd), [download it from GitHub](examples/google_colab_demo.ipynb) and upload 
 Finally, because it's compiled and not intepreted, it has a slightly different "semantic" than the Python kernels.
 It's highly recommended quickly browsing through the [**tutorial**](examples/tutorial.ipynb).
 
-# Installation
+## Installation
 
 **Only for Linux and macOS. In Windows, it works in WSL or inside a Docker**
 
 
-## Docker
+### Docker
 
 GoNB offers a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), 
 that includes JupyterLab and GoNB. 
@@ -102,7 +102,7 @@ docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jup
 Then copy&paste the URL that it outputs in your browser.
 
 
-## Linux and macOS Installation Using Standard Go Tools
+### Linux and macOS Installation Using Standard Go Tools
 
 The [official tutorial on how to install go programs here](https://go.dev/doc/tutorial/compile-install) --
 it is pretty simple, go maintains a `GOBIN` directory (that you can set) and `go install` will compile
@@ -133,7 +133,7 @@ In GitHub's Codespace, if Jupyter is already started, restart the docker — it 
 to v0.12.4 (or at least `v0.12.0`?).
 You can check it with `gopls version`.
 
-## Windows
+### Windows
 
 The recommendation is to use [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install)
 or WSL2, and run Jupyter and the GoNB kernel in the Linux/WSL environment. 
@@ -141,7 +141,7 @@ Install there as if it were in a linux machine.
 
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
-# FAQ
+## FAQ
 
 * Is there are reference documentation ?
   * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up-to-date and
@@ -155,7 +155,7 @@ A pure Windows installation is not supported at this time — but contributions 
     solutions to this. Often folks create a series of `Must()` functions, or simply use
     [this trivial `must` package](https://github.com/janpfeifer/must).
 
-# TODOs
+## TODOs
 
 Contributions are welcome! 
 
@@ -163,7 +163,7 @@ Contributions are welcome!
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 
-# Thanks
+## Thanks
 
 * [Go](golang.org)
 * [Jupyter](https://jupyter.org/), what an awesome project.
@@ -172,7 +172,7 @@ Contributions are welcome!
   (http://reneefrench.blogspot.com/), see Creative Commons 3.0 Attributions license in
   [Wikimedia](https://commons.wikimedia.org/wiki/File:Go_gopher_favicon.svg).
 
-# Contributing
+## Contributing
 
 Contributions are very welcome. The code is generally well documented -- not always, but mostly. There are a also a couple of guides worth reading if contributing in the [`docs/`](https://github.com/janpfeifer/gonb/tree/main/docs) subdirectory.
 
@@ -181,4 +181,6 @@ There are two parts of the project:
 1. The kernel itself: that builds the binary package. Most subpackages are under `internal/`.
 2. The UI library in the packages under `github.com/janpfeifer/gonb/gonbui`.
 
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=janpfeifer/gonb&type=Date)](https://star-history.com/#janpfeifer/gonb&Date)

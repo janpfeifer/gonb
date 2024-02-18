@@ -450,25 +450,6 @@ func RequestInput(prompt string, password bool) {
 	})
 }
 
-// ScriptJavascript executes the given Javascript script in the Notebook.
-//
-// Errors in javascript parsing are sent by Jupyter Server to the stderr -- as opposed to showing
-// to the browser console, which may be harder to debug.
-//
-// Also, like with DisplayHtml, each execution creates a new `<div>` block in the output area.
-// Even if empty, it uses up a bit of vertical space (Jupyter Notebook thing).
-//
-// If these are an issue, consider using TransientJavascript, which uses a transient area
-// to execute the Javascript, which is re-used for every execution.
-func ScriptJavascript(js string) {
-	if !IsNotebook {
-		return
-	}
-	SendData(&protocol.DisplayData{
-		Data: map[protocol.MIMEType]any{protocol.MIMETextJavascript: js},
-	})
-}
-
 // EmbedImageAsPNGSrc returns a string that can be used as in an HTML <img> tag, as its source (it's `src` field).
 // This simplifies embedding an image in HTML without requiring separate files. It embeds it as a PNG file
 // base64 encoded.

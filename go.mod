@@ -3,9 +3,9 @@ module github.com/janpfeifer/gonb
 go 1.21
 
 require (
+	github.com/MetalBlueberry/go-plotly v0.4.0
 	github.com/fatih/color v1.16.0
 	github.com/fsnotify/fsnotify v1.7.0
-	github.com/go-language-server/jsonrpc2 v0.4.2
 	github.com/go-language-server/protocol v0.7.0
 	github.com/go-language-server/uri v0.2.0
 	github.com/go-rod/rod v0.114.3
@@ -24,6 +24,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/go-language-server/jsonrpc2 v0.4.2 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect

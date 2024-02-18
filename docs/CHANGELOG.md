@@ -1,12 +1,14 @@
 # GoNB Changelog
 
-## Next
+## 0.9.6, 2024/02/18
 
 * Fixed some typos in klog formatting.
 * Updated dependencies.
 * Updated gopls dependencies: new jsonrpc2 API.
+* Added `LoadScriptModuleAndRun`.
+* Added [Plotly Javascript](https://plotly.com/javascript/) support, in `gonbui.plotly` package. Also added example in tutorial.
 
-## 0.9.5, 2023/01/10
+## 0.9.5, 2024/01/10
 
 * Added instrumentation to Jupyter input boxes in `nbexec`.
 * Added functional tests for input boxes created with `%with_inputs`, `%with_password` or `gonbui.RequestInput`.

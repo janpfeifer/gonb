@@ -1,5 +1,12 @@
 # GoNB Changelog
 
+## Next
+
+* Added `LoadScriptOrRequireJSModuleAndRun` that handles dynamicly decide is include script using `<script src=...>`
+  or use RequireJS.
+* Plotly library uses `LoadScriptOrRequireJSModuleAndRun` now, allowing result to show up in the HTML export of
+  the notebook.
+
 ## 0.9.6, 2024/02/18
 
 * Fixed some typos in klog formatting.

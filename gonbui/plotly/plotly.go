@@ -36,11 +36,14 @@ func DisplayFig(fig *grob.Fig) error {
 
 	// Run in plotly.
 	runJS := fmt.Sprintf(`
+	if (!module) {
+		module = window.Plotly;
+	}
 	let data = JSON.parse('%s');
-	Plotly.newPlot('%s', data);
+	module.newPlot('%s', data);
 `, figBytes, divId)
 
-	err = gonbui.LoadScriptModuleAndRun(PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
+	err = gonbui.LoadScriptOrRequireJSModuleAndRun("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
 	if err != nil {
 		return err
 	}

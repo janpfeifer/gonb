@@ -25,6 +25,8 @@ var transientJavascriptId = "gonb_transient_js_" + gonbui.UniqueId()
 //
 // This also prevents using vertical space in the cell output at every execution --
 // that happens if using DisplayHtml or ScriptJavascript to execute the javascript code.
+//
+// Notice this content is transient and cannot be persisted with [Persist] -- it's overwritten after each execution.
 func TransientJavascript(js string) {
 	gonbui.UpdateHtml(transientJavascriptId,
 		fmt.Sprintf("<script>%s</script>\n", js))
@@ -215,6 +217,8 @@ func Remove(htmlId string) {
 // and such.
 //
 // Usually, one does this at the end of a cell execution, when the content is no longer interactive.
+//
+// Notice [TransientJavascript] content is overwritten and doesn't get persisted in this fashion.
 func Persist(htmlId string) {
 	html := GetInnerHtml(htmlId)
 	if html == "" {

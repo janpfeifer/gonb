@@ -333,16 +333,16 @@ func DisplayMarkdown(markdown string) {
 //
 // Usage example:
 //
-// ```go
-//
 //	counterDisplayId := "counter_"+gonbui.UniqueId()
 //	for ii := 0; ii < 10; ii++ {
-//	  gonbui.UpdateHtml(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
+//		gonbui.UpdateHtml(counterDisplayId, fmt.Sprintf("Count: <b>%d</b>\n", ii))
 //	}
 //	gonbui.UpdateHtml(counterDisplayId, "")  // Erase transient block.
 //	gonbui.DisplayHtml(fmt.Sprintf("Count: <b>%d</b>\n", ii))  // Show on final block.
 //
-// ```
+// Notice that the value of `counterDisplayId` is not a DOM element id -- unfortunately.
+// If you want a `<div>` that you can manipulate with the [dom] package, create an empty `<div id=%q></div>`
+// with another unique id (see [gonbui.UniqueID]) and use that instead.
 func UpdateHtml(id, html string) {
 	if !IsNotebook {
 		return

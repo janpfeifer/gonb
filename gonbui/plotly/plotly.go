@@ -15,6 +15,7 @@ import (
 	"fmt"
 	grob "github.com/MetalBlueberry/go-plotly/graph_objects"
 	"github.com/janpfeifer/gonb/gonbui"
+	"github.com/janpfeifer/gonb/gonbui/dom"
 	"github.com/pkg/errors"
 )
 
@@ -24,9 +25,29 @@ var PlotlySrc = "https://cdn.plot.ly/plotly-2.29.1.min.js"
 
 // DisplayFig as HTML output.
 func DisplayFig(fig *grob.Fig) error {
+	return displayFigToId("", fig)
+}
+
+// AppendFig appends the figure to the HTML element with the given id. It uses [dom.TransientJavascript] so it won't be
+// saved, exported to HTML, or even persistable with [dom.Persist].
+// See [dom.CreateTransientDiv] to create transient div and get its `htmlId`.
+func AppendFig(htmlId string, fig *grob.Fig) error {
+	if htmlId == "" {
+		return errors.Errorf("empty htmlId passed to plots.AppendFig(\"\", fig)")
+	}
+	return displayFigToId(htmlId, fig)
+}
+
+// displayFigToId implements DisplayFig and AppendFig.
+func displayFigToId(elementId string, fig *grob.Fig) error {
 	// Create a unique div.
 	divId := gonbui.UniqueId()
-	gonbui.DisplayHTML(fmt.Sprintf(`<div id="%s"></div>`, divId))
+	divContent := fmt.Sprintf(`<div id="%s"></div>`, divId)
+	if elementId == "" {
+		gonbui.DisplayHTML(divContent)
+	} else {
+		dom.Append(elementId, divContent)
+	}
 
 	// Encode figure.
 	figBytes, err := json.Marshal(fig)
@@ -43,7 +64,11 @@ func DisplayFig(fig *grob.Fig) error {
 	module.newPlot('%s', data);
 `, figBytes, divId)
 
-	err = gonbui.LoadScriptOrRequireJSModuleAndRun("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
+	if elementId == "" {
+		err = dom.LoadScriptOrRequireJSModuleAndRun("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
+	} else {
+		err = dom.LoadScriptOrRequireJSModuleAndRunTransient("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
+	}
 	if err != nil {
 		return err
 	}

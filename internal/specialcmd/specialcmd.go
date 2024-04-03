@@ -46,7 +46,7 @@ type cellStatus struct {
 func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines Set[int]) (err error) {
 	status := &cellStatus{}
 	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
-		if _, found := usedLines[lineNum]; found {
+		if usedLines.Has(lineNum) {
 			continue
 		}
 		line := codeLines[lineNum]
@@ -65,9 +65,19 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 			if execute {
 				switch cmdType {
 				case '%':
-					err = execInternal(msg, goExec, cmdStr, status)
-					if err != nil {
-						return
+					parts := splitCmd(cmdStr)
+					// optimize...
+					if len(parts) > 0 && parts[0] == "writefile" {
+						cmdBody := parseCmdBody(codeLines, lineNum, usedLines)
+						err = execWriteFile(msg, goExec, parts[1:], cmdBody)
+						if err != nil {
+							return
+						}
+					} else {
+						err = execInternal(msg, goExec, cmdStr, status)
+						if err != nil {
+							return
+						}
 					}
 				case '!':
 					err = execShell(msg, goExec, cmdStr, status)
@@ -95,11 +105,28 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) {
 	for ; fromLine < len(lines); fromLine++ {
 		cmdStr += lines[fromLine]
-		usedLines[fromLine] = struct{}{}
+		usedLines.Insert(fromLine)
 		if cmdStr[len(cmdStr)-1] != '\\' {
 			return
 		}
 		cmdStr = cmdStr[:len(cmdStr)-1] + " "
+	}
+	return
+}
+
+// parseCmdBody starts from fromLine and joins consecutive lines until the line start with magic symbol( % ! )
+//
+// It returns the joined lines with the '\n', and appends the used lines (including fromLine) to usedLines.
+func parseCmdBody(lines []string, fromLine int, usedLines Set[int]) (cmdBody string) {
+	usedLines.Insert(fromLine)
+	fromLine++
+	for ; fromLine < len(lines); fromLine++ {
+		if len(lines[fromLine]) > 0 && (lines[fromLine][0] == '%' || lines[fromLine][0] == '!') {
+			return
+		}
+		cmdBody += lines[fromLine]
+		cmdBody += "\n"
+		usedLines.Insert(fromLine)
 	}
 	return
 }
@@ -273,6 +300,39 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 		}
 	}
 	return nil
+}
+
+// execWriteFile write cell body to file
+func execWriteFile(msg kernel.Message, goExec *goexec.State, args []string, cmdBody string) error {
+	// parse arg
+	noValArg := MakeSet[string](2)
+	noValArg.Insert("append")
+	schema := map[string]string{"a": "append"}
+	parse := FlagsParse(args, noValArg, schema)
+	_, appendMode := parse["append"]
+	filename, hasFileName := parse["-pos1"]
+	if !hasFileName {
+		filename = goExec.UniqueID + ".out"
+	}
+
+	// do write
+	fileFlag := os.O_RDWR | os.O_CREATE
+	if appendMode {
+		fileFlag |= os.O_APPEND
+	} else {
+		fileFlag |= os.O_TRUNC
+	}
+	file, err := os.OpenFile(filename, fileFlag, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.WriteString(cmdBody)
+	if err != nil {
+		return err
+	}
+	return kernel.PublishWriteStream(msg, kernel.StreamStdout, "write to "+filename+" success\n")
 }
 
 // execInternal executes internal configuration commands, see HelpMessage for details.

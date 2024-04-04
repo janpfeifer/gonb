@@ -49,6 +49,17 @@ func MakeSet[T comparable](size ...int) Set[T] {
 	return make(Set[T], size[0])
 }
 
+func SetWithValues[T comparable](values ...T) Set[T] {
+	if len(values) == 0 {
+		return MakeSet[T]()
+	}
+	s := MakeSet[T](len(values))
+	for _, v := range values {
+		s.Insert(v)
+	}
+	return s
+}
+
 // Has returns true if Set s has the given key.
 func (s Set[T]) Has(key T) bool {
 	_, found := s[key]

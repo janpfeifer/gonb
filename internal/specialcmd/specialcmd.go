@@ -65,7 +65,7 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 			if execute {
 				switch cmdType {
 				case '%':
-					err = execInternal(msg, goExec, cmdStr, status)
+					err = execSpecialConfig(msg, goExec, cmdStr, status)
 					if err != nil {
 						return
 					}
@@ -104,13 +104,14 @@ func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) 
 	return
 }
 
-// execInternal executes internal configuration commands, see HelpMessage for details.
+// execSpecialConfig executes special configuration commands (that start with "%), except cell commands.
+// See [HelpMessage] for details, and [execCellSpecialCmd].
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
 //
 // It supports msg == nil for testing.
-func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
+func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
 	_ = goExec
 	var content map[string]any
 	if msg != nil && msg.ComposedMsg().Content != nil {
@@ -120,7 +121,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	switch parts[0] {
 
 	// Configures how cell will be executed.
-	case "%", "main", "args", "test":
+	case "%", "main", "args", "test", "%test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
 		klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
@@ -128,7 +129,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			goExec.CellIsTest = true
 		}
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
-	case "wasm":
+	case "wasm", "%wasm":
 		if len(parts) > 1 {
 			return errors.Errorf("`%%wasm` takes no extra parameters.")
 		}
@@ -208,7 +209,6 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			nonEmptyArgs := slices.DeleteFunc(parts[1:], func(s string) bool { return s == "" })
 			goExec.GoBuildFlags = nonEmptyArgs
 		}
-
 		err := kernel.PublishWriteStream(msg, kernel.StreamStdout,
 			fmt.Sprintf("%%goflags=%q\n", goExec.GoBuildFlags))
 		if err != nil {
@@ -262,9 +262,18 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	case "untrack":
 		execUntrack(msg, goExec, parts[1:])
 
-		// Others.
+		// Fix issues with `go work`.
 	case "goworkfix":
 		return goExec.GoWorkFix(msg)
+
+		// These commands should always be the first ones, and if they are parsed here (as opposed to being processed by specialCells)
+		// they were in the middle somewhere.
+	case "%writefile", "%scrip", "%bash", "%sh":
+		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0]))
+		if err != nil {
+			klog.Errorf("Error while reporting back on message command \"%%%s\" kernel: %+v", parts[0], err)
+		}
+		return errors.Errorf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0])
 
 	default:
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
@@ -275,7 +284,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	return nil
 }
 
-// execInternal executes internal configuration commands, see HelpMessage for details.
+// execSpecialConfig executes internal configuration commands, see HelpMessage for details.
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
@@ -360,5 +369,32 @@ func splitCmd(cmd string) (parts []string) {
 	if partStarted {
 		parts = append(parts, part)
 	}
+	return
+}
+
+var (
+	CellSpecialCommands = SetWithValues(
+		"%%writefile",
+		"%%script",
+		"%%bash",
+		"%%sh")
+)
+
+// IsGoCell returns whether the cell is expected to be a Go cell, based on the first line.
+//
+// The first line may contain special commands that change the interpretation of the cell, e.g.: "%%script", "%%writefile".
+func IsGoCell(firstLine string) bool {
+	parts := strings.Split(firstLine, " ")
+	return CellSpecialCommands.Has(parts[0])
+}
+
+// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]) and if it is executes it.
+//
+// It returns if this was a special cell (if true it executes it), and potentially an execution error, if one happened.
+func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string) (isSpecialCell bool, err error) {
+	if len(lines) == 0 {
+		return false, nil
+	}
+
 	return
 }

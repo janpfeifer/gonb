@@ -186,6 +186,29 @@ For benchmarks, run `%test -test.bench=. -test.run=Benchmark`.
 See examples in the [`gotest.ipynb` notebook here](https://github.com/janpfeifer/gonb/blob/main/examples/tests/gotest.ipynb).
 
 
+### Cell Special ("Magic") Commands
+
+The following are special commands that change how the cell is interpreted, so they are prefixed with "%%" (two '%'
+symbols). They try to follow [IPython's Cell Magic](https://ipython.readthedocs.io/en/stable/interactive/magics.html#cell-magics).
+
+They must always appear as the first line of the cell, and will return an error if not the case.
+
+The contents in the cells are not assumed to be Go, so auto-complete and contextual help are disabled in those cells.
+
+#### '%%writefile'
+
+```
+%%writefile [-a] <filePath>
+```
+
+Write contents of the cell (except the first line with the '%%writefile') to the given `<filePath>`. If `-a` is given
+it will append the cell contents to the file.
+
+This can be handy if for instance the notebook needs to write a configuration file, or simply to dump the code inside
+the cell into some file.
+
+Tilde (`~`) expansion happens on teh file path, to the home directory of the user.
+
 ### Other
 
 - `%goworkfix`: work around 'go get' inability to handle 'go.work' files. If you are

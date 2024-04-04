@@ -1,4 +1,4 @@
-// Package specialcmd handles special commands, that come in two flavors:
+// Package specialcmd handles special (aka. "magic") commands, that come in two flavors:
 //
 //   - `%<cmd> {...args...}`: Control the environment (variables) and configure gonb.
 //   - `!<shell commands>`: Execute shell commands.
@@ -388,13 +388,63 @@ func IsGoCell(firstLine string) bool {
 	return CellSpecialCommands.Has(parts[0])
 }
 
-// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]) and if it is executes it.
+// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]), and if so it executes the special cell command.
 //
 // It returns if this was a special cell (if true it executes it), and potentially an execution error, if one happened.
 func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string) (isSpecialCell bool, err error) {
 	if len(lines) == 0 {
-		return false, nil
+		return
 	}
+	parts := strings.Split(lines[0], " ")
+	if !CellSpecialCommands.Has(parts[0]) {
+		return
+	}
+	isSpecialCell = true
+	klog.V(2).Infof("Executing special cell command %q", parts)
 
-	return
+	switch parts[0] {
+	case "%%writefile":
+		args := parts[1:]
+		var append bool
+		if len(args) > 1 && parts[1] == "-a" {
+			append = true
+			args = args[1:]
+		}
+		if len(args) != 1 {
+			err = errors.Errorf("expected \"%s [-a] <file_name>\", but got %q instead", parts[0], parts)
+			return
+		}
+		err = writeLinesToFile(args[0], lines[1:], append)
+		if err != nil {
+			return
+		}
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.", args[0]))
+		return
+
+	default:
+		err = errors.Errorf("special cell command %q not implemented", parts[0])
+		return
+	}
+}
+
+func writeLinesToFile(filePath string, lines []string, append bool) error {
+	filePath = ReplaceTildeInDir(filePath)
+	var f *os.File
+	var err error
+	if append {
+		f, err = os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	} else {
+		f, err = os.Create(filePath)
+	}
+	if err != nil {
+		return errors.Wrapf(err, "failed to open %q", filePath)
+	}
+	defer func() { _ = f.Close() }()
+	for _, line := range lines {
+		_, err = fmt.Fprintln(f, line)
+		if err != nil {
+			return errors.Wrapf(err, "failed writing to %q", filePath)
+		}
+	}
+	return nil
 }

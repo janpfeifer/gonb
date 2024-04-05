@@ -45,11 +45,10 @@ type cellStatus struct {
 // If any errors happen, it is returned in err.
 func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines Set[int]) (err error) {
 	status := &cellStatus{}
-	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
-		if _, found := usedLines[lineNum]; found {
+	for lineNum, line := range codeLines {
+		if usedLines.Has(lineNum) {
 			continue
 		}
-		line := codeLines[lineNum]
 		if len(line) > 1 && (line[0] == '%' || line[0] == '!') {
 			var cmdStr string
 			cmdStr = joinLine(codeLines, lineNum, usedLines)
@@ -95,7 +94,7 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) {
 	for ; fromLine < len(lines); fromLine++ {
 		cmdStr += lines[fromLine]
-		usedLines[fromLine] = struct{}{}
+		usedLines.Insert(fromLine)
 		if cmdStr[len(cmdStr)-1] != '\\' {
 			return
 		}
@@ -427,6 +426,7 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 	}
 }
 
+// writeLinesToFile. If `append` is true open the file with append.
 func writeLinesToFile(filePath string, lines []string, append bool) error {
 	filePath = ReplaceTildeInDir(filePath)
 	var f *os.File

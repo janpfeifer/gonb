@@ -3,7 +3,7 @@
 ## Next
 
 * Added special cell commands ("magic"):
-  * `%%writefile` to write contents of cell to file. See #103
+  * `%%writefile` to write contents of cell to file. See #103. Thanks @potoo0!
 * Added `dom.LoadScriptOrRequireJSModuleAndRun` and `dom.LoadScriptOrRequireJSModuleAndRunTransient` that dynamically decides
   if to include script using `<script src=...>` or use RequireJS.
 * Plotly library uses `dom.LoadScriptOrRequireJSModuleAndRun` now, allowing result to show up in the HTML export of

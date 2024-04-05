@@ -195,7 +195,7 @@ They must always appear as the first line of the cell, and will return an error 
 
 The contents in the cells are not assumed to be Go, so auto-complete and contextual help are disabled in those cells.
 
-#### '%%writefile'
+#### `%%writefile`
 
 ```
 %%writefile [-a] <filePath>
@@ -207,7 +207,7 @@ it will append the cell contents to the file.
 This can be handy if for instance the notebook needs to write a configuration file, or simply to dump the code inside
 the cell into some file.
 
-Tilde (`~`) expansion happens on teh file path, to the home directory of the user.
+File path passes through a tilde (`~`) expansion to the user's home directory, as well as environment variable substitution (e.g.: `${HOME}` or `$MY_DIR/a/b`). 
 
 ### Other
 

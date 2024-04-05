@@ -406,12 +406,24 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 	case "%%writefile":
 		args := parts[1:]
 		err = cellCmdWritefile(msg, goExec, args, lines[1:])
-		return
+
+	case "%%script", "%%bash", "%%sh":
+		var args []string
+		if parts[0] == "%%script" {
+			args = parts[1:]
+		} else {
+			if len(parts) != 1 {
+				err = errors.Errorf("%q expects no extra arguments, %v was given", parts[0], parts[1:])
+				return
+			}
+			args = []string{parts[0][2:]} // Trim the prefix "%%".
+		}
+		err = cellCmdScript(msg, goExec, args, lines[1:])
 
 	default:
 		err = errors.Errorf("special cell command %q not implemented", parts[0])
-		return
 	}
+	return
 }
 
 // cellCmdWritefile implements `%%writefile`.
@@ -437,6 +449,11 @@ func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, l
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.\n", filePath))
 	}
 	return nil
+}
+
+// cellCmdScript implements `%%script`, '%%bash', '%%sh'.
+func cellCmdScript(msg kernel.Message, goExec *goexec.State, args []string, lines []string) error {
+	return errors.Errorf("%%%%script not implemented: args=%q", args)
 }
 
 // writeLinesToFile. If `append` is true open the file with append.

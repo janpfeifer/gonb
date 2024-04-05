@@ -121,7 +121,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	switch parts[0] {
 
 	// Configures how cell will be executed.
-	case "%", "main", "args", "test", "%test":
+	case "%", "main", "args", "test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
 		klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
@@ -129,7 +129,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 			goExec.CellIsTest = true
 		}
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
-	case "wasm", "%wasm":
+	case "wasm":
 		if len(parts) > 1 {
 			return errors.Errorf("`%%wasm` takes no extra parameters.")
 		}

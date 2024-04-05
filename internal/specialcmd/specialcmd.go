@@ -414,11 +414,18 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 			err = errors.Errorf("expected \"%s [-a] <file_name>\", but got %q instead", parts[0], parts)
 			return
 		}
-		err = writeLinesToFile(args[0], lines[1:], append)
+		filePath := args[0]
+		filePath = ReplaceTildeInDir(filePath)
+		filePath = ReplaceEnvVars(filePath)
+		err = writeLinesToFile(filePath, lines[1:], append)
 		if err != nil {
 			return
 		}
-		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.", args[0]))
+		if append {
+			_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents appended to %q.\n", filePath))
+		} else {
+			_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.\n", filePath))
+		}
 		return
 
 	default:
@@ -429,7 +436,6 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 
 // writeLinesToFile. If `append` is true open the file with append.
 func writeLinesToFile(filePath string, lines []string, append bool) error {
-	filePath = ReplaceTildeInDir(filePath)
 	var f *os.File
 	var err error
 	if append {

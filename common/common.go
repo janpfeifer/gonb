@@ -304,3 +304,36 @@ func (f *ArrayFlag) Set(value string) error {
 	*f = append(*f, value)
 	return nil
 }
+
+// FlagsParse parse args to map
+func FlagsParse(args []string, noValArg Set[string], schema map[string]string) map[string]string {
+	keyPos := 0 // position arg
+	keyGen := func() string {
+		keyPos++
+		return fmt.Sprintf("-pos%d", keyPos)
+	}
+	resultMap := make(map[string]string)
+	var key string
+	for _, arg := range args {
+		switch {
+		case len(arg) > 2 && arg[:2] == "--":
+			key = arg[2:]
+			resultMap[key] = ""
+		case len(arg) > 1 && arg[0] == '-':
+			d, ok := schema[arg[1:]]
+			if ok && len(d) > 0 {
+				key = d
+			} else {
+				key = arg[1:]
+			}
+			resultMap[key] = ""
+		case len(arg) > 0 && arg[0] != '-':
+			if noValArg.Has(key) || key == "" {
+				key = keyGen()
+			}
+			resultMap[key] = arg
+			key = ""
+		}
+	}
+	return resultMap
+}

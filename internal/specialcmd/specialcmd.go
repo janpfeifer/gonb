@@ -45,6 +45,7 @@ type cellStatus struct {
 // If any errors happen, it is returned in err.
 func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines Set[int]) (err error) {
 	status := &cellStatus{}
+
 	for lineNum, line := range codeLines {
 		if usedLines.Has(lineNum) {
 			continue
@@ -283,7 +284,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	return nil
 }
 
-// execSpecialConfig executes internal configuration commands, see HelpMessage for details.
+// execShell executes `cmdStr` properly redirecting outputs to display in hte notebook.
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.

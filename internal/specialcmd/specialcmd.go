@@ -405,26 +405,38 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 	switch parts[0] {
 	case "%%writefile":
 		args := parts[1:]
-		var append bool
-		if len(args) > 1 && parts[1] == "-a" {
-			append = true
-			args = args[1:]
-		}
-		if len(args) != 1 {
-			err = errors.Errorf("expected \"%s [-a] <file_name>\", but got %q instead", parts[0], parts)
-			return
-		}
-		err = writeLinesToFile(args[0], lines[1:], append)
-		if err != nil {
-			return
-		}
-		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.", args[0]))
+		err = cellCmdWritefile(msg, goExec, args, lines[1:])
 		return
 
 	default:
 		err = errors.Errorf("special cell command %q not implemented", parts[0])
 		return
 	}
+}
+
+// cellCmdWritefile implements `%%writefile`.
+func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, lines []string) error {
+	var append bool
+	if len(args) > 1 && args[0] == "-a" {
+		append = true
+		args = args[1:]
+	}
+	if len(args) != 1 {
+		return errors.Errorf("expected \"%%%%writefile [-a] <file_name>\", but got %q instead", args)
+	}
+	filePath := args[0]
+	filePath = ReplaceTildeInDir(filePath)
+	filePath = ReplaceEnvVars(filePath)
+	err = writeLinesToFile(filePath, lines[1:], append)
+	if err != nil {
+		return
+	}
+	if append {
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents appended to %q.\n", filePath))
+	} else {
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.\n", filePath))
+	}
+	return
 }
 
 // writeLinesToFile. If `append` is true open the file with append.

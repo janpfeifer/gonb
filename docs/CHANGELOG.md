@@ -1,7 +1,7 @@
 # GoNB Changelog
 
 ## Next
-
+  
 * Added special cell commands ("magic"):
   * `%%writefile` to write contents of cell to file. See #103. Thanks @potoo0!
 * Added `dom.LoadScriptOrRequireJSModuleAndRun` and `dom.LoadScriptOrRequireJSModuleAndRunTransient` that dynamically decides

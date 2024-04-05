@@ -339,11 +339,7 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
 	var data kernel.MIMEMap
-	if len(lines) == 0 || !specialcmd.IsGoCell(lines[0]) {
-		// Special commands in the first line (like `%%script`) may indicate whether cell is not a normal Go cell.
-		data = kernel.MIMEMap{string(protocol.MIMETextPlain): any(specialcmd.HelpMessage)}
-
-	} else {
+	if len(lines) > 0 && specialcmd.IsGoCell(lines[0]) {
 		// Separate special commands from Go commands.
 		usedLines := MakeSet[int]()
 		if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
@@ -366,6 +362,12 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 				}
 			}
 		}
+
+	} else {
+		// Either empty lines or it has a "cell magic" command in the first line (like `%%script`), so we default
+		// for the [specialcmd.HelpMessage].
+		klog.V(2).Infof("HandleInspectRequest: empty or not Go cell.")
+		data = kernel.MIMEMap{string(protocol.MIMETextPlain): any(specialcmd.HelpMessage)}
 	}
 
 	// Send reply.
@@ -421,6 +423,7 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 	// Special commands in the first line (like `%%script`) may indicate whether cell is not a normal Go cell.
 	if len(lines) == 0 || !specialcmd.IsGoCell(lines[0]) {
 		// Either an empty cell or not a Go cell.
+		klog.V(2).Infof("handleCompleteRequest: empty or not Go cell.")
 		return
 	}
 

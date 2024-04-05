@@ -26,7 +26,7 @@ var (
 // The first line may contain special commands that change the interpretation of the cell, e.g.: "%%script", "%%writefile".
 func IsGoCell(firstLine string) bool {
 	parts := strings.Split(firstLine, " ")
-	return CellSpecialCommands.Has(parts[0])
+	return !CellSpecialCommands.Has(parts[0])
 }
 
 // ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]), and if so it executes the special cell command.

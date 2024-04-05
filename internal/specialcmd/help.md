@@ -64,6 +64,7 @@ This way each cell can create its own `init_...()` and have it called at every c
 - `%with_password`: will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
 
+Notice all these commands are executed **before** any Go code in the same cell.
 
 ### Managing Memorized Definitions
 
@@ -91,6 +92,8 @@ This way each cell can create its own `init_...()` and have it called at every c
   for instance to get a package from some specific version, something
   like `!*go get github.com/my/package@v3`.
 
+Notice that when the cell is executed, first all shell commands are executed, and only after that, if there is
+any Go code in the cell, it is executed.
 
 ### Tracking of Go Files In Development:
 

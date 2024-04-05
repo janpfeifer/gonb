@@ -2,30 +2,21 @@ package common
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 )
 
-func TestFlagsParse(t *testing.T) {
-	args := []string{
-		"-a",
-		"pos-arg1",
-		"-b",
-		"vb",
-		"pos-arg2",
-	}
-	noValArg := MakeSet[string](2)
-	noValArg.Insert("append")
-	schema := map[string]string{
-		"a": "append",
-		"b": "block",
-	}
-	actual := FlagsParse(args, noValArg, schema)
+func TestReplaceEnvVars(t *testing.T) {
+	require.NoError(t, os.Setenv("X", "foo"))
+	require.NoError(t, os.Setenv("Y", "bar"))
+	require.NoError(t, os.Setenv("SOME_VAR", "blah"))
 
-	expected := map[string]string{
-		"-pos1":  "pos-arg1",
-		"-pos2":  "pos-arg2",
-		"append": "",
-		"block":  "vb",
-	}
-	assert.Equal(t, expected, actual)
+	str := "a/${X}${Y}/$MISSING/$SOME_VAR"
+	want := "a/foobar//blah"
+	assert.Equal(t, want, ReplaceEnvVars(str))
+
+	str = "${X}"
+	want = "foo"
+	assert.Equal(t, want, ReplaceEnvVars(str))
 }

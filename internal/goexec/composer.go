@@ -348,9 +348,6 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 		if _, found := skipLines[ii]; found {
 			continue
 		}
-		if createdFuncMain && line != "" {
-			w.Write("\t")
-		}
 		if ii == cursorInCell.Line {
 			// Use current line for cursor, but add column.
 			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})

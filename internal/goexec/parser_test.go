@@ -274,9 +274,9 @@ func init() {
 
 func main() {
 	flag.Parse()
-	fmt.Printf("Hello! %s\n", c)
-	fmt.Printf("1 + 3 = %d\n", sum(1, 3))
-	fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
+fmt.Printf("Hello! %s\n", c)
+fmt.Printf("1 + 3 = %d\n", sum(1, 3))
+fmt.Printf("math.Pi - PI=%f\n", math.Pi - float64(PI32))
 
 
 }

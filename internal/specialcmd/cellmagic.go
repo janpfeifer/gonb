@@ -37,7 +37,7 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 		return
 	}
 	parts := splitCmd(lines[0])
-	if !CellSpecialCommands.Has(parts[0]) {
+	if len(parts) == 0 || !CellSpecialCommands.Has(parts[0]) {
 		return
 	}
 	isSpecialCell = true

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"math/rand"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -553,4 +554,23 @@ func (s *State) DefaultCellTestArgs() (args []string) {
 	}
 	klog.V(2).Infof("DefaultCellTestArgs: %v", args)
 	return
+}
+
+var regexpAllSpaces = regexp.MustCompile(`^\s*$`)
+
+// IsEmptyLines returns true is all lines are marked to skip, or if all lines not marked as skip are empty.
+func IsEmptyLines(lines []string, skipLines Set[int]) bool {
+	if len(skipLines) >= len(lines) {
+		return true
+	}
+	for ii, line := range lines {
+		if skipLines.Has(ii) {
+			continue
+		}
+		if len(line) == 0 || regexpAllSpaces.MatchString(line) {
+			continue
+		}
+		return false
+	}
+	return true
 }

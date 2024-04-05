@@ -292,7 +292,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 		if err := specialcmd.Parse(msg, goExec, true, lines, specialLines); err != nil {
 			executionErr = errors.WithMessagef(err, "executing special commands in cell")
 		}
-		hasMoreToRun := len(specialLines) < len(lines) || goExec.CellIsTest
+		hasMoreToRun := !goexec.IsEmptyLines(lines, specialLines) || goExec.CellIsTest
 		if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
 			executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, specialLines)
 		}

@@ -427,7 +427,7 @@ func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, l
 	filePath := args[0]
 	filePath = ReplaceTildeInDir(filePath)
 	filePath = ReplaceEnvVars(filePath)
-	err := writeLinesToFile(filePath, lines[1:], appendToFile)
+	err := writeLinesToFile(filePath, lines, appendToFile)
 	if err != nil {
 		return err
 	}

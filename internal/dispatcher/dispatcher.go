@@ -286,7 +286,7 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	var executionErr error
 
 	if specialCell, err := specialcmd.ExecuteSpecialCell(msg, goExec, lines); specialCell {
-		executionErr = err
+		executionErr = err // err may be nil here, if magic cell command was executed correctly.
 
 	} else {
 		if err := specialcmd.Parse(msg, goExec, true, lines, specialLines); err != nil {

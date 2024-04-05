@@ -266,16 +266,14 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	case "goworkfix":
 		return goExec.GoWorkFix(msg)
 
-		// These commands should always be the first ones, and if they are parsed here (as opposed to being processed by specialCells)
-		// they were in the middle somewhere.
-	case "%writefile", "%scrip", "%bash", "%sh":
-		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0]))
-		if err != nil {
-			klog.Errorf("Error while reporting back on message command \"%%%s\" kernel: %+v", parts[0], err)
-		}
-		return errors.Errorf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0])
-
 	default:
+		if CellSpecialCommands.Has("%" + parts[0]) {
+			// Cell special commands should always come first, and if they are parsed here (as opposed to being processed by specialCells)
+			// they were in the middle somewhere.
+			return errors.Errorf("\"%%%s\" can only appear at the start of the cell", parts[0])
+		}
+
+		// Unknown special command.
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
 		if err != nil {
 			klog.Errorf("Error while reporting back on unimplemented message command \"%%%s\" kernel: %+v", parts[0], err)
@@ -453,7 +451,9 @@ func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, l
 
 // cellCmdScript implements `%%script`, '%%bash', '%%sh'.
 func cellCmdScript(msg kernel.Message, goExec *goexec.State, args []string, lines []string) error {
+
 	return errors.Errorf("%%%%script not implemented: args=%q", args)
+
 }
 
 // writeLinesToFile. If `append` is true open the file with append.

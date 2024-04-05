@@ -10,6 +10,7 @@
 * Plotly library uses `dom.LoadScriptOrRequireJSModuleAndRun` now, allowing result to show up in the HTML export of
   the notebook.
 * Added `plotly.AppendFig` that allows plotting to a transient area, or anywhere in the page.
+* Several minor fixes, see #106
 
 ## 0.9.6, 2024/02/18
 

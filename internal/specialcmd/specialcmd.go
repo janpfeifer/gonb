@@ -427,9 +427,9 @@ func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, l
 	filePath := args[0]
 	filePath = ReplaceTildeInDir(filePath)
 	filePath = ReplaceEnvVars(filePath)
-	err = writeLinesToFile(filePath, lines[1:], append)
+	err := writeLinesToFile(filePath, lines[1:], append)
 	if err != nil {
-		return
+		return err
 	}
 	if append {
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents appended to %q.\n", filePath))

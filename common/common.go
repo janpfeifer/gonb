@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -49,6 +50,7 @@ func MakeSet[T comparable](size ...int) Set[T] {
 	return make(Set[T], size[0])
 }
 
+// SetWithValues creates a new [Set] initialized with the given `values`.
 func SetWithValues[T comparable](values ...T) Set[T] {
 	if len(values) == 0 {
 		return MakeSet[T]()
@@ -164,6 +166,48 @@ func ReplaceTildeInDir(dir string) string {
 	}
 	homeDir := usr.HomeDir
 	return path.Join(homeDir, dir[1+len(userName):])
+}
+
+var (
+	regexpEnvVarBrackets = regexp.MustCompile(`\$\{[^}]*}`)
+	regexpEnvVar         = regexp.MustCompile(`\$\w*`)
+)
+
+// ReplaceEnvVars makes bash-like substitutions of environment variables, when preceded by '$'.
+//
+// Example: if `HOME=/home/user` and `F=abc`, then `SubstituteEnvVars("${HOME}/$F/def")` returns the string
+// `"/home/user/abc/def"`.
+func ReplaceEnvVars(str string) string {
+	// Replace bracket expansions.
+	matches := regexpEnvVarBrackets.FindAllStringSubmatchIndex(str, -1)
+	var newStr string
+	var lastPos int
+	for _, matchPair := range matches {
+		// Replace each bracket expansion.
+		start, end := matchPair[0], matchPair[1]
+		newStr += str[lastPos:start]
+		varName := str[start+2 : end-1] // Trims the "${" prefix, and the "}" suffix.
+		newStr += os.Getenv(varName)
+		lastPos = end
+	}
+	newStr += str[lastPos:]
+
+	// Replace non-bracketed expansions
+	str = newStr
+	newStr = ""
+	matches = regexpEnvVar.FindAllStringSubmatchIndex(str, -1)
+	lastPos = 0
+	for _, matchPair := range matches {
+		// Replace each bracket expansion.
+		start, end := matchPair[0], matchPair[1]
+		newStr += str[lastPos:start]
+		varName := str[start+1 : end] // Trims the "$" prefix
+		newStr += os.Getenv(varName)
+		lastPos = end
+	}
+	newStr += str[lastPos:]
+
+	return newStr
 }
 
 // Latch implements a "latch" synchronization mechanism.
@@ -303,37 +347,4 @@ func (f *ArrayFlag) String() string {
 func (f *ArrayFlag) Set(value string) error {
 	*f = append(*f, value)
 	return nil
-}
-
-// FlagsParse parse args to map
-func FlagsParse(args []string, noValArg Set[string], schema map[string]string) map[string]string {
-	keyPos := 0 // position arg
-	keyGen := func() string {
-		keyPos++
-		return fmt.Sprintf("-pos%d", keyPos)
-	}
-	resultMap := make(map[string]string)
-	var key string
-	for _, arg := range args {
-		switch {
-		case len(arg) > 2 && arg[:2] == "--":
-			key = arg[2:]
-			resultMap[key] = ""
-		case len(arg) > 1 && arg[0] == '-':
-			d, ok := schema[arg[1:]]
-			if ok && len(d) > 0 {
-				key = d
-			} else {
-				key = arg[1:]
-			}
-			resultMap[key] = ""
-		case len(arg) > 0 && arg[0] != '-':
-			if noValArg.Has(key) || key == "" {
-				key = keyGen()
-			}
-			resultMap[key] = arg
-			key = ""
-		}
-	}
-	return resultMap
 }

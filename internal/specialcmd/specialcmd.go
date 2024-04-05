@@ -416,9 +416,9 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 
 // cellCmdWritefile implements `%%writefile`.
 func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, lines []string) error {
-	var append bool
+	var appendToFile bool
 	if len(args) > 1 && args[0] == "-a" {
-		append = true
+		appendToFile = true
 		args = args[1:]
 	}
 	if len(args) != 1 {
@@ -427,24 +427,23 @@ func cellCmdWritefile(msg kernel.Message, goExec *goexec.State, args []string, l
 	filePath := args[0]
 	filePath = ReplaceTildeInDir(filePath)
 	filePath = ReplaceEnvVars(filePath)
-	err := writeLinesToFile(filePath, lines[1:], append)
+	err := writeLinesToFile(filePath, lines[1:], appendToFile)
 	if err != nil {
 		return err
 	}
-	if append {
+	if appendToFile {
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents appended to %q.\n", filePath))
 	} else {
 		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.\n", filePath))
 	}
-	return
+	return nil
 }
 
 // writeLinesToFile. If `append` is true open the file with append.
-func writeLinesToFile(filePath string, lines []string, append bool) error {
-	filePath = ReplaceTildeInDir(filePath)
+func writeLinesToFile(filePath string, lines []string, appendToFile bool) error {
 	var f *os.File
 	var err error
-	if append {
+	if appendToFile {
 		f, err = os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	} else {
 		f, err = os.Create(filePath)

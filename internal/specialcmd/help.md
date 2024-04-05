@@ -186,12 +186,12 @@ For benchmarks, run `%test -test.bench=. -test.run=Benchmark`.
 See examples in the [`gotest.ipynb` notebook here](https://github.com/janpfeifer/gonb/blob/main/examples/tests/gotest.ipynb).
 
 
-### Cell Special ("Magic") Commands
+### Cell Magic
 
-The following are special commands that change how the cell is interpreted, so they are prefixed with "%%" (two '%'
+The following are special commands that change how the cell is interpreted, so they are prefixed with `%%` (two '%'
 symbols). They try to follow [IPython's Cell Magic](https://ipython.readthedocs.io/en/stable/interactive/magics.html#cell-magics).
 
-They must always appear as the first line of the cell, and will return an error if not the case.
+They must always appear as the first line of the cell.
 
 The contents in the cells are not assumed to be Go, so auto-complete and contextual help are disabled in those cells.
 
@@ -208,6 +208,17 @@ This can be handy if for instance the notebook needs to write a configuration fi
 the cell into some file.
 
 File path passes through a tilde (`~`) expansion to the user's home directory, as well as environment variable substitution (e.g.: `${HOME}` or `$MY_DIR/a/b`). 
+
+### `%%script`, `%%bash` and `%%sh`
+
+```
+%%script <command>
+```
+
+Execute `<command>` and feed it (`STDIN`) with the contents of the cell. The `%%bash` and `%%sh` magic is an alias to `%%script bash` and `%%script sh` respectively.
+
+Generally, a convenient way to run larger scripts.
+
 
 ### Other
 

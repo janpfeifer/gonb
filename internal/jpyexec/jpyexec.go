@@ -31,6 +31,7 @@ type Executor struct {
 	useNamedPipes              bool
 	commsHandler               CommsHandler
 	stdoutWriter, stderrWriter io.Writer
+	stdinContent               []byte
 	millisecondsToInput        int
 	inputPassword              bool
 
@@ -145,6 +146,14 @@ func (exec *Executor) WithPassword(millisecondsWait int) *Executor {
 	return exec
 }
 
+// WithStaticInput configures the executor to run withe given fixed input.
+//
+// This conflicts with [Executor.WithInputs] and [Executor.WithPassword].
+func (exec *Executor) WithStaticInput(stdinContent []byte) *Executor {
+	exec.stdinContent = stdinContent
+	return exec
+}
+
 // Exec executes the configured New configuration.
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
@@ -220,6 +229,10 @@ func (exec *Executor) Exec() error {
 	if err := cmd.Start(); err != nil {
 		klog.Warningf("Failed to start command %q", exec.command)
 		return errors.WithMessagef(err, "failed to start to execute command %q", exec.command)
+	}
+
+	if exec.stdinContent != nil {
+		exec.handleStaticInput()
 	}
 
 	// Wait for output pipes to finish.
@@ -299,4 +312,22 @@ func (exec *Executor) handleJupyterInput() {
 		return nil
 	}
 	go schedulePromptFn()
+}
+
+func (exec *Executor) handleStaticInput() {
+	go func() {
+		// Write concurrently, not to block, in case program doesn't
+		// actually read anything from the stdin.
+		_, err := exec.cmdStdin.Write([]byte(exec.stdinContent))
+		if err != nil {
+			// Could happen if something was not fully written, and channel was closed, in
+			// which case it's ok.
+			klog.Warningf("failed to write to stdin of %q %v: %+v", exec.command, exec.args, err)
+		}
+		err = exec.cmdStdin.Close()
+		if err != nil {
+			klog.Warningf("failed to clsoe stdin of %q %v: %+v", exec.command, exec.args, err)
+		}
+
+	}()
 }

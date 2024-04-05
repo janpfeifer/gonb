@@ -284,12 +284,18 @@ func handleExecuteRequest(msg kernel.Message, goExec *goexec.State) error {
 	lines := strings.Split(code, "\n")
 	specialLines := MakeSet[int]() // lines that are special commands and not Go.
 	var executionErr error
-	if err := specialcmd.Parse(msg, goExec, true, lines, specialLines); err != nil {
-		executionErr = errors.WithMessagef(err, "executing special commands in cell")
-	}
-	hasMoreToRun := len(specialLines) < len(lines) || goExec.CellIsTest
-	if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
-		executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, specialLines)
+
+	if specialCell, err := specialcmd.ExecuteSpecialCell(msg, goExec, lines); specialCell {
+		executionErr = err
+
+	} else {
+		if err := specialcmd.Parse(msg, goExec, true, lines, specialLines); err != nil {
+			executionErr = errors.WithMessagef(err, "executing special commands in cell")
+		}
+		hasMoreToRun := len(specialLines) < len(lines) || goExec.CellIsTest
+		if executionErr == nil && !msg.Kernel().Interrupted.Load() && hasMoreToRun {
+			executionErr = goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, specialLines)
+		}
 	}
 
 	// Final execution result.
@@ -332,26 +338,32 @@ func HandleInspectRequest(msg kernel.Message, goExec *goexec.State) error {
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
 
-	// Separate special commands from Go commands.
-	usedLines := MakeSet[int]()
-	if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
-		return errors.WithMessagef(err, "parsing special commands in cell")
-	}
-
-	// Get data contents for reply.
 	var data kernel.MIMEMap
-	if usedLines.Has(cursorLine) {
-		// If special command, use our help message as inspect content.
+	if len(lines) == 0 || !specialcmd.IsGoCell(lines[0]) {
+		// Special commands in the first line (like `%%script`) may indicate whether cell is not a normal Go cell.
 		data = kernel.MIMEMap{string(protocol.MIMETextPlain): any(specialcmd.HelpMessage)}
+
 	} else {
-		// Parse Go.
-		var err error
-		data, err = goExec.InspectIdentifierInCell(lines, usedLines, cursorLine, cursorCol)
-		if err != nil {
-			data = kernel.MIMEMap{
-				string(protocol.MIMETextPlain): any(
-					fmt.Sprintf("%s", err.Error())),
-				//fmt.Sprintf("Failed to inspect: in cell=[line=%d, col=%d]:\n%+v", cursorLine+1, cursorCol+1, err)),
+		// Separate special commands from Go commands.
+		usedLines := MakeSet[int]()
+		if err := specialcmd.Parse(msg, goExec, false, lines, usedLines); err != nil {
+			return errors.WithMessagef(err, "parsing special commands in cell")
+		}
+
+		// Get data contents for reply.
+		if usedLines.Has(cursorLine) {
+			// If special command, use our help message as inspect content.
+			data = kernel.MIMEMap{string(protocol.MIMETextPlain): any(specialcmd.HelpMessage)}
+		} else {
+			// Parse Go.
+			var err error
+			data, err = goExec.InspectIdentifierInCell(lines, usedLines, cursorLine, cursorCol)
+			if err != nil {
+				data = kernel.MIMEMap{
+					string(protocol.MIMETextPlain): any(
+						fmt.Sprintf("%s", err.Error())),
+					//fmt.Sprintf("Failed to inspect: in cell=[line=%d, col=%d]:\n%+v", cursorLine+1, cursorCol+1, err)),
+				}
 			}
 		}
 	}
@@ -405,6 +417,12 @@ func handleCompleteRequest(msg kernel.Message, goExec *goexec.State) (err error)
 
 	// Find cursorLine and cursorCol from cursorPos. Both are 0-based.
 	lines, cursorLine, cursorCol := kernel.JupyterToLinesAndCursor(code, cursorPos)
+
+	// Special commands in the first line (like `%%script`) may indicate whether cell is not a normal Go cell.
+	if len(lines) == 0 || !specialcmd.IsGoCell(lines[0]) {
+		// Either an empty cell or not a Go cell.
+		return
+	}
 
 	// Separate special commands from Go commands.
 	usedLines := MakeSet[int]()

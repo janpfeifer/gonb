@@ -1,4 +1,4 @@
-// Package specialcmd handles special commands, that come in two flavors:
+// Package specialcmd handles special (aka. "magic") commands, that come in two flavors:
 //
 //   - `%<cmd> {...args...}`: Control the environment (variables) and configure gonb.
 //   - `!<shell commands>`: Execute shell commands.
@@ -45,11 +45,11 @@ type cellStatus struct {
 // If any errors happen, it is returned in err.
 func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []string, usedLines Set[int]) (err error) {
 	status := &cellStatus{}
-	for lineNum := 0; lineNum < len(codeLines); lineNum++ {
+
+	for lineNum, line := range codeLines {
 		if usedLines.Has(lineNum) {
 			continue
 		}
-		line := codeLines[lineNum]
 		if len(line) > 1 && (line[0] == '%' || line[0] == '!') {
 			var cmdStr string
 			cmdStr = joinLine(codeLines, lineNum, usedLines)
@@ -65,19 +65,9 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 			if execute {
 				switch cmdType {
 				case '%':
-					parts := splitCmd(cmdStr)
-					// optimize...
-					if len(parts) > 0 && parts[0] == "writefile" {
-						cmdBody := parseCmdBody(codeLines, lineNum, usedLines)
-						err = execWriteFile(msg, goExec, parts[1:], cmdBody)
-						if err != nil {
-							return
-						}
-					} else {
-						err = execInternal(msg, goExec, cmdStr, status)
-						if err != nil {
-							return
-						}
+					err = execSpecialConfig(msg, goExec, cmdStr, status)
+					if err != nil {
+						return
 					}
 				case '!':
 					err = execShell(msg, goExec, cmdStr, status)
@@ -114,30 +104,14 @@ func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) 
 	return
 }
 
-// parseCmdBody starts from fromLine and joins consecutive lines until the line start with magic symbol( % ! )
-//
-// It returns the joined lines with the '\n', and appends the used lines (including fromLine) to usedLines.
-func parseCmdBody(lines []string, fromLine int, usedLines Set[int]) (cmdBody string) {
-	usedLines.Insert(fromLine)
-	fromLine++
-	for ; fromLine < len(lines); fromLine++ {
-		if len(lines[fromLine]) > 0 && (lines[fromLine][0] == '%' || lines[fromLine][0] == '!') {
-			return
-		}
-		cmdBody += lines[fromLine]
-		cmdBody += "\n"
-		usedLines.Insert(fromLine)
-	}
-	return
-}
-
-// execInternal executes internal configuration commands, see HelpMessage for details.
+// execSpecialConfig executes special configuration commands (that start with "%), except cell commands.
+// See [HelpMessage] for details, and [execCellSpecialCmd].
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
 //
 // It supports msg == nil for testing.
-func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
+func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
 	_ = goExec
 	var content map[string]any
 	if msg != nil && msg.ComposedMsg().Content != nil {
@@ -147,7 +121,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	switch parts[0] {
 
 	// Configures how cell will be executed.
-	case "%", "main", "args", "test":
+	case "%", "main", "args", "test", "%test":
 		// Set arguments for execution, allows one to set flags, etc.
 		goExec.Args = parts[1:]
 		klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
@@ -155,7 +129,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			goExec.CellIsTest = true
 		}
 		// %% and %main are also handled specially by goexec, where it starts a main() clause.
-	case "wasm":
+	case "wasm", "%wasm":
 		if len(parts) > 1 {
 			return errors.Errorf("`%%wasm` takes no extra parameters.")
 		}
@@ -235,7 +209,6 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 			nonEmptyArgs := slices.DeleteFunc(parts[1:], func(s string) bool { return s == "" })
 			goExec.GoBuildFlags = nonEmptyArgs
 		}
-
 		err := kernel.PublishWriteStream(msg, kernel.StreamStdout,
 			fmt.Sprintf("%%goflags=%q\n", goExec.GoBuildFlags))
 		if err != nil {
@@ -289,9 +262,18 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	case "untrack":
 		execUntrack(msg, goExec, parts[1:])
 
-		// Others.
+		// Fix issues with `go work`.
 	case "goworkfix":
 		return goExec.GoWorkFix(msg)
+
+		// These commands should always be the first ones, and if they are parsed here (as opposed to being processed by specialCells)
+		// they were in the middle somewhere.
+	case "%writefile", "%scrip", "%bash", "%sh":
+		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0]))
+		if err != nil {
+			klog.Errorf("Error while reporting back on message command \"%%%s\" kernel: %+v", parts[0], err)
+		}
+		return errors.Errorf("\"%%%s\" can only appear at the start of the cell, it is ignore if in the middle of the cell.", parts[0])
 
 	default:
 		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("\"%%%s\" unknown or not implemented yet.", parts[0]))
@@ -302,40 +284,7 @@ func execInternal(msg kernel.Message, goExec *goexec.State, cmdStr string, statu
 	return nil
 }
 
-// execWriteFile write cell body to file
-func execWriteFile(msg kernel.Message, goExec *goexec.State, args []string, cmdBody string) error {
-	// parse arg
-	noValArg := MakeSet[string](2)
-	noValArg.Insert("append")
-	schema := map[string]string{"a": "append"}
-	parse := FlagsParse(args, noValArg, schema)
-	_, appendMode := parse["append"]
-	filename, hasFileName := parse["-pos1"]
-	if !hasFileName {
-		filename = goExec.UniqueID + ".out"
-	}
-
-	// do write
-	fileFlag := os.O_RDWR | os.O_CREATE
-	if appendMode {
-		fileFlag |= os.O_APPEND
-	} else {
-		fileFlag |= os.O_TRUNC
-	}
-	file, err := os.OpenFile(filename, fileFlag, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString(cmdBody)
-	if err != nil {
-		return err
-	}
-	return kernel.PublishWriteStream(msg, kernel.StreamStdout, "write to "+filename+" success\n")
-}
-
-// execInternal executes internal configuration commands, see HelpMessage for details.
+// execShell executes `cmdStr` properly redirecting outputs to display in hte notebook.
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
@@ -421,4 +370,82 @@ func splitCmd(cmd string) (parts []string) {
 		parts = append(parts, part)
 	}
 	return
+}
+
+var (
+	CellSpecialCommands = SetWithValues(
+		"%%writefile",
+		"%%script",
+		"%%bash",
+		"%%sh")
+)
+
+// IsGoCell returns whether the cell is expected to be a Go cell, based on the first line.
+//
+// The first line may contain special commands that change the interpretation of the cell, e.g.: "%%script", "%%writefile".
+func IsGoCell(firstLine string) bool {
+	parts := strings.Split(firstLine, " ")
+	return CellSpecialCommands.Has(parts[0])
+}
+
+// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]), and if so it executes the special cell command.
+//
+// It returns if this was a special cell (if true it executes it), and potentially an execution error, if one happened.
+func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string) (isSpecialCell bool, err error) {
+	if len(lines) == 0 {
+		return
+	}
+	parts := strings.Split(lines[0], " ")
+	if !CellSpecialCommands.Has(parts[0]) {
+		return
+	}
+	isSpecialCell = true
+	klog.V(2).Infof("Executing special cell command %q", parts)
+
+	switch parts[0] {
+	case "%%writefile":
+		args := parts[1:]
+		var append bool
+		if len(args) > 1 && parts[1] == "-a" {
+			append = true
+			args = args[1:]
+		}
+		if len(args) != 1 {
+			err = errors.Errorf("expected \"%s [-a] <file_name>\", but got %q instead", parts[0], parts)
+			return
+		}
+		err = writeLinesToFile(args[0], lines[1:], append)
+		if err != nil {
+			return
+		}
+		_ = kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Cell contents written to %q.", args[0]))
+		return
+
+	default:
+		err = errors.Errorf("special cell command %q not implemented", parts[0])
+		return
+	}
+}
+
+// writeLinesToFile. If `append` is true open the file with append.
+func writeLinesToFile(filePath string, lines []string, append bool) error {
+	filePath = ReplaceTildeInDir(filePath)
+	var f *os.File
+	var err error
+	if append {
+		f, err = os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	} else {
+		f, err = os.Create(filePath)
+	}
+	if err != nil {
+		return errors.Wrapf(err, "failed to open %q", filePath)
+	}
+	defer func() { _ = f.Close() }()
+	for _, line := range lines {
+		_, err = fmt.Fprintln(f, line)
+		if err != nil {
+			return errors.Wrapf(err, "failed writing to %q", filePath)
+		}
+	}
+	return nil
 }

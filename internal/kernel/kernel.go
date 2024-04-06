@@ -294,7 +294,7 @@ func New(connectionFile string) (*Kernel, error) {
 	if matches := reExtractJupyterSessionId.FindStringSubmatch(connectionFile); len(matches) == 2 {
 		k.JupyterKernelId = matches[1]
 		must.M(os.Setenv(protocol.GONB_JUPYTER_KERNEL_ID_ENV, k.JupyterKernelId))
-		klog.Infof("%s=%s", protocol.GONB_JUPYTER_KERNEL_ID_ENV, k.JupyterKernelId)
+		klog.V(1).Infof("%s=%s", protocol.GONB_JUPYTER_KERNEL_ID_ENV, k.JupyterKernelId)
 	} else {
 		klog.Warningf("Could not parse Jupyter KernelId from kernel configuration path %q",
 			connectionFile)

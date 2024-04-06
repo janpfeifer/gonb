@@ -23,7 +23,7 @@
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Shell command executions with `!` -- handy at times, for instance to install packages.
-* Reported to work with Github Codespace, VSCode, Binder, Google's Colab, etc.
+* Reported to work with Github Codespace, [VSCode](docs/VSCode.md), Binder, Google's Colab, etc.
 * Very well documented and supported.
 * Great for data-science, testing, writing reports, live demos, etc.
 * Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out. Alternatively, there is a [Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing), that bootstraps **GoNB** and can be used online.

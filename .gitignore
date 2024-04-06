@@ -1,6 +1,9 @@
 # GoLand configuration.
 .idea
 
+# VSCode Workspace
+gonb.code-workspace
+
 # Ignore Go workspace, this is particular to the developers machine.
 go.work
 

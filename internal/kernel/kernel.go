@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/go-zeromq/zmq4"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/must"
@@ -23,9 +24,6 @@ import (
 	"regexp"
 	"sync"
 	"sync/atomic"
-	"syscall"
-
-	"github.com/go-zeromq/zmq4"
 )
 
 var (
@@ -102,8 +100,8 @@ type Kernel struct {
 	// ExecCounter is incremented each time we run user code in the notebook.
 	ExecCounter int
 
-	// Channel where interruption is received.
-	sigintC, sighupC chan os.Signal
+	// Channel where signals are received.
+	signalsChan chan os.Signal
 
 	// Interrupted indicates whether shell currently being executed was Interrupted.
 	Interrupted atomic.Bool
@@ -175,44 +173,30 @@ func (k *Kernel) Stop() {
 // So instead of the kernel dying, it will recover, and where appropriate
 // interrupt other subprocesses it may have spawned.
 func (k *Kernel) HandleInterrupt() {
-	// Handle Sigint: Control+C, Jupyter uses it to ask for the kernel
+	// Handle Sigint (os.Interrupt): Control+C, Jupyter uses it to ask for the kernel
 	// to interrupt execution of a program.
-	if k.sigintC == nil {
-		k.sigintC = make(chan os.Signal, 1)
-		signal.Notify(k.sigintC, os.Interrupt)
+	// All other signals captured are assumed to mean that the kernel should exit.
+	if k.signalsChan == nil {
+		k.signalsChan = make(chan os.Signal, 1)
+		signal.Notify(k.signalsChan, CaptureSignals...) // Signals we are interested in.
 		go func() {
 			// At exit reset notification.
 			defer func() {
 				signal.Reset(os.Interrupt)
-				k.sigintC = nil
+				k.signalsChan = nil
 			}()
 			for {
 				select {
-				case <-k.sigintC:
+				case sig := <-k.signalsChan:
 					k.Interrupted.Store(true)
-					klog.Infof("INTERRUPT received.")
-				case <-k.stop:
-					return // kernel stopped.
-				}
-			}
-		}()
-	}
-
-	// Handle Sighup: sent when the parent process dies.
-	if k.sighupC == nil {
-		k.sighupC = make(chan os.Signal, 1)
-		signal.Notify(k.sighupC, syscall.SIGHUP)
-		go func() {
-			// At exit reset notification.
-			defer func() {
-				signal.Reset(syscall.SIGHUP)
-				k.sighupC = nil
-			}()
-			for {
-				select {
-				case <-k.sighupC:
-					klog.Infof("SIGHUP received, stopping kernel.")
-					k.Stop()
+					sigName := sig.String()
+					klog.Infof("Signal %s received.", sigName)
+					switch sigName {
+					case "terminated", "hangup":
+						// These signals should stop the kernel.
+						klog.Errorf("Signal %s triggers kernel stop.", sigName)
+						k.Stop()
+					}
 				case <-k.stop:
 					return // kernel stopped.
 				}

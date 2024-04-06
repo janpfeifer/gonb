@@ -11,6 +11,7 @@
   the notebook.
 * Added `plotly.AppendFig` that allows plotting to a transient area, or anywhere in the page.
 * Several minor fixes, see #106
+* Added handling of SIGHUP and SIGTERM to handle a clean exit: and avoid leaking `gopls` daemons.
 
 ## 0.9.6, 2024/02/18
 

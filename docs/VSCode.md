@@ -19,10 +19,40 @@ VSCode doesn't support notebooks that output javascript by default. So GoNB libr
 [Plotly](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/plotly), or 
 [widgets](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/widgets) won't work.
 
+A longer explanation: VSCode has some partial filters to Javascript. For instance, the following doesn't work:
+
+```go
+import "github.com/janpfeifer/gonb/gonbui"
+
+%%
+gonbui.DisplayHtml(`<script>alert('hello');</script>`)
+```
+
+But the following does:
+
+```go
+%%
+gonbui.DisplayHtml(`<div></div><script>alert('hello');</script>`)
+```
+
+So there may be a solution to hack around VSCode javascript limitations. But ideally, VSCode would have an official
+way to support it.
+
+**It works**: somehow Javascript started working ... not sure if after I installed [Polyglot](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-interactive-vscode) 
+or something else. Mysteriously, suddenly it works!? If anyone knows what is needed, pls let us know.
+
 ## No WASM
 
 It's an experimental feature for GoNB, but in VSCode for various reasons won't work either.
 
+## [Polyglot](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-interactive-vscode)
+
+"Polyglot Notebooks for VS Code. Use multiple languages in one notebook with full language server support for
+each language and share variables between them."
+
+Unfortunately, they don't list Go as a supported language. 
+
+Installing it does require installing .NET SDK. 
 
 ## Debugging
 
@@ -36,6 +66,7 @@ of GoNB set up to also log to the file `/tmp/gonb.out` with:
 ```bash
 go run . --install --logtostderr --vmodule=goexec=2,specialcmd=2,cellmagic=2,gopls=2,connection=2 --extra_log=/tmp/gonb.out
 ```
+
 
 ## Links of interest
 

@@ -14,8 +14,10 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"k8s.io/klog/v2"
+	"os"
 	osexec "os/exec"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -154,6 +156,9 @@ func (exec *Executor) WithStaticInput(stdinContent []byte) *Executor {
 	return exec
 }
 
+// WaitToKill is the to wait after an interrupt signal, before killing the process.
+var WaitToKill = 5 * time.Second
+
 // Exec executes the configured New configuration.
 //
 // It returns an error if it failed to execute or created the pipes -- but not if the executed
@@ -231,6 +236,26 @@ func (exec *Executor) Exec() error {
 		return errors.WithMessagef(err, "failed to start to execute command %q", exec.command)
 	}
 
+	var interruptId kernel.SubscriptionId
+	interruptId = exec.Msg.Kernel().SubscribeInterrupt(func(id kernel.SubscriptionId) {
+		// Sent interrupt to process.
+		err := cmd.Process.Signal(os.Interrupt)
+		exec.Msg.Kernel().UnsubscribeInterrupt(interruptId)
+		if err != nil {
+			klog.Errorf("failed to interrupt process %s (%v): %+v", cmd, cmd.Process, err)
+		}
+		select {
+		case <-exec.doneChan:
+			// Normal stop, nothing to do.
+		case <-time.After(WaitToKill):
+			// If process hasn't yet died, kill it.
+			err = cmd.Process.Signal(syscall.SIGKILL)
+			if err != nil {
+				klog.Errorf("failed to kill process %s (%v): %+v", cmd, cmd.Process, err)
+			}
+		}
+	})
+
 	if exec.stdinContent != nil {
 		exec.handleStaticInput()
 	}
@@ -244,6 +269,9 @@ func (exec *Executor) Exec() error {
 		}
 		_ = kernel.PublishWriteStream(exec.Msg, kernel.StreamStderr, errMsg)
 	}
+
+	// Unsubscribe from interruption messages.
+	exec.Msg.Kernel().UnsubscribeInterrupt(interruptId)
 
 	klog.V(2).Infof("Execution finished successfully")
 	// Notice some of the cleanup will happen in parallel after return,

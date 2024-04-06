@@ -7,6 +7,7 @@
 package kernel
 
 import (
+	"container/list"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -103,8 +104,12 @@ type Kernel struct {
 	// Channel where signals are received.
 	signalsChan chan os.Signal
 
-	// Interrupted indicates whether shell currently being executed was Interrupted.
+	// Interrupted indicates whether cell/shell currently being executed was Interrupted.
 	Interrupted atomic.Bool
+
+	// InterruptCond gets signaled whenever an interruption happens.
+	interruptSubscriptions *list.List
+	muSubscriptions        sync.Mutex
 
 	// stdinMsg holds the MessageImpl that last asked from input from stdin (MessageImpl.PromptInput).
 	stdinMsg *MessageImpl
@@ -189,19 +194,69 @@ func (k *Kernel) HandleInterrupt() {
 				select {
 				case sig := <-k.signalsChan:
 					k.Interrupted.Store(true)
-					sigName := sig.String()
-					klog.Infof("Signal %s received.", sigName)
-					switch sigName {
-					case "terminated", "hangup":
-						// These signals should stop the kernel.
-						klog.Errorf("Signal %s triggers kernel stop.", sigName)
-						k.Stop()
+					k.callInterruptSubscribers()
+					klog.Infof("Signal %s received.", sig)
+					if sig == os.Interrupt {
+						// Simply interrupt running cells.
+						continue
 					}
+					// Otherwise stop kernel.
+					klog.Errorf("Signal %s triggers kernel stop.", sig)
+					k.Stop()
 				case <-k.stop:
 					return // kernel stopped.
 				}
 			}
 		}()
+	}
+}
+
+// SubscriptionId is returned by [Kernel.SubscribeInterrupt], and can be used by [Kernel.UnsubscribeInterrupt].
+type SubscriptionId *list.Element
+
+// InterruptFn is called on its own goroutine.
+type InterruptFn func(id SubscriptionId)
+
+// SubscribeInterrupt registers `fn` to be called if any interruptions occur.
+// It returns a [SubscriptionId] that needs to be used to unsubscribe to it later.
+func (k *Kernel) SubscribeInterrupt(fn InterruptFn) SubscriptionId {
+	k.muSubscriptions.Lock()
+	defer k.muSubscriptions.Unlock()
+	if klog.V(2).Enabled() {
+		klog.Infof("SubscribeInterrupt(): %d elements", k.interruptSubscriptions.Len()+1)
+	}
+	return k.interruptSubscriptions.PushBack(fn)
+}
+
+// UnsubscribeInterrupt stops being called back in case of interruptions.
+// It takes the `id` returned by [SubscribeInterrupt].
+func (k *Kernel) UnsubscribeInterrupt(id SubscriptionId) {
+	k.muSubscriptions.Lock()
+	defer k.muSubscriptions.Unlock()
+
+	if id.Value == nil {
+		// Already unsubscribed.
+		return
+	}
+	id.Value = nil
+	k.interruptSubscriptions.Remove(id)
+	if klog.V(2).Enabled() {
+		klog.Infof("UnsubscribeInterrupt(): %d elements left", k.interruptSubscriptions.Len())
+	}
+}
+
+// callInterruptSubscribers in a separate goroutine each.
+// Meant to be called when JupyterServer sends a kernel interrupt (either a SIGINT, or a message to interrupt).
+func (k *Kernel) callInterruptSubscribers() {
+	k.muSubscriptions.Lock()
+	defer k.muSubscriptions.Unlock()
+
+	for e := k.interruptSubscriptions.Front(); e != nil; e = e.Next() {
+		if e.Value == nil {
+			continue
+		}
+		fn := e.Value.(InterruptFn)
+		go fn(e) // run on separate goroutine.
 	}
 }
 
@@ -272,7 +327,8 @@ func New(connectionFile string) (*Kernel, error) {
 		stdin:   make(chan Message, 1),
 		control: make(chan Message, 1),
 
-		KnownBlockIds: make(common.Set[string]),
+		interruptSubscriptions: list.New(),
+		KnownBlockIds:          make(common.Set[string]),
 	}
 
 	if matches := reExtractJupyterSessionId.FindStringSubmatch(connectionFile); len(matches) == 2 {

@@ -71,3 +71,5 @@ go run . --install --logtostderr --vmodule=goexec=2,specialcmd=2,cellmagic=2,gop
 ## Links of interest
 
 * [VSCode Jupyter Notebooks](https://code.visualstudio.com/docs/datascience/jupyter-notebooks)
+* [Renderers for Jupyter Notebooks in Visual Studio Code](https://github.com/Microsoft/vscode-notebook-renderers):
+  presumably adds renderes to several specialized mime-types, including a specialized plotly mime type, that one could take advantage of. I haven't tried it.

@@ -13,13 +13,24 @@ and hence won't make use of the auto-complete or contextual information that GoN
 
 For Python VSCode relies on IntelliSense.
 
-## No Javascript
+## Javascript Caveats
 
-VSCode doesn't support notebooks that output javascript by default. So GoNB libraries like 
-[Plotly](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/plotly), or 
-[widgets](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/widgets) won't work.
+VSCode does not "render" mimetype `text/javascript` properly, instead it just displays it as text. Hence `gonbui.ScriptJavascript` won't work.
 
-A longer explanation: VSCode has some partial filters to Javascript. For instance, the following doesn't work:
+That affects [widgets](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/widgets) (it won't work), and 
+[Plotly](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui/plotly) (only up to version 0.9.6, after that it 
+started using `gonbui.DisplayHtml` and should start working).
+
+Example, the following doesn't work:
+
+```go
+import "github.com/janpfeifer/gonb/gonbui"
+
+%%
+gonbui.ScriptJavascript(`<script>alert('hello');</script>`)
+```
+
+But the following does:
 
 ```go
 import "github.com/janpfeifer/gonb/gonbui"
@@ -27,19 +38,6 @@ import "github.com/janpfeifer/gonb/gonbui"
 %%
 gonbui.DisplayHtml(`<script>alert('hello');</script>`)
 ```
-
-But the following does:
-
-```go
-%%
-gonbui.DisplayHtml(`<div></div><script>alert('hello');</script>`)
-```
-
-So there may be a solution to hack around VSCode javascript limitations. But ideally, VSCode would have an official
-way to support it.
-
-**It works**: somehow Javascript started working ... not sure if after I installed [Polyglot](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.dotnet-interactive-vscode) 
-or something else. Mysteriously, suddenly it works!? If anyone knows what is needed, pls let us know.
 
 ## No WASM
 
@@ -73,3 +71,6 @@ go run . --install --logtostderr --vmodule=goexec=2,specialcmd=2,cellmagic=2,gop
 * [VSCode Jupyter Notebooks](https://code.visualstudio.com/docs/datascience/jupyter-notebooks)
 * [Renderers for Jupyter Notebooks in Visual Studio Code](https://github.com/Microsoft/vscode-notebook-renderers):
   presumably adds renderes to several specialized mime-types, including a specialized plotly mime type, that one could take advantage of. I haven't tried it.
+* [vscode-jupyter wiki: IPyWidgets](https://github.com/microsoft/vscode-jupyter/wiki/Component:-IPyWidgets) (a lot going on!)
+* [vscode-jupyter wiki: React WebViews: Variable Viewer, Plot Viewer, and Data Viewer](https://github.com/microsoft/vscode-jupyter/wiki/React-WebViews:-Variable-Viewer,-Plot-Viewer,-and-Data-Viewer)
+* [vscode Extension Notebook API Renderer](https://code.visualstudio.com/api/extension-guides/notebook#notebook-renderer)

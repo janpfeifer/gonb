@@ -19,6 +19,7 @@ experimental.ipynb
 *.dll
 *.so
 *.dylib
+/gonb
 
 # Test binary, built with `go test -c`
 *.test

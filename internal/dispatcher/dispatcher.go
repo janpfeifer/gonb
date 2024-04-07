@@ -137,6 +137,15 @@ func handleShellMsg(msg kernel.Message, goExec *goexec.State) (err error) {
 				err = errors.WithMessagef(err, "replying 'shutdown_request'")
 			}
 
+		case "interrupt_request":
+			// Interrupt current cell being executed if any.
+			klog.V(2).Infof("Received interrupt_request.")
+			msg.Kernel().CallInterruptSubscribers()
+			replyContent := make(map[string]any)
+			replyContent["status"] = "ok"
+			err = msg.Reply("interrupt_reply", replyContent)
+			klog.V(2).Infof("Replied with interrupt_reply.")
+
 		default:
 			// Log, ignore, and hope for the best.
 			klog.Infof("Unhandled shell-socket message %q", msg.ComposedMsg().Header.MsgType)
@@ -226,6 +235,7 @@ func handleBusyMessage(msg kernel.Message, goExec *goexec.State) (err error) {
 // handleShutdownRequest sends a "shutdown" message.
 func handleShutdownRequest(msg kernel.Message, goExec *goexec.State) error {
 	klog.Info("Shutting down in response to shutdown_request")
+	msg.Kernel().CallInterruptSubscribers() // Interrupt current runs.
 
 	content := msg.ComposedMsg().Content.(map[string]any)
 	replyContent := make(map[string]any)

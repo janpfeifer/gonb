@@ -194,7 +194,7 @@ func (k *Kernel) HandleInterrupt() {
 				select {
 				case sig := <-k.signalsChan:
 					k.Interrupted.Store(true)
-					k.callInterruptSubscribers()
+					k.CallInterruptSubscribers()
 					klog.Infof("Signal %s received.", sig)
 					if sig == os.Interrupt {
 						// Simply interrupt running cells.
@@ -245,9 +245,9 @@ func (k *Kernel) UnsubscribeInterrupt(id SubscriptionId) {
 	}
 }
 
-// callInterruptSubscribers in a separate goroutine each.
-// Meant to be called when JupyterServer sends a kernel interrupt (either a SIGINT, or a message to interrupt).
-func (k *Kernel) callInterruptSubscribers() {
+// CallInterruptSubscribers in a separate goroutine each.
+// Meant to be called when JupyterServer sends a kernel interrupt (either a SIGINT, or a `interrupt_request` message to interrupt).
+func (k *Kernel) CallInterruptSubscribers() {
 	k.muSubscriptions.Lock()
 	defer k.muSubscriptions.Unlock()
 

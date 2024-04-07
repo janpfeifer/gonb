@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* [`interrupt_mode`] set to `message`, as opposed to having a `SIGINT`. Works both in JupyterLab and VSCode.
+* Interrupt all cell executions at `shutdown_request`.
+
 ## 0.10.0, 2024/04/07 Improvements on Plotly, VSCode support, interrupt handling and several minor fixes. 
   
 * Added special cell commands ("magic"):

@@ -25,11 +25,13 @@ var logoSVG []byte
 // jupyterKernelConfig is the Jupyter configuration to be
 // converted to a `kernel.json` file under `~/.local/share/jupyter/kernels/gonb`
 // (or `${HOME}/Library/Jupyter/kernels/` in Macs)
+// See details in: https://jupyter-client.readthedocs.io/en/latest/kernels.html#kernelspecs
 type jupyterKernelConfig struct {
-	Argv        []string          `json:"argv"`
-	DisplayName string            `json:"display_name"`
-	Language    string            `json:"language"`
-	Env         map[string]string `json:"env"`
+	Argv          []string          `json:"argv"`
+	DisplayName   string            `json:"display_name"`
+	Language      string            `json:"language"`
+	InterruptMode string            `json:"interrupt_mode"`
+	Env           map[string]string `json:"env"`
 }
 
 // Install gonb in users local Jupyter configuration, making it available. It assumes
@@ -40,16 +42,19 @@ type jupyterKernelConfig struct {
 // the kernel configuration, and that copy is used.
 //
 // If forceDeps is true, installation will succeed even with missing dependencies.
+//
+// Documentation: https://jupyter-client.readthedocs.io/en/latest/kernels.html#kernelspecs
 func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	gonbPath, err := os.Executable()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to find path to GoNB binary")
 	}
 	config := jupyterKernelConfig{
-		Argv:        []string{gonbPath, "--kernel", "{connection_file}"},
-		DisplayName: "Go (gonb)",
-		Language:    "go",
-		Env:         make(map[string]string),
+		Argv:          []string{gonbPath, "--kernel", "{connection_file}"},
+		DisplayName:   "Go (gonb)",
+		Language:      "go",
+		InterruptMode: "message", // "message" (a `interrupt_request` is sent) or "signal" (using SIGINT signal)
+		Env:           make(map[string]string),
 	}
 	if len(extraArgs) > 0 {
 		config.Argv = append(config.Argv, extraArgs...)

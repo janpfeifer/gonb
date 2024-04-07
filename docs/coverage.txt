@@ -9,7 +9,7 @@ github.com/janpfeifer/gonb/main.go						SetUpKlog					66.7%
 github.com/janpfeifer/gonb/cache/cache.go					New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go					AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					68.2%
+github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					72.7%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go					NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewHidden					100.0%
@@ -322,7 +322,7 @@ github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.WithStdout			
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.WithInputs				100.0%
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.WithPassword				100.0%
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.WithStaticInput			100.0%
-github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.Exec					77.4%
+github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.Exec					68.8%
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.done					92.3%
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.handleJupyterInput			91.3%
 github.com/janpfeifer/gonb/internal/jpyexec/jpyexec.go			*Executor.handleStaticInput			71.4%
@@ -344,7 +344,10 @@ github.com/janpfeifer/gonb/internal/kernel/kernel.go			*SyncSocket.RunLocked				
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.IsStopped				66.7%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.StoppedChan				100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Stop					72.2%
-github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.HandleInterrupt				91.7%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.HandleInterrupt				88.2%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.SubscribeInterrupt			80.0%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.UnsubscribeInterrupt			75.0%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.callInterruptSubscribers		42.9%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.ExitWait				100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Stdin					100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Shell					100.0%
@@ -410,4 +413,4 @@ github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execUntrack					54.5%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			showTrackedList					91.7%
 github.com/janpfeifer/gonb/internal/websocket/websocket.go			Javascript					83.3%
-total										(statements)					64.4%
+total										(statements)					64.3%

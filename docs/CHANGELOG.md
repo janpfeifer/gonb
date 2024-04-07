@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## 0.10.0, 2024/04/07 Improvements on Plotly, VSCode support, interrupt handling and several minor fixes. 
   
 * Added special cell commands ("magic"):
   * `%%writefile` to write contents of cell to file. See #103. Thanks @potoo0!
@@ -12,6 +12,8 @@
 * Added `plotly.AppendFig` that allows plotting to a transient area, or anywhere in the page.
 * Several minor fixes, see #106
 * Added handling of SIGHUP and SIGTERM to handle a clean exit: and avoid leaking `gopls` daemons.
+* Make sure SIGINT triggers an equivalent SIGINT on the child processes (it was not happening in VSCode).
+* Added `docs/VSCode.md` with notes/info on running GoNB with Visual Studio Code.
 
 ## 0.9.6, 2024/02/18
 

@@ -8,6 +8,7 @@
 * New `github.com/janpfeifer/gonb-echarts` to add support to [Apache ECharts](https://echarts.apache.org/en/index.html)
   using [github.com/go-echarts/go-echarts](https://github.com/go-echarts/go-echarts).
 * Updated documentation on VSCode limitation for Javascript.
+* Fixed bug in `dom.LoadScriptOrRequireJSModuleAndRun` where plotly source was hardcoded by mistake.
 
 ## 0.10.0, 2024/04/07 Improvements on Plotly, VSCode support, interrupt handling and several minor fixes. 
   

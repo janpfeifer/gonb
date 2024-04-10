@@ -14,6 +14,10 @@ import (
 //
 // If these are an issue, consider using TransientJavascript, which uses a transient area
 // to execute the Javascript, which is re-used for every execution.
+//
+// Note: `text/javascript` mime-type ([protocol.MIMETextJavascript]) is not supported by VSCode,
+// it's displayed as text. So using this won't work in VSCode. Consider instead using [DisplayHtml],
+// and wrapping the `js` string with `("<scrip>%s</script>", js)`.
 func ScriptJavascript(js string) {
 	if !IsNotebook {
 		return

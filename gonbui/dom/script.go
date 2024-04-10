@@ -98,9 +98,10 @@ var loadOrRequireAndRunTmpl = template.Must(template.New("load_or_required_and_r
 	
     if (typeof requirejs === "function") {
         // Use RequireJS to load module.
+		let srcWithoutExtension = src.substring(0, src.lastIndexOf(".js"));
         requirejs.config({
             paths: {
-                '{{.ModuleName}}': 'https://cdn.plot.ly/plotly-2.29.1.min'
+                '{{.ModuleName}}': srcWithoutExtension
             }
         });
         require(['{{.ModuleName}}'], function({{.ModuleName}}) {

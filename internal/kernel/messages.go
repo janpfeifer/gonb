@@ -482,6 +482,9 @@ func PublishMarkdown(msg Message, markdown string) error {
 }
 
 // PublishJavascript is a shortcut to PublishData for javascript content to be executed.
+//
+// Note: `text/javascript` mime-type ([protocol.MIMETextJavascript]) is not supported by VSCode,
+// it's displayed as text. So using this won't work in VSCode.
 func PublishJavascript(msg Message, js string) error {
 	return PublishData(msg, Data{
 		Data:      MIMEMap{string(protocol.MIMETextJavascript): js},

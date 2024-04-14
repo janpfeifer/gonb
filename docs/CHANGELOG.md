@@ -1,12 +1,13 @@
 # GoNB Changelog
 
-## Next
+## 0.10.1, 2024/04/14 Added support for Apache ECharts
 
 * Interrupt and Shutdown:
   * [`interrupt_mode`] set to `message`, as opposed to having a `SIGINT`. Works both in JupyterLab and VSCode.
   * Interrupt all cell executions at `shutdown_request`.
 * New `github.com/janpfeifer/gonb-echarts` to add support to [Apache ECharts](https://echarts.apache.org/en/index.html)
   using [github.com/go-echarts/go-echarts](https://github.com/go-echarts/go-echarts).
+  * Added `gonb_echarts.Display` and `gonb_echarts.DisplayContent`.
 * Updated documentation on VSCode limitation for Javascript.
 * Fixed bug in `dom.LoadScriptOrRequireJSModuleAndRun` where plotly source was hardcoded by mistake.
 

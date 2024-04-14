@@ -16,7 +16,7 @@
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
   * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
   * [Plotly integration](https://plotly.com/javascript/) using [go-plotly](https://github.com/MetalBlueberry/go-plotly) (see example in [tutorial](examples/tutorial.ipynb))
-  * [Apache ECharts](https://echarts.apache.org/en/index.html) integration using [gonb-echarts](https://github.com/janpfeifer/gonb-echarts) (with GoNB examples) and [go-echarts](https://github.com/go-echarts/go-echarts)
+  * [Apache ECharts](https://echarts.apache.org/en/index.html) integration using [gonb-echarts](https://github.com/janpfeifer/gonb-echarts) and [go-echarts](https://github.com/go-echarts/go-echarts): see [examples](https://janpfeifer.github.io/gonb-echarts/)
 * Uses standard Go compiler: 100% compatibility with projects, even those using CGO.
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 

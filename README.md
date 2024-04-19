@@ -8,6 +8,8 @@
 ![Coverage](https://img.shields.io/badge/Coverage-64.3%25-yellow)
 
 
+<img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
+
 ## For a quick start, see the [**tutorial**](examples/tutorial.ipynb)!
 
 ## Highlights:

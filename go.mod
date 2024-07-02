@@ -1,6 +1,6 @@
 module github.com/janpfeifer/gonb
 
-go 1.21
+go 1.22
 
 require (
 	github.com/MetalBlueberry/go-plotly v0.4.0

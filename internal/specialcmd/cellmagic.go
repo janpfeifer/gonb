@@ -25,6 +25,7 @@ var (
 //
 // The first line may contain special commands that change the interpretation of the cell, e.g.: "%%script", "%%writefile".
 func IsGoCell(firstLine string) bool {
+	firstLine = goexec.TrimGonbCommentPrefix(firstLine)
 	parts := strings.Split(firstLine, " ")
 	return !CellSpecialCommands.Has(parts[0])
 }
@@ -36,7 +37,8 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 	if len(lines) == 0 {
 		return
 	}
-	parts := splitCmd(lines[0])
+	line := goexec.TrimGonbCommentPrefix(lines[0])
+	parts := splitCmd(line)
 	if len(parts) == 0 || !CellSpecialCommands.Has(parts[0]) {
 		return
 	}

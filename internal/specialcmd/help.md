@@ -40,13 +40,16 @@ This way each cell can create its own `init_...()` and have it called at every c
 
 ### Special non-Go Commands
 
-- `%%` or `%main`: Marks the lines as follows to be wrapped in a `func main() {...}` during
+- `%% [<args...>]` or `%main [<args...>]`: Marks the lines as follows to be wrapped in a `func main() {...}` during
   execution. A shortcut to quickly execute code. It also automatically includes `flag.Parse()`
-  as the very first statement. Anything `%%` or `%main` are taken as arguments
+  as the very first statement. Anything after`%%` or `%main` are taken as arguments
   to be passed to the program -- it resets previous values given by `%args`.
-- `%args`: Sets arguments to be passed when executing the Go code. This allows one to
+- `%args <args...>`: Sets arguments to be passed when executing the Go code. This allows one to
   use flags as a normal program. Notice that if a value after `%%` or `%main` is given, it will
   overwrite the values here.
+- `%exec <my_func> [<args...>]`: this will call the function `my_func()`, and optionally set the program arguments.
+  Behind the scenes it creates a trivial `func main()` that parses the flags and calls `my_func()` (without any
+  parameters or return values).
 - `%autoget` and `%noautoget`: Default is `%autoget`, which automatically does `go get` for
   packages not yet available.
 - `%cd [<directory>]`: Change current directory of the Go kernel, and the directory from where
@@ -64,7 +67,13 @@ This way each cell can create its own `init_...()` and have it called at every c
 - `%with_password`: will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
 
-Notice all these commands are executed **before** any Go code in the same cell.
+**Notes**: 
+
+1. The special commands below can be used in the start of the line as is, or prefixed by a `//gonb:`, which may be easier
+on some IDEs if editing the code externally (since these special commands are not proper Go). 
+So `//gonb:%%` is the same as `%%` 
+2. All these commands are executed **before** any Go code in the same cell.
+
 
 ### Managing Memorized Definitions
 

@@ -15,6 +15,9 @@
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
 
+* **NEW**: Now supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal
+  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc). 
+  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
   * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!

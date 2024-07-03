@@ -97,16 +97,16 @@ func SortedKeys[K constraints.Ordered, V any](m map[K]V) []K {
 }
 
 // WalkDirWithSymbolicLinks is similar filepath.WalkDir, but it follows symbolic links. It also checks for
-// infinite loops in symbolic links, and returns an error if it finds one.
+// infinite loops in symbolic links, and ignore them.
 func WalkDirWithSymbolicLinks(root string, dirFunc fs.WalkDirFunc) error {
 	visited := MakeSet[string]()
 	return walkDirWithSymbolicLinksImpl(root, root, dirFunc, visited)
 }
 
 func walkDirWithSymbolicLinksImpl(root, current string, dirFunc fs.WalkDirFunc, visited Set[string]) error {
-	// Break infinite loops
+	// Break infinite loops, or simply repeated files/directories linked from different parts.
 	if visited.Has(current) {
-		return errors.Errorf("directory %q is in an infinite loop of symbolic links, cannot WalkDirWithSymbolicLinks(%q)", current, root)
+		return nil
 	}
 	visited.Insert(current)
 

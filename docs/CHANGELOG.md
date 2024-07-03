@@ -1,5 +1,8 @@
 # GoNB Changelog
 
+## Next
+* Fixed tracking to simply ignore loops, but not interrupt traversal during tracking.
+
 ## 0.10.1, 2024/04/14 Added support for Apache ECharts
 
 * Interrupt and Shutdown:

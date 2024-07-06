@@ -104,6 +104,23 @@ So `//gonb:%%` is the same as `%%`
 Notice that when the cell is executed, first all shell commands are executed, and only after that, if there is
 any Go code in the cell, it is executed.
 
+### Running a Debugger
+
+While **GoNB** doesn't (yet) talk the debug protocol with JupyterLab, it's easy to start a GUI debugger
+from a cell, if being executed on the same machine as the browser.
+
+The common Go debugger recommendation is [delve](https://github.com/go-delve/delve), and in particular its front-end
+[gdlv](https://github.com/aarzilli/gdlv). And to make it simpler **GoNB** includes a small wrapper script 
+[`ndlv`](https://github.com/janpfeifer/gonb/blob/main/cmd/ndlv/ndlv) to
+set the directory and program name to the last cell executed. Copy or link that script somewhere in your `PATH`
+(maybe `${HOME}/bin` if you have such directory set up).
+
+To open the debugger, after executing a cell you want to debug, you create and execute a new cell with this single shell command:
+
+```
+!ndlv
+```
+
 ### Tracking of Go Files In Development:
 
 A convenient way to develop programs or libraries in **GoNB** is to use replace

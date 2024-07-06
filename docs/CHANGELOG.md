@@ -7,6 +7,7 @@
   * Ignore `package` tag -- as opposed to raising an error: also to make easy on IDEs that may require a `package` tag.
   * Added special variation: `%exec <function_name> <args...>` that creates a main function that calls `<function_name>`
     and sets the program arguments (flags) to the given values.
+* Added `ndlv` wrapper script for starting [gdlv](https://github.com/aarzilli/gdlv) on cell binary.
 
 ## 0.10.1, 2024/04/14 Added support for Apache ECharts
 

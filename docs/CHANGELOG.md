@@ -11,6 +11,8 @@
     and sets the program arguments (flags) to the given values.
 * Added `ndlv` wrapper script for starting [gdlv](https://github.com/aarzilli/gdlv) on cell binary.
   * Many thanks for @HaveF for the help -- see [#122](https://github.com/janpfeifer/gonb/discussions/122)
+* Notebook testing: changed `nbexec` to use system's google-chrome if available (with sandbox), or let Rod download 
+  chromium, but then use with --no-sandbox (since there is no SUID on the binaries).
 
 ## 0.10.1, 2024/04/14 Added support for Apache ECharts
 

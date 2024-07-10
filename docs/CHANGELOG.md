@@ -1,13 +1,16 @@
 # GoNB Changelog
 
-## Next
+## 0.10.2, 2024/07/10 Added Jupytext support and `ndlv` script for debugging cells.
 
-* [Jupytext] integration:
+* [Jupytext](https://jupytext.readthedocs.io/en/latest/) integration [#120](https://github.com/janpfeifer/gonb/discussions/120):
+  * Many thanks for [Marc Wouts](github.com/mwouts) for [adding support in Jupytext](https://github.com/mwouts/jupytext/releases/tag/v1.16.3), 
+    and @HaveF for the help and starting the topic.
   * Handle special commands to be prefixed with `//gonb:` -- this allows special commands to be parseable Go code, and makes it easier for IDEs.
   * Ignore `package` tag -- as opposed to raising an error: also to make easy on IDEs that may require a `package` tag.
   * Added special variation: `%exec <function_name> <args...>` that creates a main function that calls `<function_name>`
     and sets the program arguments (flags) to the given values.
 * Added `ndlv` wrapper script for starting [gdlv](https://github.com/aarzilli/gdlv) on cell binary.
+  * Many thanks for @HaveF for the help -- see [#122](https://github.com/janpfeifer/gonb/discussions/122)
 
 ## 0.10.1, 2024/04/14 Added support for Apache ECharts
 

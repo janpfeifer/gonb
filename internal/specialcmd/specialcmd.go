@@ -50,12 +50,13 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 		if usedLines.Has(lineNum) {
 			continue
 		}
+		line = goexec.TrimGonbCommentPrefix(line)
 		if len(line) > 1 && (line[0] == '%' || line[0] == '!') {
 			var cmdStr string
-			cmdStr = joinLine(codeLines, lineNum, usedLines)
+			cmdStr = joinLine(codeLines, lineNum, usedLines) // Gather current line and following if line ends with a `\` symbol
 			cmdType := cmdStr[0]
 			cmdStr = cmdStr[1:]
-			for cmdStr[0] == ' ' {
+			for cmdStr[0] == ' ' || cmdStr[0] == '\t' {
 				cmdStr = cmdStr[1:] // Skip initial space
 			}
 			if len(cmdStr) == 0 {
@@ -87,14 +88,17 @@ func Parse(msg kernel.Message, goExec *goexec.State, execute bool, codeLines []s
 	return
 }
 
-// joinLine starts from fromLine and joins consecutive lines if the current line terminates with a `\n`,
+// joinLine starts from fromLine and joins consecutive lines if the current line terminates with a `\\\n`,
 // allowing multi-line commands to be issued.
+//
+// It removes the `//gonb:` prefix from all the joined lines, if the prefix is present.
 //
 // It returns the joined lines with the '\\\n' replaced by a space, and appends the used lines (including
 // fromLine) to usedLines.
 func joinLine(lines []string, fromLine int, usedLines Set[int]) (cmdStr string) {
 	for ; fromLine < len(lines); fromLine++ {
-		cmdStr += lines[fromLine]
+		line := goexec.TrimGonbCommentPrefix(lines[fromLine])
+		cmdStr += line
 		usedLines.Insert(fromLine)
 		if cmdStr[len(cmdStr)-1] != '\\' {
 			return
@@ -121,9 +125,17 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	switch parts[0] {
 
 	// Configures how cell will be executed.
-	case "%", "main", "args", "test":
+	case "%", "main", "args", "test", "exec":
 		// Set arguments for execution, allows one to set flags, etc.
-		goExec.Args = parts[1:]
+		if parts[0] == "exec" {
+			if len(parts) == 1 {
+				return errors.Errorf("%%exec requires the name of the function to execute")
+			}
+			// The function to execute is in parts[1], but it will be extracted later when parsing the cell code.
+			goExec.Args = parts[2:]
+		} else {
+			goExec.Args = parts[1:]
+		}
 		klog.V(2).Infof("Program args to use (%%%s): %+q", parts[0], goExec.Args)
 		if parts[0] == "test" {
 			goExec.CellIsTest = true

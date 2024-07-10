@@ -3,7 +3,6 @@ package goexec
 import (
 	"fmt"
 	. "github.com/janpfeifer/gonb/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
 	"strings"
@@ -64,11 +63,16 @@ func TestCreateGoFileFromLines(t *testing.T) {
 		require.Equalf(t, cellLines[cellLineIdx], newLine, "Line mapping look wrong: file line %d --> cell line %d", ii, cellLineIdx)
 	}
 
-	// Test check for invalid "package xxx" in cell.
+	// Test check "package xxx" in cell is ignored.
 	cellLines = strings.Split("package xxx\n%%\nfmt.Println(\"Hello\")\n", "\n")
 	skipLines = MakeSet[int]()
 	cursorInCell = NoCursor
 	_, _, err = s.createGoFileFromLines(s.CodePath(), 1, cellLines, skipLines, cursorInCell)
-	require.Errorf(t, err, "Expected error for unnecessary setting of `package`.")
-	assert.Contains(t, err.Error(), "Please don't set a `package`")
+	require.NoErrorf(t, err, "Failed createGoFileFromLines with: %q", cellLines)
+	contentBytes, err = os.ReadFile(s.CodePath())
+	require.NoErrorf(t, err, "Failed os.ReadFile(%q)", s.CodePath())
+	content = string(contentBytes)
+	require.Contains(t, content, "func main() {")
+	require.Contains(t, content, "Hello")
+	require.NotContains(t, content, "xxx", "`package xxx` should have been discarded")
 }

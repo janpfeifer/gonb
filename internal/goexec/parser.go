@@ -574,3 +574,17 @@ func IsEmptyLines(lines []string, skipLines Set[int]) bool {
 	}
 	return true
 }
+
+// GonbCommentPrefix allows one to enter the special commands (`%%`, `!`) prefixed as a Go comment, so
+// it doesn't conflict with Go IDEs.
+// Particularly useful if using Jupytext.
+const GonbCommentPrefix = "//gonb:"
+
+// TrimGonbCommentPrefix removes a prefixing "//gonb:" (GonbCommentPrefix) from line, if there is such a prefix.
+// This is optionally used to escape special commands.
+func TrimGonbCommentPrefix(line string) string {
+	if strings.HasPrefix(line, GonbCommentPrefix) {
+		line = line[len(GonbCommentPrefix):]
+	}
+	return line
+}

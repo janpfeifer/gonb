@@ -9,7 +9,7 @@ github.com/janpfeifer/gonb/main.go						SetUpKlog					66.7%
 github.com/janpfeifer/gonb/cache/cache.go					New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go					AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					72.7%
+github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					68.2%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go					NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewHidden					100.0%
@@ -28,7 +28,7 @@ github.com/janpfeifer/gonb/cache/cache.go					CacheWith					91.7%
 github.com/janpfeifer/gonb/cache/cache.go					Cache						0.0%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				main						72.2%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				startJupyterNotebook				73.2%
-github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				executeNotebook					81.8%
+github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				executeNotebook					78.6%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				checkForInputBoxes				95.7%
 github.com/janpfeifer/gonb/common/common.go					Panicf						0.0%
 github.com/janpfeifer/gonb/common/common.go					Pause						0.0%
@@ -165,9 +165,9 @@ github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.ProgramUnsubscr
 github.com/janpfeifer/gonb/internal/comms/namedpipes.go			*State.deliverProgramSubscriptionsLocked	62.5%
 github.com/janpfeifer/gonb/internal/dispatcher/comms.go			handleComms					55.6%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		RunKernel					80.0%
-github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShellMsg					71.0%
+github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShellMsg					78.4%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleBusyMessage				47.8%
-github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShutdownRequest				83.3%
+github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleShutdownRequest				84.6%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleExecuteRequest				87.5%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		HandleInspectRequest				0.0%
 github.com/janpfeifer/gonb/internal/dispatcher/dispatcher.go		handleCompleteRequest				0.0%
@@ -185,7 +185,7 @@ github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderFun
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderTypes			100.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderConstants			100.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Constant.Render				100.0%
-github.com/janpfeifer/gonb/internal/goexec/composer.go			*State.createGoFileFromLines			85.7%
+github.com/janpfeifer/gonb/internal/goexec/composer.go			*State.createGoFileFromLines			81.8%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*State.createCodeFileFromDecls			58.8%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*State.createAlternativeFileFromDecls		0.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*State.createCodeFromDecls			71.9%
@@ -258,6 +258,7 @@ github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.readMainGo				77.8
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.SetCellTests				100.0%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.DefaultCellTestArgs			100.0%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			IsEmptyLines					77.8%
+github.com/janpfeifer/gonb/internal/goexec/parser.go			TrimGonbCommentPrefix				100.0%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			newTrackingInfo					100.0%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.Track					100.0%
 github.com/janpfeifer/gonb/internal/goexec/tracking.go			*State.lockedTrack				54.8%
@@ -344,10 +345,10 @@ github.com/janpfeifer/gonb/internal/kernel/kernel.go			*SyncSocket.RunLocked				
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.IsStopped				66.7%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.StoppedChan				100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Stop					72.2%
-github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.HandleInterrupt				88.2%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.HandleInterrupt				58.8%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.SubscribeInterrupt			80.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.UnsubscribeInterrupt			75.0%
-github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.callInterruptSubscribers		42.9%
+github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.CallInterruptSubscribers		42.9%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.ExitWait				100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Stdin					100.0%
 github.com/janpfeifer/gonb/internal/kernel/kernel.go			*Kernel.Shell					100.0%
@@ -395,7 +396,7 @@ github.com/janpfeifer/gonb/internal/nbtests/nbtests.go			Sequence					63.2%
 github.com/janpfeifer/gonb/internal/nbtests/nbtests.go			OutputLine					100.0%
 github.com/janpfeifer/gonb/internal/nbtests/nbtests.go			InputLine					100.0%
 github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go			IsGoCell					0.0%
-github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go			ExecuteSpecialCell				80.0%
+github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go			ExecuteSpecialCell				81.0%
 github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go			cellCmdWritefile				87.5%
 github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go			writeLinesToFile				85.7%
 github.com/janpfeifer/gonb/internal/specialcmd/cellmagic.go		cellCmdScript					50.0%
@@ -404,9 +405,9 @@ github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		displayEnumeratio
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		listDefinitions					100.0%
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		removeDefinitionImpl				87.5%
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		removeDefinitions				75.0%
-github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		Parse						84.0%
-github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		joinLine					85.7%
-github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		execSpecialConfig				54.4%
+github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		Parse						84.6%
+github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		joinLine					87.5%
+github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		execSpecialConfig				55.3%
 github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		execShell					100.0%
 github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		splitCmd					97.0%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%

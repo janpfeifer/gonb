@@ -216,10 +216,20 @@ func TestHello(t *testing.T) {
 	}
 	f := executeNotebook(t, "hello")
 	err := Check(f,
-		Match(OutputLine(2),
-			Separator,
-			"Hello World!",
-			Separator),
+		Sequence(
+			Match(OutputLine(2),
+				Separator,
+				"Hello World!",
+				Separator),
+			Match(OutputLine(3),
+				Separator,
+				"Works with //gonb:",
+				Separator),
+			Match(OutputLine(4),
+				Separator,
+				"%exec worked for x=17",
+				Separator),
+		),
 		*flagPrintNotebook)
 
 	require.NoError(t, err)

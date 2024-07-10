@@ -1,6 +1,6 @@
 module github.com/janpfeifer/gonb
 
-go 1.21
+go 1.22
 
 require (
 	github.com/MetalBlueberry/go-plotly v0.4.0
@@ -8,7 +8,7 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-language-server/protocol v0.7.0
 	github.com/go-language-server/uri v0.2.0
-	github.com/go-rod/rod v0.114.3
+	github.com/go-rod/rod v0.116.1
 	github.com/go-zeromq/zmq4 v0.16.0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gowebapi/webapi v0.0.0-20221221115732-41cedfc27a0b
@@ -33,9 +33,9 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.4.0 // indirect
-	github.com/ysmood/fetchup v0.2.3 // indirect
+	github.com/ysmood/fetchup v0.2.4 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
-	github.com/ysmood/got v0.34.1 // indirect
+	github.com/ysmood/got v0.40.0 // indirect
 	github.com/ysmood/gson v0.7.3 // indirect
 	github.com/ysmood/leakless v0.8.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect

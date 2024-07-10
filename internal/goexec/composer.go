@@ -333,36 +333,50 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 	}()
 
 	w.Write("package main\n\n")
-	var createdFuncMain bool
-	isFirstLine := true
+	var needsClosingMain bool
 	for ii, line := range lines {
-		if strings.HasPrefix(line, "%main") || strings.HasPrefix(line, "%%") {
+		trimmedLine := TrimGonbCommentPrefix(line)
+		if strings.HasPrefix(trimmedLine, "%main") || strings.HasPrefix(trimmedLine, "%%") {
 			// Write preamble of func main() and associate to the "%%" line:
 			fileToCellLines[w.Line] = ii
 			fileToCellLines[w.Line+1] = ii
 			w.Write("func main() {\n\tflag.Parse()\n")
-			createdFuncMain = true
-			isFirstLine = false
+			needsClosingMain = true
+			continue
+		}
+		if strings.HasPrefix(trimmedLine, "%exec") {
+			parts := strings.Split(trimmedLine, " ")
+			if len(parts) < 2 {
+				err = errors.Errorf("%%exec requires the name of a function to execute, none given in line %d: %q", ii, line)
+			}
+			mainFuncName := parts[1]
+			for jj := range 4 {
+				fileToCellLines[w.Line+jj] = ii
+			}
+			w.Write(fmt.Sprintf(`func main() {
+	flag.Parse()
+	%s()
+}
+`, mainFuncName))
 			continue
 		}
 		if _, found := skipLines[ii]; found {
+			// Other special commands.
 			continue
 		}
 		if ii == cursorInCell.Line {
 			// Use current line for cursor, but add column.
 			cursorInFile = w.CursorPlusDelta(Cursor{Col: cursorInCell.Col})
 		}
-		if isFirstLine && strings.HasPrefix(line, "package") {
-			err = errors.Errorf("Please don't set a `package` in any of your cells: GoNB will set a `package main` automatically for you when compiling your cells. Cell #%d Line %d: %q",
-				cellId, ii+1, line)
-			return
+		if strings.HasPrefix(line, "package") {
+			// Ignore package line, since GoNB will rewrite the package to main.
+			continue
 		}
 		fileToCellLines[w.Line] = ii // Registers line mapping.
 		w.Write(line)
 		w.Write("\n")
-		isFirstLine = false
 	}
-	if createdFuncMain {
+	if needsClosingMain {
 		w.Write("\n}\n")
 	}
 	if w.Error() != nil {

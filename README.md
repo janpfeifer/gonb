@@ -15,6 +15,9 @@
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
 
+* **NEW**: Now supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal.
+  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc). 
+  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
   * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
@@ -26,6 +29,7 @@
   start up, since each cell is compiled.
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
+* Debug using [gdlv](https://github.com/aarzilli/gdlv), a GUI for the [delve](https://github.com/go-delve/delve) debugger (see %help).
 * Shell command executions with `!` -- handy at times, for instance to install packages.
 * Reported to work with Github Codespace, [VSCode](docs/VSCode.md), Binder, Google's Colab, etc.
 * Very well documented and supported.

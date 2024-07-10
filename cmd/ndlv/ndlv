@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# ndlv is a wrapper script that executes gdlv, a delve GUI, from inside a gonb notebook.
+# It will fail if not being executed by gonb, or if dlv and gdlv are not installed, or if no cell has
+# yet been executed to be debugged.
+
+if [[ "${GONB_TMP_DIR}" == "" ]] ; then
+  echo "No being executed from a gonb notebook cell, GONB_TMP_DIR not set." 1>&2
+  exit 1
+fi
+if [[ "$(which dlv)" == "" ]] ; then
+  echo "Can't find delve (dlv) debugger. See https://github.com/go-delve/delve/tree/master/Documentation/installation" 1>&2
+  exit 1
+fi
+if [[ "$(which gdlv)" == "" ]] ; then
+  echo "Can't find gdlv GUI for delve debugger. See https://github.com/aarzilli/gdlv" 1>&2
+  exit 1
+fi
+
+go_binary="$(basename "${GONB_TMP_DIR}")"
+cd "${GONB_TMP_DIR}" || ( echo "Can't cd to GONB_TMP_DIR=${GONB_TMP_DIR}" ; exit 1 )
+
+if [[ ! -e "${go_binary}" ]] ; then
+  echo "Cell binary is not available (${GONB_TMP_DIR}/${go_binary}) -- has cell already been executed ?" 1>&2
+  exit 1
+fi
+
+gdlv debug "${go_binary}"

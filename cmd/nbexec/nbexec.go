@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/must"
@@ -267,9 +268,17 @@ func startJupyterNotebook() {
 }
 
 // Notebook instrumenting using go-rod.
-
 func executeNotebook(url string, inputBoxes []string) {
-	page := rod.New().MustConnect().MustPage(url)
+	// Use system's Google Chrome is available, for sandboxing:
+	var controlURL string
+	chromePath, err := exec.LookPath("google-chrome")
+	if err == nil {
+		controlURL = launcher.New().Bin(chromePath).MustLaunch()
+	} else {
+		klog.Warningf("Using rod downloaded chromium, with --no-sandbox")
+		controlURL = launcher.New().NoSandbox(true).MustLaunch()
+	}
+	page := rod.New().ControlURL(controlURL).MustConnect().MustPage(url)
 	klog.V(1).Infof("Waiting for opening of page %q", url)
 	page.MustWaitStable()
 

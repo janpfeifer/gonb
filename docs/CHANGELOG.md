@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* go1.23, and update dependencies.
+* 
+
 ## 0.10.2, 2024/07/10 Added Jupytext support and `ndlv` script for debugging cells.
 
 * [Jupytext](https://jupytext.readthedocs.io/en/latest/) integration [#120](https://github.com/janpfeifer/gonb/discussions/120):

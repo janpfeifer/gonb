@@ -1,9 +1,9 @@
 # GoNB Changelog
 
-## Next
+## 0.10.3, Simple go1.23 update.
 
 * go1.23, and update dependencies.
-* 
+* Fixed GitHub's go.yaml actions, test shows green now.
 
 ## 0.10.2, 2024/07/10 Added Jupytext support and `ndlv` script for debugging cells.
 

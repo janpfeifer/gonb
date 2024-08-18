@@ -22,15 +22,13 @@ FROM ${BASE_IMAGE}:${BASE_TAG}
 
 # Update apt and install basic utils
 USER root
-RUN apt-get update --yes
-RUN apt-get install --yes --no-install-recommends wget
-RUN apt-get install --yes --no-install-recommends git
+RUN apt update --yes
+RUN apt install --yes --no-install-recommends wget git
 
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ENV GO_VERSION=1.22.5
-ENV GONB_VERSION="v0.10.2"
+ARG GO_VERSION=1.23.0
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/opt/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -41,10 +39,11 @@ RUN mkdir ${GOPATH} && chown ${NB_USER}:users ${GOPATH}
 
 USER root
 WORKDIR /usr/local
-RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xz \
+RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xvz \
     && go version
 
 # Install GoNB (https://github.com/janpfeifer/gonb) in the user account
+ARG GONB_VERSION="v0.10.3"
 USER $NB_USER
 WORKDIR ${HOME}
 RUN export GOPROXY=direct && \

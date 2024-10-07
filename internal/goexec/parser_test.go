@@ -117,6 +117,8 @@ type Model[T any] struct {
 
 !echo nonono
 
+var contents, _ = os.ReadFile("/tmp/a")
+
 %%
 fmt.Printf("Hello! %s\n", c)
 fmt.Printf("1 + 3 = %d\n", sum(1, 3))
@@ -159,16 +161,17 @@ func TestState_Parse(t *testing.T) {
 	assert.Contains(t, s.Definitions.Functions, "Kg~Gain")
 	assert.Contains(t, s.Definitions.Functions, "N~Weight")
 	assert.Contains(t, s.Definitions.Functions, "main")
-	assert.ElementsMatch(t, []int{71, 71, 72, 73, 74, 75, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
+	assert.ElementsMatch(t, []int{73, 73, 74, 75, 76, 77, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Definitions.Variables)
-	assert.Lenf(t, s.Definitions.Variables, 6, "Expected 4 variables, got %+v", s.Definitions.Variables)
+	assert.Lenf(t, s.Definitions.Variables, 8, "Expected 6 variables, got %d: %+v", len(s.Definitions.Variables), s.Definitions.Variables)
 	assert.Contains(t, s.Definitions.Variables, "x")
 	assert.Contains(t, s.Definitions.Variables, "y")
 	assert.Contains(t, s.Definitions.Variables, "z")
 	assert.Contains(t, s.Definitions.Variables, "b")
 	assert.Contains(t, s.Definitions.Variables, "c")
+	assert.Contains(t, s.Definitions.Variables, "contents")
 	// The 5th var is "_", which gets a random key.
 	assert.ElementsMatch(t, []int{21, 22}, s.Definitions.Variables["b"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
@@ -230,6 +233,7 @@ func TestState_Parse(t *testing.T) {
 	b = math.Sqrt(30.0 +
 		34.0)
 	c = "blah, blah, blah"
+	contents, _ = os.ReadFile("/tmp/a")
 	x float32 = 1
 	y float32 = 2
 	z float64
@@ -251,6 +255,7 @@ func TestState_Parse(t *testing.T) {
 		{cellId, 20},
 		{cellId, 20},
 		{cellId, 25},
+		{cellId, 71}, // var contents, _ = os.ReadFile("/tmp/a")
 	}, fileToCellIdAndLine, "Line numbers in cell code don't match")
 
 	// Checks functions rendering.

@@ -32,7 +32,7 @@ func GoNBRootDir() string {
 // variable JUPYTER_DATA_DIR to that directory, and compile and install
 // GoNB to that directory, so it will be used by `nbconvert`.
 //
-// It also compiles `nbexec` to the same directory, which is used to controle the
+// It also compiles `nbexec` to the same directory, which is used to control the
 // execution of the notebooks.
 //
 // Parameters:

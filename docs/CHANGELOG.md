@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next 
+
+* Issue #131: proper handling of tuple variable declarations like `var contents, _ = os.ReadFile(...)`
+
 ## 0.10.3, Simple go1.23 update.
 
 * go1.23, and update dependencies.

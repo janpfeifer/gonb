@@ -89,8 +89,7 @@ func main() {
 	// Start Jupyter Notebook
 	startJupyterNotebook()
 	if jupyterDone == nil || jupyterDone.Test() {
-		klog.Errorf("The program `jupyter notebook` failed to run, notebook was not executed!")
-		return
+		klog.Fatal("The program `jupyter notebook` failed to run, notebook was not executed!")
 	}
 
 	go func() {

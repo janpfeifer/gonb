@@ -20,7 +20,7 @@ type CellIdAndLine struct {
 	Id, Line int
 }
 
-// MakeFileToCellIdAndLine converts a cellId slice of cell line numbers for a file to a slice of CellIdAndLine.
+// MakeFileToCellIdAndLine converts a cellId and a slice of cell line numbers for a file to a slice of CellIdAndLine.
 func MakeFileToCellIdAndLine(cellId int, fileToCellLine []int) (fileToCellIdAndLine []CellIdAndLine) {
 	fileToCellIdAndLine = make([]CellIdAndLine, len(fileToCellLine))
 	for ii, line := range fileToCellLine {
@@ -146,6 +146,11 @@ func (d *Declarations) RenderVariables(w *WriterWithCursor, fileToCellIdAndLine 
 	w.Write("var (\n")
 	for _, key := range SortedKeys(d.Variables) {
 		varDecl := d.Variables[key]
+		isTuple := len(varDecl.TupleDefinitions) > 0
+		if isTuple && varDecl.TupleDefinitions[0] != varDecl {
+			// We only render the first variable of the tuple.
+			continue
+		}
 		w.Write("\t")
 		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
 		fileToCellIdAndLine = varDecl.CellLines.Append(fileToCellIdAndLine)
@@ -153,6 +158,17 @@ func (d *Declarations) RenderVariables(w *WriterWithCursor, fileToCellIdAndLine 
 			cursor = w.CursorPlusDelta(varDecl.Cursor)
 		}
 		w.Write(varDecl.Name)
+
+		if isTuple {
+			for _, otherVar := range varDecl.TupleDefinitions[1:] {
+				w.Write(", ")
+				if otherVar.CursorInName {
+					cursor = w.CursorPlusDelta(otherVar.Cursor)
+				}
+				w.Write(otherVar.Name)
+			}
+		}
+
 		if varDecl.TypeDefinition != "" {
 			w.Write(" ")
 			if varDecl.CursorInType {

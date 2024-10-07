@@ -671,3 +671,44 @@ func TestGonbui(t *testing.T) {
 	require.NoError(t, os.Remove(f.Name()))
 	clearNotebook(t, notebook)
 }
+
+func TestVarTuple(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	f := executeNotebook(t, "vartuple")
+	err := Check(f,
+		Sequence(
+			Match(OutputLine(1),
+				Separator,
+				"a=3, c=7",
+				Separator),
+
+			Match(OutputLine(2),
+				Separator),
+			// Here the Markdown output is all scrambled, so I tried to match some individual lines -- there is
+			// garbage (from the conversion to ASCII) in-between.
+			Match("== Variables"),
+			Match("a"),
+			Match("c"),
+			Match("== Functions"),
+
+			Match(OutputLine(3),
+				Separator,
+				"c=1.5",
+				Separator),
+
+			// Match failure of doing `%rm a`, since `a` definition must have been removed.
+			Match(OutputLine(4),
+				Separator,
+				`. key "a" not found in any definition, not removed`,
+				Separator),
+		),
+		*flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, "vartuple")
+}

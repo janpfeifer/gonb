@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"slices"
 )
 
 const (
@@ -269,13 +270,30 @@ func (d *Declarations) Copy() *Declarations {
 func (d *Declarations) MergeFrom(d2 *Declarations) {
 	copyMap(d.Imports, d2.Imports)
 	copyMap(d.Functions, d2.Functions)
-	copyMap(d.Variables, d2.Variables)
+	variablesCopyFrom(d.Variables, d2.Variables)
 	copyMap(d.Types, d2.Types)
 	copyMap(d.Constants, d2.Constants)
 }
 
 func copyMap[K comparable, V any](dst, src map[K]V) {
 	for k, v := range src {
+		dst[k] = v
+	}
+}
+
+// variablesCopyFrom is similar to copyMap above, but it handles the special tuple cases.
+func variablesCopyFrom(dst, src map[string]*Variable) {
+	for k, v := range src {
+		if oldV, found := dst[k]; found {
+			// If there is a previous variable with the same name, tied to a tuple that is not the same
+			// tuple that is being merged, then remove all the definitions of the previous tuple.
+			if oldV.TupleDefinitions != nil && !slices.Equal(oldV.TupleDefinitions, v.TupleDefinitions) {
+				for _, removeV := range oldV.TupleDefinitions {
+					// One of the removeV will be equal to oldV, which is fine.
+					delete(dst, removeV.Key)
+				}
+			}
+		}
 		dst[k] = v
 	}
 }
@@ -387,6 +405,18 @@ type Function struct {
 }
 
 // Variable definition, parsed from a notebook cell.
+//
+// There is one special case, where one variable entry will define multiple variables, when we have line like:
+//
+//	var a, b, c = someFuncThatReturnsATuple()
+//
+// For such cases, one set TupleDefinitions in order ("a", "b", "c"). And we define the following behavior:
+//
+//   - Only the first element of TupleDefinitions is rendered, but it renders the tuple definition.
+//   - If any of the elements of the tuple is redefined or removed, all elements are removed.
+//
+// This means that if "a" is redefined, "b" and "c" disappear. And that if "b" or "c" are redefined, it will
+// yield and error, that is subtle to track.
 type Variable struct {
 	Cursor
 	CellLines
@@ -394,6 +424,9 @@ type Variable struct {
 	CursorInName, CursorInType, CursorInValue bool
 	Key, Name                                 string
 	TypeDefinition, ValueDefinition           string // Type definition may be empty.
+
+	// TupleDefinitions are present when multiple variables are tied to the same definition as in `var a, b, c = someFunc()`.
+	TupleDefinitions []*Variable
 }
 
 // TypeDecl definition, parsed from a notebook cell.

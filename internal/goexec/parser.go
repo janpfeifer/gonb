@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 
 	. "github.com/janpfeifer/gonb/common"
@@ -261,6 +260,18 @@ func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl)
 }
 
 // ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.parseFromGoCode
+//
+// There are a many variations to consider:
+//
+// (1) var v Type            -> One variable, one type
+// (2) var v1, v2 Type       -> N variables, 1 type
+// (3) var v1, v2 = 0, 1     -> N variables, N values
+// (4) var v1, v2 int = 0, 1 -> N variables, 1 type, N values
+// (5) var c, _ = os.ReadFile(...)  -> N variables, one function that returns tuple.
+//
+// Case (5) is the most complicated, because the N variables are tied to one definition.
+// We key it on the first variable, but this may cause issues with some code like `var a, b = someFunc()`
+// and later the user decides to redefine `var b = 10`. It will require manual removal of the definition of `a`.
 func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 	// Multiple declarations in the same line may share the cursor (e.g: `var a, b int` if the cursor
 	// is in the `int` token). Only the first definition ('a' in the example) takes the cursor.
@@ -274,9 +285,20 @@ func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 			typeDefinition = pi.extractContentOfNode(vType)
 			cursorInType = pi.getCursor(vType)
 		}
+
+		isTuple := len(vSpec.Names) > 0 && len(vSpec.Values) == 1
+		var tupleDefinitions []*Variable
+		if isTuple {
+			tupleDefinitions = make([]*Variable, len(vSpec.Names))
+		}
+
 		// Each spec may be a list of variables (comma separated).
 		for nameIdx, name := range vSpec.Names {
 			v := &Variable{Name: name.Name, TypeDefinition: typeDefinition}
+			if isTuple {
+				v.TupleDefinitions = tupleDefinitions
+				tupleDefinitions[nameIdx] = v
+			}
 			if !cursorFound {
 				if c := pi.getCursor(name); c.HasCursor() {
 					v.CursorInName = true
@@ -304,7 +326,7 @@ func (pi *parseInfo) ParseVarEntry(decls *Declarations, genDecl *ast.GenDecl) {
 			v.CellLines = pi.calculateCellLines(vSpec)
 			if v.Name == "_" {
 				// Each un-named reference has a unique key.
-				v.Key = "_~" + strconv.Itoa(rand.Int()%0xFFFF)
+				v.Key = "_~" + fmt.Sprintf("%06d", rand.Int63n(1_000_000))
 			}
 			decls.Variables[v.Key] = v
 		}

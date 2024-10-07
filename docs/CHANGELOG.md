@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next 
+## v0.10.4, Fixed #131
 
 * Issue #131: proper handling of tuple variable declarations like `var contents, _ = os.ReadFile(...)`
 

@@ -28,7 +28,7 @@ RUN apt install --yes --no-install-recommends wget git
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ARG GO_VERSION=1.23.0
+ARG GO_VERSION=1.23.2
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/opt/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -43,7 +43,7 @@ RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-am
     && go version
 
 # Install GoNB (https://github.com/janpfeifer/gonb) in the user account
-ARG GONB_VERSION="v0.10.3"
+ARG GONB_VERSION="v0.10.4"
 USER $NB_USER
 WORKDIR ${HOME}
 RUN export GOPROXY=direct && \

@@ -7,14 +7,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BrowserDownload triggers a download from the browser of the given data, named fileName with the given
-// mimeType (the type protocol.MIMEType is a string, so you can easily convert mimetypes unknown to gonbui).
+// BrowserDownload triggers a browser download of the provided data.
 //
-// It does that by creating a temporary link to download and faking a click on it, and later removing it.
+// This function initiates a file download in the user's browser. It works by
+// creating a temporary link with the provided data and simulating a click on it.
+// The link is then removed.
 //
-// The data is converted to javascript in the page, that means that there is a large overhead, and that all
-// data will be uploaded to the browser page (hence in the client's computer memory). This is totally fine
-// for small files, but don't use this for large data.
+// Note: This function encodes the data into the webpage, which is inefficient
+// for large files. It's best suited for downloading smaller files.
+//
+// Parameters:
+//   - fileName: The name of the downloaded file.
+//   - data: The file content as a byte array.
+//   - mimeType: The MIME type of the file (e.g., "text/csv", "image/png").
 //
 // Example:
 //

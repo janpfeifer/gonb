@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// BrowserDownload triggers a browser download of the provided data.
+// SendAsDownload sends data from a cell to the client by triggering a browser download.
 //
 // This function initiates a file download in the user's browser. It works by
 // creating a temporary link with the provided data and simulating a click on it.
@@ -33,17 +33,17 @@ import (
 //		lines = append(lines, fmt.Sprintf("%q,%q", name, phone))
 //	}
 //	data := []byte(strings.Join(lines, "\n"))
-//	dom.BrowserDownload("phonebook.csv", data, "text/csv")
-func BrowserDownload(fileName string, data []byte, mimeType protocol.MIMEType) {
+//	dom.SendAsDownload("phonebook.csv", data, "text/csv")
+func SendAsDownload(fileName string, data []byte, mimeType protocol.MIMEType) {
 	var b bytes.Buffer
 	w := base64.NewEncoder(base64.StdEncoding, &b)
 	if _, err := w.Write(data); err != nil {
 		// bytes.Buffer.Write never returns an error.
-		panic(errors.Wrapf(err, "failed to write to bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
+		panic(errors.Wrapf(err, "failed to write to bytes.Buffer, this should never happen -- in dom.SendAsDownload(%q, data, %q)", fileName, mimeType))
 	}
 	if err := w.Close(); err != nil {
 		// bytes.Buffer.Close never returns an error.
-		panic(errors.Wrapf(err, "failed to close bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
+		panic(errors.Wrapf(err, "failed to close bytes.Buffer, this should never happen -- in dom.SendAsDownload(%q, data, %q)", fileName, mimeType))
 	}
 	dataURL := "data:" + string(mimeType) + ";base64," + b.String()
 

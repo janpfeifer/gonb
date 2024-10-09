@@ -38,9 +38,11 @@ func BrowserDownload(fileName string, data []byte, mimeType protocol.MIMEType) {
 	var b bytes.Buffer
 	w := base64.NewEncoder(base64.StdEncoding, &b)
 	if _, err := w.Write(data); err != nil {
+		// bytes.Buffer.Write never returns an error.
 		panic(errors.Wrapf(err, "failed to write to bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
 	}
 	if err := w.Close(); err != nil {
+		// bytes.Buffer.Close never returns an error.
 		panic(errors.Wrapf(err, "failed to close bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
 	}
 	dataURL := "data:" + string(mimeType) + ";base64," + b.String()

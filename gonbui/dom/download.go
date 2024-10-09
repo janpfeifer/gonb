@@ -34,14 +34,14 @@ import (
 //	}
 //	data := []byte(strings.Join(lines, "\n"))
 //	dom.BrowserDownload("phonebook.csv", data, "text/csv")
-func BrowserDownload(fileName string, data []byte, mimeType protocol.MIMEType) error {
+func BrowserDownload(fileName string, data []byte, mimeType protocol.MIMEType) {
 	var b bytes.Buffer
 	w := base64.NewEncoder(base64.StdEncoding, &b)
 	if _, err := w.Write(data); err != nil {
-		return errors.Wrapf(err, "failed to convert data to base64 in dom.BrowserDownload(%q, data, %q)", fileName, mimeType)
+		panic(errors.Wrapf(err, "failed to write to bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
 	}
 	if err := w.Close(); err != nil {
-		return errors.Wrapf(err, "failed to convert (Close) data to base64 in dom.BrowserDownload(%q, data, %q)", fileName, mimeType)
+		panic(errors.Wrapf(err, "failed to close bytes.Buffer, this should never happen -- in dom.BrowserDownload(%q, data, %q)", fileName, mimeType))
 	}
 	dataURL := "data:" + string(mimeType) + ";base64," + b.String()
 
@@ -51,5 +51,4 @@ downloadLink.download = '` + fileName + `';
 document.body.appendChild(downloadLink);
 downloadLink.click();
 document.body.removeChild(downloadLink);`)
-	return nil
 }

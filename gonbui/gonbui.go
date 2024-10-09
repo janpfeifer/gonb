@@ -13,6 +13,21 @@
 //
 // This guarantees that no in-transit display content get left behind when a program
 // exits.
+//
+// Error Handling in Gonbui:
+//
+// Gonbui involves communication between several components: the code execution environment,
+// the Jupyter kernel, the Jupyter server, and the browser. This communication is asynchronous
+// and errors may occur at various points.
+//
+// Gonbui employs a simplified error handling approach:
+//   - Global Error State: A single global error state is maintained.  While not recoverable,
+//     errors are rare. You can check this state using the `Error` function.
+//   - Logging: All errors are logged. However, if communication is broken, logs might not
+//     reach the browser.  Check the Jupyter (and potentially Gonbui) logs in such cases.
+//
+// This approach prioritizes simplicity over transactional error handling, acknowledging the
+// challenges of maintaining consistency across asynchronous components.
 package gonbui
 
 import (
@@ -27,7 +42,6 @@ import (
 	"image/png"
 	"io"
 	"k8s.io/klog/v2"
-	"log"
 	"os"
 	"sync"
 )
@@ -44,7 +58,7 @@ var Debug bool
 // Usually only useful for those developing new widgets and the like.
 func Logf(format string, args ...any) {
 	if Debug {
-		log.Printf(format, args...)
+		klog.Infof(format, args...)
 	}
 }
 
@@ -74,6 +88,21 @@ var (
 // It returns nil if there were no errors.
 //
 // It can be tested as a health check.
+//
+// Error Handling in Gonbui:
+//
+// Gonbui involves communication between several components: the code execution environment,
+// the Jupyter kernel, the Jupyter server, and the browser. This communication is asynchronous
+// and errors may occur at various points.
+//
+// Gonbui employs a simplified error handling approach:
+//   - Global Error State: A single global error state is maintained.  While not recoverable,
+//     errors are rare. You can check this state using the `Error` function.
+//   - Logging: All errors are logged. However, if communication is broken, logs might not
+//     reach the browser.  Check the Jupyter (and potentially Gonbui) logs in such cases.
+//
+// This approach prioritizes simplicity over transactional error handling, acknowledging the
+// challenges of maintaining consistency across asynchronous components.
 func Error() error {
 	return gonbPipesError
 }
@@ -219,7 +248,7 @@ func pollReaderPipe() {
 				Logf("\ttriggered sync(%d) latch.", syncId)
 				delete(syncRequestsMap, syncId)
 			} else {
-				log.Printf("Received invalid sync acknowledgment %+v !? Communication to front-end may have become unstable!", valueMsg)
+				klog.Infof("Received invalid sync acknowledgment %+v !? Communication to front-end may have become unstable!", valueMsg)
 			}
 			mu.Unlock()
 

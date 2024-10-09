@@ -26,7 +26,7 @@ github.com/janpfeifer/gonb/cache/cache.go					*Storage.Reset					75.0%
 github.com/janpfeifer/gonb/cache/cache.go					Reset						0.0%
 github.com/janpfeifer/gonb/cache/cache.go					CacheWith					91.7%
 github.com/janpfeifer/gonb/cache/cache.go					Cache						0.0%
-github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				main						72.2%
+github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				main						74.3%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				startJupyterNotebook				73.2%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				executeNotebook					78.6%
 github.com/janpfeifer/gonb/cmd/nbexec/nbexec.go				checkForInputBoxes				95.7%
@@ -59,8 +59,8 @@ github.com/janpfeifer/gonb/common/common.go				*ArrayFlag.String				66.7%
 github.com/janpfeifer/gonb/common/common.go				*ArrayFlag.Set					0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go					init						100.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go					Logf						50.0%
-github.com/janpfeifer/gonb/gonbui/gonbui.go					Error						100.0%
-github.com/janpfeifer/gonb/gonbui/gonbui.go					Open						100.0%
+github.com/janpfeifer/gonb/gonbui/gonbui.go				Error						100.0%
+github.com/janpfeifer/gonb/gonbui/gonbui.go				Open						100.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				openLocked					67.7%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				closePipesLocked				0.0%
 github.com/janpfeifer/gonb/gonbui/gonbui.go				SendData					54.5%
@@ -107,6 +107,7 @@ github.com/janpfeifer/gonb/gonbui/dom/dom.go				SetInnerText					100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				GetInnerHtml					83.3%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				Remove						100.0%
 github.com/janpfeifer/gonb/gonbui/dom/dom.go				Persist						66.7%
+github.com/janpfeifer/gonb/gonbui/dom/download.go				SendAsDownload					0.0%
 github.com/janpfeifer/gonb/gonbui/dom/script.go				LoadScriptModuleAndRun				0.0%
 github.com/janpfeifer/gonb/gonbui/dom/script.go				LoadScriptOrRequireJSModuleAndRun		0.0%
 github.com/janpfeifer/gonb/gonbui/dom/script.go				LoadScriptOrRequireJSModuleAndRunTransient	0.0%
@@ -180,7 +181,7 @@ github.com/janpfeifer/gonb/internal/goexec/composer.go			*WriterWithCursor.Error
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*WriterWithCursor.Writef			75.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*WriterWithCursor.Write				76.9%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderImports			100.0%
-github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderVariables			92.0%
+github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderVariables			91.2%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderFunctions			100.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderTypes			100.0%
 github.com/janpfeifer/gonb/internal/goexec/composer.go			*Declarations.RenderConstants			100.0%
@@ -215,6 +216,7 @@ github.com/janpfeifer/gonb/internal/goexec/goexec.go			NewDeclarations					100.0
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			*Declarations.Copy				100.0%
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			*Declarations.MergeFrom				100.0%
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			copyMap						100.0%
+github.com/janpfeifer/gonb/internal/goexec/goexec.go			variablesCopyFrom				100.0%
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			*Declarations.ClearCursor			100.0%
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			clearCursor					100.0%
 github.com/janpfeifer/gonb/internal/goexec/goexec.go			*Declarations.DropFuncInit			100.0%
@@ -248,7 +250,7 @@ github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.parseFromGoCode			
 github.com/janpfeifer/gonb/internal/goexec/parser.go			NewImport					88.9%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseImportEntry			100.0%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseFuncEntry			100.0%
-github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseVarEntry			81.2%
+github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseVarEntry			84.6%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseConstEntry			100.0%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*parseInfo.ParseTypeEntry			100.0%
 github.com/janpfeifer/gonb/internal/goexec/parser.go			*State.parseLinesAndComposeMain			74.3%
@@ -404,7 +406,7 @@ github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		resetDefinitions	
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		displayEnumeration				90.9%
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		listDefinitions					100.0%
 github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		removeDefinitionImpl				87.5%
-github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		removeDefinitions				75.0%
+github.com/janpfeifer/gonb/internal/specialcmd/definitions.go		removeDefinitions				91.7%
 github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		Parse						84.6%
 github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		joinLine					87.5%
 github.com/janpfeifer/gonb/internal/specialcmd/specialcmd.go		execSpecialConfig				55.3%
@@ -414,4 +416,4 @@ github.com/janpfeifer/gonb/internal/specialcmd/track.go			execTrack					27.3%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			execUntrack					54.5%
 github.com/janpfeifer/gonb/internal/specialcmd/track.go			showTrackedList					91.7%
 github.com/janpfeifer/gonb/internal/websocket/websocket.go			Javascript					83.3%
-total										(statements)					64.3%
+total										(statements)					64.4%

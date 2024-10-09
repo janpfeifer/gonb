@@ -33,7 +33,7 @@ import (
 //		lines = append(lines, fmt.Sprintf("%q,%q", name, phone))
 //	}
 //	data := []byte(strings.Join(lines, "\n"))
-//	dom.BrowserDownload("phonebook.csv", data, protocol.MIMEType("text/csv"))
+//	dom.BrowserDownload("phonebook.csv", data, "text/csv")
 func BrowserDownload(fileName string, data []byte, mimeType protocol.MIMEType) error {
 	var b bytes.Buffer
 	w := base64.NewEncoder(base64.StdEncoding, &b)

@@ -20,10 +20,19 @@ ARG BASE_IMAGE=jupyter/base-notebook
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
-# Update apt and install basic utils
+# Update apt and install basic utils that may be helpful for users to install their own dependencies.
 USER root
 RUN apt update --yes
-RUN apt install --yes --no-install-recommends wget git
+RUN apt install --yes --no-install-recommends \
+    sudo wget git openssh-client rsync curl
+
+# Give NB_USER sudo power for "/usr/bin/apt-get install/update" or "/usr/bin/apt install/update".
+USER root
+RUN groupadd apt-users
+RUN usermod -aG apt-users $NB_USER
+# Allow members of the apt-users group to execute only apt-get commands without a password
+RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get install *" >> /etc/sudoers
+RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt install *" >> /etc/sudoers
 
 #######################################################################################################
 # Go and GoNB Libraries

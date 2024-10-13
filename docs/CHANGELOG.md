@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Added extra tools to Dockerfile to allow users to install other dependencies; added sudo for apt install and apt update. See #138.
+
 ## v0.10.5, Added SendAsDownload
 
 * Added `dom.SendAsDownload` to send data from cells to the client by triggering a browser download. #134

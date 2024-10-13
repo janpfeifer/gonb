@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eu
 
-GO_VERSION=1.20
+GO_VERSION=1.23.2
 
 curl -sfL https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -xz
 

@@ -15,9 +15,6 @@
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
 
-* **NEW**: Now supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal.
-  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc). 
-  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
   * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
@@ -27,6 +24,9 @@
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
   start up, since each cell is compiled.
+* Supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal.
+  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc).
+  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Debug using [gdlv](https://github.com/aarzilli/gdlv), a GUI for the [delve](https://github.com/go-delve/delve) debugger (see %help).
@@ -104,11 +104,18 @@ To start it:
 
 ```shell
 docker pull janpfeifer/gonb_jupyterlab:latest
-docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jupyterlab:latest
+docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks janpfeifer/gonb_jupyterlab:latest
 ```
 
 Then copy&paste the URL that it outputs in your browser.
 
+#### Docker Customized Initialization
+
+If the container you run `gonb` needs some custom initialization, and you don't want to simply edit the dockerfile and 
+create your own docker, just create a files `autostart.sh` in the directory mounted under `/notebooks` in the container,
+owned by `root` and with executable permissions, and it will be executed at start up of the container by default.
+
+This allows you to download/install databases, or set up credentials, etc.
 
 ### Linux and macOS Installation Using Standard Go Tools
 

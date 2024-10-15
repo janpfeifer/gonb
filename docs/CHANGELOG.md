@@ -5,7 +5,8 @@
 * Feature request #138
   * Added openssh-client, rsync and curl, to allow users to install other dependencies.
   * Added sudo for apt install and apt update.
-  * Added support for `autostart.sh` that if present in the
+  * Added support for `autostart.sh` that if present in the mounted container `/notebooks` directory, and if root owned
+    and set as executable.
 
 ## v0.10.5, Added SendAsDownload
 

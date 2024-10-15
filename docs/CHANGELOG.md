@@ -2,7 +2,10 @@
 
 ## Next
 
-* Added extra tools to Dockerfile to allow users to install other dependencies; added sudo for apt install and apt update. See #138.
+* Feature request #138
+  * Added openssh-client, rsync and curl, to allow users to install other dependencies.
+  * Added sudo for apt install and apt update.
+  * Added support for `autostart.sh` that if present in the
 
 ## v0.10.5, Added SendAsDownload
 

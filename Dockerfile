@@ -65,7 +65,7 @@ RUN export GOPROXY=direct && \
 # Prepare directory where Jupyter Lab will run, with the notebooks we want to demo
 ####################################################################################################### \
 USER root
-ARG NOTEBOOKS=/notebooks
+ENV NOTEBOOKS=/notebooks
 
 # Create directory where notebooks will be stored, where Jupyter Lab will run by default.
 RUN mkdir ${NOTEBOOKS} && chown ${NB_USER}:users ${NOTEBOOKS}
@@ -86,8 +86,11 @@ USER root
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Start-up.
-USER $NB_USER
+USER root
 WORKDIR ${NOTEBOOKS}
 
-EXPOSE 8888
-ENTRYPOINT ["tini", "-g", "--", "jupyter", "lab"]
+# Script that checks for `autostart.sh` (and runs it if owned by root and present), and then starts
+# JupyterLab.
+COPY cmd/check_and_run_autostart.sh /usr/local/bin/
+
+ENTRYPOINT ["tini", "-g", "--", "/usr/local/bin/check_and_run_autostart.sh"]

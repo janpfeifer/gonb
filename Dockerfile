@@ -61,7 +61,7 @@ RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-am
     && go version
 
 # Install GoNB (https://github.com/janpfeifer/gonb) in the user account
-ARG GONB_VERSION="v0.10.5"
+ARG GONB_VERSION="v0.10.6"
 USER $NB_USER
 WORKDIR ${HOME}
 RUN export GOPROXY=direct && \

@@ -723,8 +723,8 @@ func TestCapture(t *testing.T) {
 	// Create directory where to write the file, and set TEST_DIR env variable.
 	testDir, err := os.MkdirTemp("", "gonb_nbtests_writefile_")
 	require.NoError(t, err)
-	require.NoError(t, os.Setenv("TEST_DIR", testDir+"/"))
-	klog.Infof("TEST_DIR=%s/", testDir)
+	require.NoError(t, os.Setenv("TEST_DIR", testDir))
+	klog.Infof("TEST_DIR=%q", testDir)
 
 	notebook := "capture"
 	f := executeNotebook(t, notebook)

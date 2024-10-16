@@ -295,10 +295,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 		filePath := args[0]
 		filePath = ReplaceTildeInDir(filePath)
 		filePath = ReplaceEnvVars(filePath)
-		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Capturing output to %q\n", filePath))
-		if err != nil {
-			klog.Errorf("Failed to write to kernel stdout: %+v", err)
-		}
+		var err error
 		var f *os.File
 		if appendToFile {
 			f, err = os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

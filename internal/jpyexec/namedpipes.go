@@ -281,7 +281,19 @@ func (exec *Executor) dispatchDisplayData(data *protocol.DisplayData) {
 	}
 	for mimeType, content := range data.Data {
 		msgData.Data[string(mimeType)] = content
+
+		// Capture display data output, if requested.
+		if exec.captureDisplayDataOutput != nil {
+			str, ok := content.(string)
+			if ok {
+				_, err := exec.captureDisplayDataOutput.Write([]byte(str))
+				if err != nil {
+					klog.Errorf("failed to capture display data output: %v", err)
+				}
+			}
+		}
 	}
+
 	if klog.V(1).Enabled() {
 		kernel.LogDisplayData(msgData.Data)
 	}

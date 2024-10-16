@@ -58,9 +58,9 @@ func (s *State) serializeExecuteCell() {
 	for {
 		select {
 		case params := <-s.cellExecChan:
-			// Received new execution request.
-			params.done.Trigger(s.executeCellImpl(
-				params.msg, params.cellId, params.lines, params.skipLines))
+			// New execution request: execute it, and report back error in the params.done latch.
+			err := s.executeCellImpl(params.msg, params.cellId, params.lines, params.skipLines)
+			params.done.Trigger(err)
 
 		case <-stopC:
 			// Kernel stopped, exit.
@@ -74,9 +74,11 @@ func (s *State) serializeExecuteCell() {
 // It is not reentrant, and calls to it should be serialized.
 // ExecuteCell serializes the calls to this method.
 func (s *State) executeCellImpl(msg kernel.Message, cellId int, lines []string, skipLines Set[int]) error {
+	// Makes sure at exit state is reset of any "one-shot" state.
+	defer s.PostExecuteCell()
+
 	klog.V(1).Infof("ExecuteCell: %q", lines)
 
-	defer s.PostExecuteCell()
 	klog.V(2).Infof("ExecuteCell(): CellIsTest=%v, CellIsWasm=%v", s.CellIsTest, s.CellIsWasm)
 	if s.CellIsTest && s.CellIsWasm {
 		return errors.Errorf("Cannot execute test in a %%wasm cell. Please, choose either `%%wasm` or `%%test`.")
@@ -138,6 +140,13 @@ func (s *State) PostExecuteCell() {
 	s.CellHasBenchmarks = false
 	s.CellIsWasm = false
 	s.WasmDivId = ""
+	if s.CaptureFile != nil {
+		err := s.CaptureFile.Close()
+		if err != nil {
+			klog.Errorf("goexec.PostExecuteCell(): failed to close capture file: %+v", err)
+		}
+		s.CaptureFile = nil
+	}
 }
 
 // BinaryPath is the path to the generated binary file.
@@ -178,6 +187,12 @@ func (s *State) AlternativeDefinitionsPath() string {
 	return path.Join(s.TempDir, "other.go")
 }
 
+// Execute cell code already prepared to `${GONB_TMP_DIR}/main.go`.
+//
+// If errors in execution happen, fileToCellIdAndLine helps to map the `main.go` line numbers to cell id and line,
+// so errors can be annotated.
+//
+// If s.CellIsWasm is true, it passes through State.ExecuteWasm.
 func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine) error {
 	if s.CellIsWasm {
 		return s.ExecuteWasm(msg)
@@ -186,10 +201,21 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 	if len(args) == 0 && s.CellIsTest {
 		args = s.DefaultCellTestArgs()
 	}
+
+	// Create stdout and stderr pipes that write to Jupyter stdout/stderr streams.
+	stdout := kernel.NewJupyterStreamWriter(msg, kernel.StreamStdout)
+	stderrWithAnnotator := newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)
+	if s.CaptureFile != nil {
+		stdout = io.MultiWriter(stdout, s.CaptureFile)
+		stderrWithAnnotator = io.MultiWriter(stderrWithAnnotator, s.CaptureFile)
+	}
+
 	err := jpyexec.New(msg, s.BinaryPath(), args...).
 		UseNamedPipes(s.Comms).
 		ExecutionCount(msg.Kernel().ExecCounter).
-		WithStderr(newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)).
+		WithStdout(stdout).
+		WithStderr(stderrWithAnnotator).
+		CaptureDisplayDataOutput(s.CaptureFile).
 		Exec()
 	if err != nil {
 		klog.Infof("goexec.Execute(): failed to run the compiled cell: %+v", msg)

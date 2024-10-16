@@ -146,7 +146,7 @@ func executeNotebookWithInputBoxes(t *testing.T, notebook string, inputBoxValues
 	notebookRelPath := path.Join("examples", "tests", notebook+".ipynb")
 	args := []string{"-n=" + notebookRelPath, "-jupyter_dir=" + rootDir, "-logtostderr"}
 	if *flagLogExec {
-		args = append(args, "-jupyter_log", "-console_log", "-vmodule=main=1,nbexec=1")
+		args = append(args, "-jupyter_log", "-console_log", "-vmodule=main=2,nbexec=2")
 	}
 	if len(inputBoxValues) > 0 {
 		// Check there are no commas in the values.
@@ -711,4 +711,52 @@ func TestVarTuple(t *testing.T) {
 	require.NoError(t, f.Close())
 	require.NoError(t, os.Remove(f.Name()))
 	clearNotebook(t, "vartuple")
+}
+
+func TestCapture(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	klog.Infof("GOCOVERDIR=%s", os.Getenv("GOCOVERDIR"))
+
+	// Create directory where to write the file, and set TEST_DIR env variable.
+	testDir, err := os.MkdirTemp("", "gonb_nbtests_writefile_")
+	require.NoError(t, err)
+	require.NoError(t, os.Setenv("TEST_DIR", testDir+"/"))
+	klog.Infof("TEST_DIR=%s/", testDir)
+
+	notebook := "capture"
+	f := executeNotebook(t, notebook)
+	err = Check(f,
+		Sequence(
+			Match(OutputLine(2),
+				Separator,
+				"Ping",
+				Separator),
+
+			Match(OutputLine(4),
+				Separator,
+				"Ping",
+				"Pong",
+				Separator),
+
+			Match(OutputLine(6),
+				Separator,
+				"Ping",
+				"Pong",
+				Separator),
+
+			Match(OutputLine(8),
+				Separator,
+				"# Ping",
+				"# Pong",
+				Separator),
+		),
+		*flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
 }

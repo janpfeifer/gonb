@@ -227,7 +227,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 			klog.Errorf("Failed publishing contents: %+v", err)
 		}
 
-		// Automatic `go get` control:
+	// Automatic `go get` control:
 	case "autoget":
 		goExec.AutoGet = true
 	case "noautoget":
@@ -239,7 +239,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 			klog.Errorf("Failed publishing help contents: %+v", err)
 		}
 
-		// Definitions management.
+	// Definitions management.
 	case "reset":
 		if len(parts) == 1 {
 			resetDefinitions(msg, goExec)
@@ -254,7 +254,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	case "rm", "remove":
 		removeDefinitions(msg, goExec, parts[1:])
 
-		// Input handling.
+	// Input handling.
 	case "with_inputs":
 		allowInput := content["allow_stdin"].(bool)
 		if !allowInput && (status.withInputs || status.withPassword) {
@@ -268,15 +268,58 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 		}
 		status.withPassword = true
 
-		// Files that need tracking for `gopls` (for auto-complete and contextual help).
+	// Files that need tracking for `gopls` (for auto-complete and contextual help).
 	case "track":
+		if len(parts) != 2 {
+			return errors.New("%track takes one argument, the name Go file to tack")
+		}
 		execTrack(msg, goExec, parts[1:])
 	case "untrack":
+		if len(parts) != 2 {
+			return errors.New("%untrack takes one argument, the name Go file to tack")
+		}
 		execUntrack(msg, goExec, parts[1:])
 
-		// Fix issues with `go work`.
+	// Fix issues with `go work`.
 	case "goworkfix":
 		return goExec.GoWorkFix(msg)
+
+	// Capture output of cell.
+	case "capture":
+		args := parts[1:]
+		var appendToFile bool
+		if len(args) > 1 && args[0] == "-a" {
+			appendToFile = true
+			args = args[1:]
+		}
+		if len(args) != 1 {
+			return errors.New("%capture takes one argument, the name of the file where to save the captured output")
+		}
+		filePath := args[0]
+		filePath = ReplaceTildeInDir(filePath)
+		filePath = ReplaceEnvVars(filePath)
+		err := kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("Capturing output to %q\n", filePath))
+		if err != nil {
+			klog.Errorf("Failed to write to kernel stdout: %+v", err)
+		}
+		var f *os.File
+		if appendToFile {
+			f, err = os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				err = errors.Wrapf(err, "failed to append to \"%%capture\" file %q", filePath)
+				klog.Errorf("Error: %+v", err)
+				return err
+			}
+		} else {
+			f, err = os.Create(filePath)
+			if err != nil {
+				err = errors.Wrapf(err, "failed to create \"%%capture\" file %q", filePath)
+				klog.Errorf("Error: %+v", err)
+				return err
+			}
+		}
+		// Notice, file will be closed in goExec.PostExecuteCell(), where all "one-shot" state is cleaned up.
+		goExec.CaptureFile = f
 
 	default:
 		if CellSpecialCommands.Has("%" + parts[0]) {

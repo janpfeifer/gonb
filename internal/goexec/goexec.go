@@ -12,6 +12,7 @@ import (
 	"github.com/janpfeifer/gonb/internal/goexec/goplsclient"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
+	"io"
 	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
@@ -96,6 +97,11 @@ type State struct {
 
 	// Comms represents the communication with the front-end.
 	Comms *comms.State
+
+	// CaptureFile is the file where to write any cell output. It is closed and set to nil at the end of the cell
+	// executions.
+	// If nil, no output is to be captured.
+	CaptureFile io.WriteCloser
 }
 
 // Declarations is a collection of declarations that we carry over from one cell to another.

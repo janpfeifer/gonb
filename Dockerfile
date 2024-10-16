@@ -24,7 +24,7 @@ FROM ${BASE_IMAGE}:${BASE_TAG}
 USER root
 RUN apt update --yes
 RUN apt install --yes --no-install-recommends \
-    sudo wget git openssh-client rsync curl
+    sudo tzdata wget git openssh-client rsync curl
 
 # Give NB_USER sudo power for "/usr/bin/apt-get install/update" or "/usr/bin/apt install/update".
 USER root

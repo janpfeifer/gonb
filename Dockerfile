@@ -16,26 +16,44 @@
 #######################################################################################################
 # Base image from JupyterLab
 #######################################################################################################
-ARG BASE_IMAGE=jupyter/base-notebook
+ARG BASE_IMAGE=quay.io/jupyter/base-notebook
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 
-# Update apt and install basic utils
+# Update apt and install basic utils that may be helpful for users to install their own dependencies.
 USER root
 RUN apt update --yes
-RUN apt install --yes --no-install-recommends wget git
+RUN apt install --yes --no-install-recommends \
+    sudo wget git openssh-client rsync curl
+
+# Give NB_USER sudo power for "/usr/bin/apt-get install/update" or "/usr/bin/apt install/update".
+USER root
+RUN groupadd apt-users
+RUN usermod -aG apt-users $NB_USER
+# Allow members of the apt-users group to execute only apt-get commands without a password
+RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get install *" >> /etc/sudoers
+RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt install *" >> /etc/sudoers
 
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
 ARG GO_VERSION=1.23.2
 ENV GOROOT=/usr/local/go
-ENV GOPATH=/opt/go
+ENV GOPATH=$HOME/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-# Create Go directory for user -- that will not move if the user home directory is moved.
-USER root
-RUN mkdir ${GOPATH} && chown ${NB_USER}:users ${GOPATH}
+# Add exported variables to $NB_USER .profile: notice we start the docker as root, and it executes
+# JupyterLab with a `su -l $NB_USER`, so the environment variables are lost. We could use --preserve_environment
+# for GOROOT and GOPATH, but it feels safer to add these to .profile, so the autostart.sh script can also
+# execute `su -l $NB_USER -c "<some command>"` if it wants.
+USER $NB_USER
+WORKDIR ${HOME}
+RUN <<EOF
+  echo "NB_USER=${NB_USER}" >> .profile
+  echo "export PATH=${PATH}" >> .profile
+  echo "export GOPATH=${GOPATH}" >> .profile
+  echo "export GOROOT=${GOROOT}" >> .profile
+EOF
 
 USER root
 WORKDIR /usr/local
@@ -56,7 +74,7 @@ RUN export GOPROXY=direct && \
 # Prepare directory where Jupyter Lab will run, with the notebooks we want to demo
 ####################################################################################################### \
 USER root
-ARG NOTEBOOKS=/notebooks
+ENV NOTEBOOKS=/notebooks
 
 # Create directory where notebooks will be stored, where Jupyter Lab will run by default.
 RUN mkdir ${NOTEBOOKS} && chown ${NB_USER}:users ${NOTEBOOKS}
@@ -77,8 +95,11 @@ USER root
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Start-up.
-USER $NB_USER
+USER root
 WORKDIR ${NOTEBOOKS}
 
-EXPOSE 8888
-ENTRYPOINT ["tini", "-g", "--", "jupyter", "lab"]
+# Script that checks for `autostart.sh` (and runs it if owned by root and present), and then starts
+# JupyterLab.
+COPY cmd/check_and_run_autostart.sh /usr/local/bin/
+
+ENTRYPOINT ["tini", "-g", "--", "/usr/local/bin/check_and_run_autostart.sh"]

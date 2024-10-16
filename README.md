@@ -1,4 +1,4 @@
-# GoNB, A Modern Go Kernel for Jupyter Notebooks
+# GoNB, A Modern Go Kernel for Jupyter 📓Notebooks📓
 
 [![GoDev](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/janpfeifer/gonb?tab=doc)
 [![GitHub](https://img.shields.io/github/license/janpfeifer/gonb)](https://github.com/Kwynto/gosession/blob/master/LICENSE)
@@ -9,15 +9,12 @@
 
 
 
-## For a quick start, see the [**tutorial**](examples/tutorial.ipynb)!
+## For a quick start, see the [**tutorial** 🧭](examples/tutorial.ipynb)
 
-## Highlights:
+## ✨ Highlights:
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
 
-* **NEW**: Now supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal.
-  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc). 
-  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
   * Widgets (sliders, buttons) support: interact using HTML elements. Create your own widgets!
@@ -27,6 +24,9 @@
   It also supports arbitrary Go compilation flags to be used when executing the cells.
 * Faster execution than interpreted Go, used in other similar kernels -- at the cost of imperceptible increased 
   start up, since each cell is compiled.
+* Supported by [Jupytext](https://github.com/mwouts/jupytext): it allows one to write the notebook as a normal.
+  Go file, and use [Jupytext](https://github.com/mwouts/jupytext) to convert to a notebook (with markdown support, etc).
+  See [example](https://github.com/mwouts/jupytext/issues/1244#issuecomment-2202097837).
 * Run cell's `Test*` and `Benchmark*` functions with `go test`, simply adding `%test` to cell.
 * Support for `go.mod` and `go.work`, to allow local development. Including importing specific versions of libraries.
 * Debug using [gdlv](https://github.com/aarzilli/gdlv), a GUI for the [delve](https://github.com/go-delve/delve) debugger (see %help).
@@ -38,7 +38,7 @@
 * Online help and much more, see `%help`.
 * Compile and execute the Go code as WASM: allows one to do interactive widgets in notebooks. See `%wasm` (EXPERIMENTAL).
 
-## Examples:
+## 👁️‍🗨️ Examples:
 
 ### Auto-complete and Contextual Help
 
@@ -57,7 +57,7 @@ https://github.com/janpfeifer/gonb/assets/7460115/f1187dad-4c10-4d21-a73e-909001
 
 <img src="docs/demo-browser.png" alt="Browser Screenshot Demo" width="50%" height="50%"/>
 
-## Introduction
+## 🌱 Introduction
 
 Go is a compiled language, but with very fast compilation, that allows one to use
 it in a REPL (Read-Eval-Print-Loop) fashion, by inserting a "Compile" step in the middle
@@ -84,15 +84,15 @@ There is also
 that one can interact with (make a copy first) — if the link doesn't work (Google Drive sharing publicly
 is odd), [download it from GitHub](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
 
-Finally, because it's compiled and not intepreted, it has a slightly different "semantic" than the Python kernels.
+Finally, because it's compiled and not interpreted, it has a slightly different "semantic" than the Python kernels.
 It's highly recommended quickly browsing through the [**tutorial**](examples/tutorial.ipynb).
 
-## Installation
+## 📦 Installation
 
 **Only for Linux and macOS. In Windows, it works in WSL or inside a Docker**
 
 
-### Docker
+### 🐳 Docker
 
 GoNB offers a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), 
 that includes JupyterLab and GoNB. 
@@ -104,11 +104,13 @@ To start it:
 
 ```shell
 docker pull janpfeifer/gonb_jupyterlab:latest
-docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jupyterlab:latest
+docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks janpfeifer/gonb_jupyterlab:latest
 ```
 
 Then copy&paste the URL that it outputs in your browser.
 
+**Note**: The docker allows for customization by running an arbitrary script at start up as `root`, which allows
+one to install any planned dependencies. See [docker.md](docs/docker.md) for details.
 
 ### Linux and macOS Installation Using Standard Go Tools
 
@@ -149,7 +151,7 @@ Install there as if it were in a linux machine.
 
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
-## FAQ
+## 🤔 FAQ
 
 * Is there are reference documentation ?
   * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up-to-date and
@@ -163,7 +165,7 @@ A pure Windows installation is not supported at this time — but contributions 
     solutions to this. Often folks create a series of `Must()` functions, or simply use
     [this trivial `must` package](https://github.com/janpfeifer/must).
 
-## TODOs
+## 📝 TODOs
 
 Contributions are welcome! 
 
@@ -171,7 +173,7 @@ Contributions are welcome!
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 
-## Thanks
+##  💖 Thanks
 
 * [Go](golang.org)
 * [Jupyter](https://jupyter.org/), what an awesome project.
@@ -180,7 +182,7 @@ Contributions are welcome!
   (http://reneefrench.blogspot.com/), see Creative Commons 3.0 Attributions license in
   [Wikimedia](https://commons.wikimedia.org/wiki/File:Go_gopher_favicon.svg).
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are very welcome. The code is generally well documented -- not always, but mostly. There are a also a couple of guides worth reading if contributing in the [`docs/`](https://github.com/janpfeifer/gonb/tree/main/docs) subdirectory.
 
@@ -189,6 +191,6 @@ There are two parts of the project:
 1. The kernel itself: that builds the binary package. Most subpackages are under `internal/`.
 2. The UI library in the packages under `github.com/janpfeifer/gonb/gonbui`.
 
-## Star History
+##  🌟 Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=janpfeifer/gonb&type=Date)](https://star-history.com/#janpfeifer/gonb&Date)

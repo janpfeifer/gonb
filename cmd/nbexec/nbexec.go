@@ -103,7 +103,7 @@ func main() {
 				jupyterStop.Trigger()
 				if e != nil {
 					// Wait for jupyter notebook to get killed, before re-throwing the panic.
-					klog.Errorf("%v", e)
+					klog.Errorf("Panic: %+v", e)
 					jupyterDone.Wait()
 					panic(e)
 				}
@@ -271,14 +271,24 @@ func executeNotebook(url string, inputBoxes []string) {
 	// Use system's Google Chrome is available, for sandboxing:
 	var controlURL string
 	chromePath, err := exec.LookPath("google-chrome")
+	var l *launcher.Launcher
 	if err == nil {
-		controlURL = launcher.New().Bin(chromePath).MustLaunch()
+		klog.V(1).Infof("Using system's Google Chrome")
+		l = launcher.New().Bin(chromePath)
 	} else {
 		klog.Warningf("Using rod downloaded chromium, with --no-sandbox")
-		controlURL = launcher.New().NoSandbox(true).MustLaunch()
+		l = launcher.New().NoSandbox(true)
 	}
-	page := rod.New().ControlURL(controlURL).MustConnect().MustPage(url)
-	klog.V(1).Infof("Waiting for opening of page %q", url)
+	controlURL = l.
+		Set("disable-gpu", "true").
+		Set("disable-software-rasterizer", "true").
+		Logger(os.Stderr).
+		MustLaunch()
+	klog.V(1).Infof("Using controlURL=%q", controlURL)
+	browser := rod.New().ControlURL(controlURL).MustConnect()
+	klog.V(1).Info("Connected to browser.")
+	page := browser.MustPage(url)
+	klog.V(1).Infof("Connected to page in browser, waiting for opening of page %q", url)
 	page.MustWaitStable()
 
 	if *flagConsoleLog {

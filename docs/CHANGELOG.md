@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 
 * Feature request #138
   * Added openssh-client, rsync and curl, to allow users to install other dependencies.

@@ -109,13 +109,8 @@ docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks janpfeifer/gonb_jupyterl
 
 Then copy&paste the URL that it outputs in your browser.
 
-#### Docker Customized Initialization
-
-If the container you run `gonb` needs some custom initialization, and you don't want to simply edit the dockerfile and 
-create your own docker, just create a files `autostart.sh` in the directory mounted under `/notebooks` in the container,
-owned by `root` and with executable permissions, and it will be executed at start up of the container by default.
-
-This allows you to download/install databases, or set up credentials, etc.
+**Note**: The docker allows for customization by running an arbitrary script at start up as `root`, which allows
+one to install any planned dependencies. See [docker.md](docs/docker.md) for details.
 
 ### Linux and macOS Installation Using Standard Go Tools
 

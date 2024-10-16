@@ -6,10 +6,13 @@
 # Notice ${NOTEBOOKS} is /notebooks in the container, and is assumed to be mounted from the host directory that
 # will have the users notebooks.
 
+# Makes sure we are not using $NB_USER's GOPATH.
+export GOPATH=/root/go
+
 # Check if autostart.sh exists
 if [[ -f "${NOTEBOOKS}/autostart.sh" ]]; then
   # Check if it's owned by root and is executable
-  if [[ "$(stat -c '%U' ${NOTEBOOKS}/autostart.sh)" = "root" && -x "${NOTEBOOKS}/autostart.sh" ]]; then
+  if [[ "$(stat -c '%U' "${NOTEBOOKS}/autostart.sh")" = "root" && -x "${NOTEBOOKS}/autostart.sh" ]]; then
     # Run autostart.sh as root
     echo "Running autostart.sh as root..."
     "${NOTEBOOKS}/autostart.sh"
@@ -21,10 +24,5 @@ else
   echo "No autostart.sh initialization script."
 fi
 
-
-echo "Current directory:"
-pwd
-
-# Switch to the $NB_USER, preserving environment variables.
-# Notice $PATH gets rewritten anyway, so we need to explicitly set it again with the new user.
-su --preserve-environment  $NB_USER -c "export PATH=${PATH} ; jupyter lab"
+# Run JupyterLab from $NOTEBOOKS as user $NB_USER.
+su -l "${NB_USER}" -c "cd \"${NOTEBOOKS}\" ; jupyter lab"

@@ -39,12 +39,21 @@ RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt insta
 #######################################################################################################
 ARG GO_VERSION=1.23.2
 ENV GOROOT=/usr/local/go
-ENV GOPATH=/opt/go
+ENV GOPATH=$HOME/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-# Create Go directory for user -- that will not move if the user home directory is moved.
-USER root
-RUN mkdir ${GOPATH} && chown ${NB_USER}:users ${GOPATH}
+# Add exported variables to $NB_USER .profile: notice we start the docker as root, and it executes
+# JupyterLab with a `su -l $NB_USER`, so the environment variables are lost. We could use --preserve_environment
+# for GOROOT and GOPATH, but it feels safer to add these to .profile, so the autostart.sh script can also
+# execute `su -l $NB_USER -c "<some command>"` if it wants.
+USER $NB_USER
+WORKDIR ${HOME}
+RUN <<EOF
+  echo "NB_USER=${NB_USER}" >> .profile
+  echo "export PATH=${PATH}" >> .profile
+  echo "export GOPATH=${GOPATH}" >> .profile
+  echo "export GOROOT=${GOROOT}" >> .profile
+EOF
 
 USER root
 WORKDIR /usr/local

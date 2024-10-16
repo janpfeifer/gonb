@@ -270,9 +270,6 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 
 	// Files that need tracking for `gopls` (for auto-complete and contextual help).
 	case "track":
-		if len(parts) != 2 {
-			return errors.New("%track takes one argument, the name Go file to tack")
-		}
 		execTrack(msg, goExec, parts[1:])
 	case "untrack":
 		if len(parts) != 2 {

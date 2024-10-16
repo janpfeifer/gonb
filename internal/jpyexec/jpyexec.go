@@ -56,6 +56,12 @@ type Executor struct {
 	// Currently, it is assumed that it will be used by the CommsHandler.
 	PipeWriterFifo chan *protocol.CommValue
 
+	// captureDisplayDataOutput is a writer to where all data to be displayed send through the named pipe is
+	// copied.
+	//
+	// Notice the contents are written raw, without the mime-type.
+	captureDisplayDataOutput io.Writer
+
 	isDone   bool
 	doneChan chan struct{}
 	muDone   sync.Mutex
@@ -153,6 +159,15 @@ func (exec *Executor) WithPassword(millisecondsWait int) *Executor {
 // This conflicts with [Executor.WithInputs] and [Executor.WithPassword].
 func (exec *Executor) WithStaticInput(stdinContent []byte) *Executor {
 	exec.stdinContent = stdinContent
+	return exec
+}
+
+// CaptureDisplayDataOutput configures the Executor to capture the output of the program
+// and send it as protocol.DisplayMessage messages, in the named pipe.
+//
+// The captured data is sent to the given `io.Writer` raw without any processing or attached mime-type.
+func (exec *Executor) CaptureDisplayDataOutput(writer io.Writer) *Executor {
+	exec.captureDisplayDataOutput = writer
 	return exec
 }
 

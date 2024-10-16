@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 
 * Feature request #138
   * Added openssh-client, rsync and curl, to allow users to install other dependencies.
@@ -8,6 +8,8 @@
   * Added support for `autostart.sh` that if present in the mounted container `/notebooks` directory, and if root owned
     and set as executable.
 * Updated Dockerfile to latest version to JupyterLab -- now the base docker is served `quay.io/jupyter/base-notebook`
+* Added `%capture [-a] <file>` to capture the output of a cell (#142)
+* Fixed `nbexec`: added `--disable-gpu` and `--disable-software-rasterizer` when executing "headless" chrome for tests.
 
 ## v0.10.5, Added SendAsDownload
 

@@ -66,6 +66,10 @@ This way each cell can create its own `init_...()` and have it called at every c
   you to enter one last value after the shell script executes.
 - `%with_password`: will prompt for a password passed to the next shell command.
   Do this is if your next shell command requires a password.
+- `%capture [-a] <file_path>` will make a copy of all **cell execution output** to the given file. By default
+  it overwrites the file contents each time the cell is executed. Use `-a` instead to append to the file.
+  It works only for the current cell. See also `%%writefile` to write files with a specific content.
+  It doesn't work with `%wasm` cells.
 
 **Notes**: 
 
@@ -236,7 +240,9 @@ it will append the cell contents to the file.
 This can be handy if for instance the notebook needs to write a configuration file, or simply to dump the code inside
 the cell into some file.
 
-File path passes through a tilde (`~`) expansion to the user's home directory, as well as environment variable substitution (e.g.: `${HOME}` or `$MY_DIR/a/b`). 
+File path passes through a tilde (`~`) expansion to the user's home directory, as well as environment variable substitution (e.g.: `${HOME}` or `$MY_DIR/a/b`).
+
+See also `%capture` to instead write the output of the execution of the cell to a file.
 
 ### `%%script`, `%%bash` and `%%sh`
 

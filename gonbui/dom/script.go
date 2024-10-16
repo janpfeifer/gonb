@@ -176,7 +176,7 @@ func loadScriptOrRequireJSModuleAndRunImpl(moduleName, src string, attributes ma
 	if transient {
 		TransientJavascript(js)
 	} else {
-		gonbui.DisplayHtmlf("<script charset=%q>%s</script>", "UTF-8", js)
+		gonbui.DisplayHTMLF("<script charset=%q>%s</script>", "UTF-8", js)
 	}
 	return nil
 }

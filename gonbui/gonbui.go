@@ -314,8 +314,13 @@ func UniqueID() string {
 	return UniqueId()
 }
 
-// DisplayHtml will display the given HTML in the notebook, as the output of the cell being executed.
+// DisplayHtml is an alias to DisplayHTML.
 func DisplayHtml(html string) {
+	DisplayHTML(html)
+}
+
+// DisplayHTML will display the given HTML in the notebook, as the output of the cell being executed.
+func DisplayHTML(html string) {
 	if !IsNotebook {
 		return
 	}
@@ -324,19 +329,19 @@ func DisplayHtml(html string) {
 	})
 }
 
-// DisplayHTML is an alias to DisplayHtml.
-func DisplayHTML(html string) {
-	DisplayHtml(html)
-}
-
-// DisplayHtmlf is similar to DisplayHtml, but it takes a format string and its args which
+// DisplayHTMLF is similar to DisplayHTML, but it takes a format string and its args which
 // are passed to fmt.Sprintf.
-func DisplayHtmlf(htmlFormat string, args ...any) {
+func DisplayHTMLF(htmlFormat string, args ...any) {
 	if !IsNotebook {
 		return
 	}
 	html := fmt.Sprintf(htmlFormat, args...)
 	DisplayHtml(html)
+}
+
+// DisplayHtmlf is an alias to DisplayHTMLF.
+func DisplayHtmlf(htmlFormat string, args ...any) {
+	DisplayHTMLF(htmlFormat, args...)
 }
 
 // DisplayMarkdown will display the given markdown content in the notebook, as the output of
@@ -353,7 +358,7 @@ func DisplayMarkdown(markdown string) {
 	})
 }
 
-// UpdateHtml displays the given HTML in the notebook on an output block with the given `id`:
+// UpdateHTML displays the given HTML in the notebook on an output block with the given `id`:
 // the block identified by 'id' is created automatically the first time this function is
 // called, and simply updated thereafter.
 //
@@ -372,7 +377,7 @@ func DisplayMarkdown(markdown string) {
 // Notice that the value of `counterDisplayId` is not a DOM element id -- unfortunately.
 // If you want a `<div>` that you can manipulate with the [dom] package, create an empty `<div id=%q></div>`
 // with another unique id (see [gonbui.UniqueID]) and use that instead.
-func UpdateHtml(id, html string) {
+func UpdateHTML(id, html string) {
 	if !IsNotebook {
 		return
 	}
@@ -382,10 +387,10 @@ func UpdateHtml(id, html string) {
 	})
 }
 
-// UpdateHTML is an alias for UpdateHtml.
-// Deprecated: use UpdateHtml instead, it's the same.
-func UpdateHTML(id, html string) {
-	UpdateHtml(id, html)
+// UpdateHtml is an alias for UpdateHTML.
+// Deprecated: use UpdateHTML instead, it's the same.
+func UpdateHtml(id, html string) {
+	UpdateHTML(id, html)
 }
 
 // UpdateMarkdown updates the contents of the output identified by id:

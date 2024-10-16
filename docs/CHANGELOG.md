@@ -7,6 +7,7 @@
   * Added sudo for apt install and apt update.
   * Added support for `autostart.sh` that if present in the mounted container `/notebooks` directory, and if root owned
     and set as executable.
+* Updated Dockerfile to latest version to JupyterLab -- now the base docker is served `quay.io/jupyter/base-notebook`
 
 ## v0.10.5, Added SendAsDownload
 

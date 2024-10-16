@@ -16,7 +16,7 @@
 #######################################################################################################
 # Base image from JupyterLab
 #######################################################################################################
-ARG BASE_IMAGE=jupyter/base-notebook
+ARG BASE_IMAGE=quay.io/jupyter/base-notebook
 ARG BASE_TAG=latest
 FROM ${BASE_IMAGE}:${BASE_TAG}
 

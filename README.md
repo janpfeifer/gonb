@@ -84,7 +84,7 @@ There is also
 that one can interact with (make a copy first) — if the link doesn't work (Google Drive sharing publicly
 is odd), [download it from GitHub](examples/google_colab_demo.ipynb) and upload it to Google's Colab.
 
-Finally, because it's compiled and not intepreted, it has a slightly different "semantic" than the Python kernels.
+Finally, because it's compiled and not interpreted, it has a slightly different "semantic" than the Python kernels.
 It's highly recommended quickly browsing through the [**tutorial**](examples/tutorial.ipynb).
 
 ## Installation

@@ -1,8 +1,16 @@
 # Docker Customization
 
-If the container you run `gonb` needs some custom initialization, and you don't want to simply edit the dockerfile and
-create your own docker, just create the file `autostart.sh` in the directory mounted under `/notebooks` in the container,
-owned by `root` and with executable permissions, and it will be executed at start up of the container by default.
+1. The docker runs _JupyterLab_ and _GoNB_ under the user `$NB_USER` (== "jovyan").
+2. It has configured `sudo` privileges for `apt update` and `apt install *`. So a cell with 
+   `!sudo apt install <my_package>` will work, and install your package.
+3. One can always create another docker based on `janpfeifer/gonb_jupyterlab@latest`
+4. Create an `autostart.sh` script, see next section.
+
+## Customization with `autostart.sh`
+
+If you create the file `autostart.sh` in the directory mounted under `/notebooks` in the container,
+**owned by `root` and with executable permissions**, it will be executed at start up of the container by default
+**as `root`**.
 
 This allows you to download/install databases, or set up credentials, etc.
 

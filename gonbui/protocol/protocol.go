@@ -68,6 +68,12 @@ const (
 	// Notice that the Wasm program gets this value from a global variable automatically introduced in the Go code,
 	// see `%help`.
 	GONB_WASM_URL_ENV = "GONB_WASM_URL"
+
+	// GONB_VERSION of the build -- based on latest git tag.
+	GONB_VERSION = "GONB_VERSION"
+
+	// GONB_GIT_COMMIT hash for the build.
+	GONB_GIT_COMMIT = "GONB_GIT_COMMIT"
 )
 
 type MIMEType string

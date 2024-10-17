@@ -238,6 +238,17 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 		if err != nil {
 			klog.Errorf("Failed publishing help contents: %+v", err)
 		}
+	case "version":
+		gitHash := os.Getenv(protocol.GONB_GIT_COMMIT)
+		gitVersion := os.Getenv(protocol.GONB_VERSION)
+		gitCommitURL := fmt.Sprintf("https://github.com/janpfeifer/gonb/tree/%s", gitHash)
+		gitTagURL := fmt.Sprintf("https://github.com/janpfeifer/gonb/releases/tag/%s", gitVersion)
+
+		err := kernel.PublishMarkdown(msg, fmt.Sprintf(
+			"**GoNB** version [%s](%s) / Commit: [%s](%s)\n", gitVersion, gitTagURL, gitHash, gitCommitURL))
+		if err != nil {
+			klog.Errorf("Failed publishing version contents: %+v", err)
+		}
 
 	// Definitions management.
 	case "reset":

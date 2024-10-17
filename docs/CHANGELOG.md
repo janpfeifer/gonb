@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## Next
+
+* Added `%version`, and environment variables `GONB_VERSION`, `GONB_GIT_COMMIT`.
+* Added `%help` info on missing environment variables.
+
 ## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 
 * Feature request #138

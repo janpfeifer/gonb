@@ -70,6 +70,7 @@ This way each cell can create its own `init_...()` and have it called at every c
   it overwrites the file contents each time the cell is executed. Use `-a` instead to append to the file.
   It works only for the current cell. See also `%%writefile` to write files with a specific content.
   It doesn't work with `%wasm` cells.
+- `%version` prints out **GoNB**'s version.
 
 **Notes**: 
 
@@ -155,6 +156,15 @@ scripts (`!` and `!*`) and for the Go cells:
 - `GONB_PIPE`: is the _named pipe_ directory used to communicate rich content (HTML, images)
   to the kernel. Only available for _Go_ cells, and a new one is created at every execution.
   This is used by the `**GoNB**ui`` functions described above, and doesn't need to be accessed directly.
+- `GONB_VERSION`: Version of this *GoNB* build.
+- `GONB_GIT_COMMIT`: Git commit hash for this *GoNB* build -- notice it doesn't account for any modifications that
+  may have been made and not committed.
+- `GONB_JUPYTER_KERNEL_ID`: the unique id assigned by Jupyter to this kernel.
+  It's used to build some of the API paths to the JupyterServer.
+  If it's not set, GoNB was not able to parse it from the kernel file path.
+- `GONB_JUPYTER_ROOT`: the path to the Jupyter root directory, if GONB managed to read it (depends on the architecture).
+  This can be used to construct URLs to static file contents (images, javascript, etc.) served by Jupyter: 
+  one can use `src="/file/...<path under GONB_JUPYTER_ROOT>..."`.
 
 ### Widgets
 

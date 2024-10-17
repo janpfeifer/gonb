@@ -1,2 +1,2 @@
 package main
-var GitCommitHash = "a3e905f994db16213060264623c82d240d2dcc73"
+var GitCommitHash = "0e5f587a077810d058202b76a127651a02bd4382"

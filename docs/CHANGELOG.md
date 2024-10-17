@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Added `%version`
+
 ## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 
 * Feature request #138

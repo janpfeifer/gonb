@@ -13,13 +13,14 @@
 #
 # Then copy&paste the URL it outputs in your browser.
 #
-# You can also provide an `autostart.sh` file (it doesn't really need to be shell script) if you
-# mount it _READONLY_ under `/root/autostart/autostart.sh`. So the command line would look like:
+# You can also provide an `autostart.sh` file that is automatically executed at the docker start up --
+# it doesn't really need to be shell script. Just **mount it as READONLY in `/root/autostart/autostart.sh**`.
+# A typical command line for that would look like:
 #
 # ```
-#   docker run -it --rm -p 8888:8888 \
-#       -v "${PWD}":/notebooks/host -v "~/work/gonb/autostart:/root/autostart:ro" \
-#       janpfeifer/gonb_jupyterlab:latest
+# docker run -it --rm -p 8888:8888 \
+#    -v "${PWD}":/notebooks/host -v "~/work/gonb/autostart:/root/autostart:ro" \
+#    janpfeifer/gonb_jupyterlab:latest
 # ```
 
 #######################################################################################################

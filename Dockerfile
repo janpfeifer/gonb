@@ -7,11 +7,20 @@
 # To start it:
 #
 # ```
-# docker pull janpfeifer/gonb_jupyter:latest
-# docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jupyterlab:latest
+#   docker pull janpfeifer/gonb_jupyter:latest
+#   docker run -it --rm -p 8888:8888 -v "${PWD}":/notebooks/host janpfeifer/gonb_jupyterlab:latest
 # ```
 #
 # Then copy&paste the URL it outputs in your browser.
+#
+# You can also provide an `autostart.sh` file (it doesn't really need to be shell script) if you
+# mount it _READONLY_ under `/root/autostart/autostart.sh`. So the command line would look like:
+#
+# ```
+#   docker run -it --rm -p 8888:8888 \
+#       -v "${PWD}":/notebooks/host -v "~/work/gonb/autostart:/root/autostart:ro" \
+#       janpfeifer/gonb_jupyterlab:latest
+# ```
 
 #######################################################################################################
 # Base image from JupyterLab
@@ -98,8 +107,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 USER root
 WORKDIR ${NOTEBOOKS}
 
-# Script that checks for `autostart.sh` (and runs it if owned by root and present), and then starts
-# JupyterLab.
+# Script that checks for `/root/autostart/autostart.sh` (mounted readonly) and then starts JupyterLab.
 COPY cmd/check_and_run_autostart.sh /usr/local/bin/
 
 ENTRYPOINT ["tini", "-g", "--", "/usr/local/bin/check_and_run_autostart.sh"]

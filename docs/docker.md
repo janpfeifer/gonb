@@ -8,9 +8,8 @@
 
 ## Customization with `autostart.sh`
 
-If you create the file `autostart.sh` in the directory mounted under `/notebooks` in the container,
-**owned by `root` and with executable permissions**, it will be executed at start up of the container by default
-**as `root`**.
+If you **readonly** mount a file `/root/autostart/autostart.sh` with executable permissions, it will be executed at
+start up of the container by default **as `root`**.
 
 This allows you to download/install databases, or set up credentials, etc.
 

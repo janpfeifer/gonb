@@ -2,6 +2,7 @@
 
 ## Next
 
+* Improved `autostart` logic: it now requires being mounted as "readonly" under `/root/autostart`.
 * Added `%version`, and environment variables `GONB_VERSION`, `GONB_GIT_COMMIT`.
 * Added `%help` info on missing environment variables.
 

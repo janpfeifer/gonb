@@ -9,19 +9,22 @@
 # Makes sure we are not using $NB_USER's GOPATH.
 export GOPATH=/root/go
 
-# Check if autostart.sh exists
-if [[ -f "${NOTEBOOKS}/autostart.sh" ]]; then
-  # Check if it's owned by root and is executable
-  if [[ "$(stat -c '%U' "${NOTEBOOKS}/autostart.sh")" = "root" && -x "${NOTEBOOKS}/autostart.sh" ]]; then
+# Check if autostart.sh exists and is executable.
+AUTOSTART="/root/autostart/autostart.sh"
+if [[ -x "${AUTOSTART}" ]]; then
+  # Check if it's mounted readonly: we chmod to its current permissions. If it fails we assume it is mounted
+  # readonly.
+  permissions=$(stat -c '%a' "${AUTOSTART}")
+  if chmod "${permissions}" "${AUTOSTART}" 2> /dev/null ; then
+    echo "${AUTOSTART} doesn't seem to be mounted readonly, NOT EXECUTING IT." 2>&1
+  else
     # Run autostart.sh as root
     echo "Running autostart.sh as root..."
-    "${NOTEBOOKS}/autostart.sh"
-  else
-    # Print a message indicating why it's not running
-    echo "autostart.sh exists but is not owned by root or not executable. Not running it."
+    "${AUTOSTART}"
   fi
+
 else
-  echo "No autostart.sh initialization script."
+  echo "No ${AUTOSTART} initialization script."
 fi
 
 # Run JupyterLab from $NOTEBOOKS as user $NB_USER.

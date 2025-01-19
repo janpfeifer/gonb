@@ -5,6 +5,7 @@
 * Improved `autostart` logic: it now requires being mounted as "readonly" under `/root/autostart`.
 * Added `%version`, and environment variables `GONB_VERSION`, `GONB_GIT_COMMIT`.
 * Added `%help` info on missing environment variables.
+* Added stack traces to protocol parsing errors.
 
 ## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 

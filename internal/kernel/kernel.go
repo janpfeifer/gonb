@@ -520,11 +520,11 @@ func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) Message {
 		signature := make([]byte, hex.DecodedLen(len(parts[i+1])))
 		_, err := hex.Decode(signature, parts[i+1])
 		if err != nil {
-			m.err = errors.WithMessagef(&InvalidSignatureError{}, "while decoding received message")
+			m.err = errors.Wrapf(&InvalidSignatureError{}, "while hex-decoding received message")
 			return m
 		}
 		if !hmac.Equal(mac.Sum(nil), signature) {
-			m.err = errors.WithMessagef(&InvalidSignatureError{}, "invalid signature of received message, doesn't match secret key used during initialization")
+			m.err = errors.Wrapf(&InvalidSignatureError{}, "invalid check sum of received message, doesn't match secret key used during initialization")
 			return m
 		}
 	}
@@ -533,22 +533,22 @@ func (k *Kernel) FromWireMsg(zmqMsg zmq4.Msg) Message {
 	var err error
 	err = json.Unmarshal(parts[i+2], &m.Composed.Header)
 	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Header")
+		m.err = errors.Wrapf(err, "while decoding ComposedMsg.Header")
 		return m
 	}
 	err = json.Unmarshal(parts[i+3], &m.Composed.ParentHeader)
 	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.ParentHeader")
+		m.err = errors.Wrapf(err, "while decoding ComposedMsg.ParentHeader")
 		return m
 	}
 	err = json.Unmarshal(parts[i+4], &m.Composed.Metadata)
 	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Metadata")
+		m.err = errors.Wrapf(err, "while decoding ComposedMsg.Metadata")
 		return m
 	}
 	err = json.Unmarshal(parts[i+5], &m.Composed.Content)
 	if err != nil {
-		m.err = errors.WithMessagef(err, "while decoding ComposedMsg.Content")
+		m.err = errors.Wrapf(err, "while decoding ComposedMsg.Content")
 		return m
 	}
 	return m

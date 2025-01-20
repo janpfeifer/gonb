@@ -97,6 +97,7 @@ const (
 )
 
 // f calls g and adds 1.
+//go:noinline
 func f(x int) {
 	return g(x)+1  // g not defined in this file, but we still want to parse this.
 }
@@ -161,7 +162,9 @@ func TestState_Parse(t *testing.T) {
 	assert.Contains(t, s.Definitions.Functions, "Kg~Gain")
 	assert.Contains(t, s.Definitions.Functions, "N~Weight")
 	assert.Contains(t, s.Definitions.Functions, "main")
-	assert.ElementsMatch(t, []int{73, 73, 74, 75, 76, 77, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
+	assert.ElementsMatch(t, []int{50, 51}, s.Definitions.Functions["f"].Comments.CellLines.Lines,
+		"Index to line numbers in original cell don't match.")
+	assert.ElementsMatch(t, []int{74, 74, 75, 76, 77, 78, -1, -1}, s.Definitions.Functions["main"].CellLines.Lines,
 		"Index to line numbers in original cell don't match.")
 
 	fmt.Printf("\ttest variables: %+v\n", s.Definitions.Variables)
@@ -251,11 +254,11 @@ func TestState_Parse(t *testing.T) {
 		{cellId, 29},
 		{cellId, 21},
 		{cellId, 22},
-		{cellId, 55},
+		{cellId, 56},
 		{cellId, 20},
 		{cellId, 20},
 		{cellId, 25},
-		{cellId, 71}, // var contents, _ = os.ReadFile("/tmp/a")
+		{cellId, 72}, // var contents, _ = os.ReadFile("/tmp/a")
 	}, fileToCellIdAndLine, "Line numbers in cell code don't match")
 
 	// Checks functions rendering.
@@ -269,6 +272,8 @@ func (k *Kg) Weight() N {
 
 func (n N) Weight() N { return n }
 
+// f calls g and adds 1.
+//go:noinline
 func f(x int) {
 	return g(x)+1  // g not defined in this file, but we still want to parse this.
 }
@@ -374,7 +379,7 @@ func TestCursorPositioning(t *testing.T) {
 		{Cursor{Line: 29, Col: 23}, `type XY struct { x, y f‸loat64 }`},
 
 		// Functions Lines:
-		{Cursor{Line: 59, Col: 12}, `func sum[T i‸nterface{int | float32 | float64}](a, b T) T {`},
+		{Cursor{Line: 60, Col: 12}, `func sum[T i‸nterface{int | float32 | float64}](a, b T) T {`},
 	}
 	for _, testLine := range testLines {
 		buf := bytes.NewBuffer(make([]byte, 0, 16384))

@@ -138,7 +138,7 @@ func (s *State) parseFromGoCode(msg kernel.Message,
 		keep := name == "main.go" || name == "main_test.go"
 		klog.V(2).Infof("parser.ParseDir().filter(%q) -> keep=%v", name, keep)
 		return keep
-	}, parser.SkipObjectResolution) // |parser.AllErrors
+	}, parser.SkipObjectResolution|parser.ParseComments) // |parser.AllErrors
 	if err != nil {
 		if msg != nil {
 			err = s.DisplayErrorWithContext(msg, fileToCellIdAndLine, err.Error(), err)
@@ -163,6 +163,7 @@ func (s *State) parseFromGoCode(msg kernel.Message,
 				return nil, errors.Wrapf(err, "Failed to read %q", fileObj.Name)
 			}
 			pi.filesContents[fileName] = string(content)
+
 			// Incorporate Imports
 			for _, entry := range fileObj.Imports {
 				pi.ParseImportEntry(decls, entry)
@@ -172,7 +173,9 @@ func (s *State) parseFromGoCode(msg kernel.Message,
 			for _, decl := range fileObj.Decls {
 				switch typedDecl := decl.(type) {
 				case *ast.FuncDecl:
-					klog.V(2).Infof("> Declaration %T: %+v", typedDecl, typedDecl.Name)
+					if klog.V(2).Enabled() {
+						klog.Infof("> Declaration %T: %+v", typedDecl, typedDecl.Name)
+					}
 					pi.ParseFuncEntry(decls, typedDecl)
 				case *ast.GenDecl:
 					klog.V(2).Infof("> Declaration %T: %s", typedDecl, typedDecl.Tok)
@@ -189,7 +192,7 @@ func (s *State) parseFromGoCode(msg kernel.Message,
 						klog.Warningf("Dropped unknown generic declaration of type %s\n", typedDecl.Tok)
 					}
 				default:
-					klog.Warningf("Dropped unknown declaration type\n")
+					klog.Warningf("Dropped unknown declaration type %T\n", decl)
 				}
 			}
 		}
@@ -253,10 +256,30 @@ func (pi *parseInfo) ParseFuncEntry(decls *Declarations, funcDecl *ast.FuncDecl)
 		}
 		key = fmt.Sprintf("%s~%s", typeName, key)
 	}
-	f := &Function{Key: key, Definition: pi.extractContentOfNode(funcDecl)}
+	f := &Function{
+		Key:        key,
+		Definition: pi.extractContentOfNode(funcDecl),
+		Comments:   pi.ParseComments(funcDecl.Doc),
+	}
 	f.CellLines = pi.calculateCellLines(funcDecl)
 	f.Cursor = pi.getCursor(funcDecl)
 	decls.Functions[f.Key] = f
+}
+
+// ParseComments that precedes a declaration.
+// It returns the Comments object that can be included in the declaration.
+func (pi *parseInfo) ParseComments(doc *ast.CommentGroup) *Comments {
+	if doc == nil {
+		return nil
+	}
+	c := &Comments{}
+	c.CellLines = pi.calculateCellLines(doc)
+	c.Cursor = pi.getCursor(doc)
+	c.Lines = make([]string, len(doc.List))
+	for ii, line := range doc.List {
+		c.Lines[ii] = line.Text
+	}
+	return c
 }
 
 // ParseVarEntry registers a new `var` declaration based on the ast.GenDecl. See State.parseFromGoCode
@@ -424,7 +447,7 @@ func (s *State) parseLinesAndComposeMain(
 	cursorInFile = NoCursor
 
 	var fileToCellLine []int
-	if err = s.RemoveCode(); err != nil {
+	if err = s.RemoveGeneratedCode(); err != nil {
 		return
 	}
 	cursorInFile, fileToCellLine, err = s.createGoFileFromLines(s.CodePath(), cellId, lines, skipLines, cursorInCell)

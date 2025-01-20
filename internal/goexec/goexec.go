@@ -408,6 +408,15 @@ type Function struct {
 	Name, Receiver string
 	Definition     string // Multi-line definition, includes comments preceding definition.
 
+	// Comments preceding the function, if any.
+	Comments *Comments
+}
+
+// Comments block definition: these are comments that precedes a declaration, like a function or variable.
+type Comments struct {
+	Cursor
+	CellLines
+	Lines []string
 }
 
 // Variable definition, parsed from a notebook cell.

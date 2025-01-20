@@ -168,9 +168,9 @@ func (s *State) CodePath() string {
 	return path.Join(s.TempDir, name)
 }
 
-// RemoveCode removes the code files (`main.go` or `main_test.go`).
-// Usually used just before creating creating a new version.
-func (s *State) RemoveCode() error {
+// RemoveGeneratedCode removes the code files (`main.go` or `main_test.go`).
+// Usually, it is used just before creating a new version.
+func (s *State) RemoveGeneratedCode() error {
 	for _, name := range [2]string{MainGo, MainTestGo} {
 		p := path.Join(s.TempDir, name)
 		err := os.Remove(p)

@@ -249,7 +249,6 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 	updated = true
 	if !foundInFile && foundInCache {
 		// Remove notify removal.
-
 		delete(c.fileCache, filePath)
 		return
 	}

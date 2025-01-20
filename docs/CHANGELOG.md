@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## Next
+## v0.10.7, 2025/01/20
 
 * Improved `autostart` logic: it now requires being mounted as "readonly" under `/root/autostart`.
 * Added `%version`, and environment variables `GONB_VERSION`, `GONB_GIT_COMMIT`.

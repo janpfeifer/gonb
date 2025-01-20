@@ -47,7 +47,7 @@ RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt insta
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ARG GO_VERSION=1.23.2
+ARG GO_VERSION=1.23.5
 ENV GOROOT=/usr/local/go
 ENV GOPATH=$HOME/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -71,7 +71,7 @@ RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-am
     && go version
 
 # Install GoNB (https://github.com/janpfeifer/gonb) in the user account
-ARG GONB_VERSION="v0.10.6"
+ARG GONB_VERSION="v0.10.7"
 USER $NB_USER
 WORKDIR ${HOME}
 RUN export GOPROXY=direct && \

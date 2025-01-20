@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"k8s.io/klog/v2"
 	"net"
+	"path"
 	"strings"
 	"time"
 
-	lsp "github.com/go-language-server/protocol"
-	"github.com/go-language-server/uri"
 	"github.com/pkg/errors"
 	"go.lsp.dev/jsonrpc2"
+	lsp "go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 var _ = lsp.MethodInitialize
@@ -90,8 +91,13 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	callId, err := c.jsonConn.Call(ctx, lsp.MethodInitialize, &lsp.InitializeParams{
 		ProcessID: 0,
-		RootURI:   uri.File(c.dir),
 		// Capabilities:          lsp.ClientCapabilities{},
+		WorkspaceFolders: []lsp.WorkspaceFolder{
+			lsp.WorkspaceFolder{
+				URI:  string(uri.File(c.dir)),
+				Name: path.Base(c.dir),
+			},
+		},
 	}, &c.lspCapabilities)
 	_ = callId // Not used now.
 	if err != nil {
@@ -177,7 +183,7 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 			TextDocument: lsp.TextDocumentItem{
 				URI:        fileData.URI,
 				LanguageID: "go",
-				Version:    float64(fileVersion),
+				Version:    int32(fileVersion),
 				Text:       fileData.Content,
 			}}
 		err = c.jsonConn.Notify(ctx, lsp.MethodTextDocumentDidOpen, params)
@@ -196,7 +202,7 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 			TextDocumentIdentifier: lsp.TextDocumentIdentifier{
 				URI: fileData.URI,
 			},
-			Version: &version,
+			Version: int32(version),
 		},
 		ContentChanges: []lsp.TextDocumentContentChangeEvent{
 			{
@@ -244,8 +250,8 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 			URI: uri.File(filePath),
 		},
 		Position: lsp.Position{
-			Line:      float64(line),
-			Character: float64(col),
+			Line:      uint32(line),
+			Character: uint32(col),
 		},
 	}
 	_, err = c.jsonConn.Call(ctx, lsp.MethodTextDocumentDefinition, params, &results)
@@ -294,8 +300,8 @@ func (c *Client) callHoverLocked(ctx context.Context, filePath string, line, col
 			URI: uri.File(filePath),
 		},
 		Position: lsp.Position{
-			Line:      float64(line),
-			Character: float64(col),
+			Line:      uint32(line),
+			Character: uint32(col),
 		},
 	}
 
@@ -336,12 +342,12 @@ func (c *Client) callCompleteLocked(ctx context.Context, filePath string, line, 
 				URI: uri.File(filePath),
 			},
 			Position: lsp.Position{
-				Line:      float64(line),
-				Character: float64(col),
+				Line:      uint32(line),
+				Character: uint32(col),
 			},
 		},
 		Context: &lsp.CompletionContext{
-			TriggerKind: lsp.Invoked,
+			TriggerKind: lsp.CompletionTriggerKindInvoked,
 		},
 	}
 	items = &lsp.CompletionList{}
@@ -371,10 +377,12 @@ func trimString(s string, maxLen int) string {
 // Handler implements jsonrpc2.Handler, and receives messages initiated by gopls.
 func (c *Client) Handler(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
 	_ = ctx
-	switch req.Method() {
+	method := req.Method()
+	switch method {
 	case lsp.MethodWindowShowMessage:
 		var params lsp.ShowMessageParams
-		err := json.Unmarshal(req.Params(), &params)
+		rawJson := req.Params()
+		err := json.Unmarshal(rawJson, &params)
 		if err != nil {
 			klog.Errorf("Failed to parse ShowMessageParams: %v", err)
 			return err
@@ -384,7 +392,8 @@ func (c *Client) Handler(ctx context.Context, reply jsonrpc2.Replier, req jsonrp
 
 	case lsp.MethodWindowLogMessage:
 		var params lsp.LogMessageParams
-		err := json.Unmarshal(req.Params(), &params)
+		rawJson := req.Params()
+		err := json.Unmarshal(rawJson, &params)
 		if err != nil {
 			klog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return err
@@ -393,7 +402,8 @@ func (c *Client) Handler(ctx context.Context, reply jsonrpc2.Replier, req jsonrp
 
 	case lsp.MethodTextDocumentPublishDiagnostics:
 		var params lsp.PublishDiagnosticsParams
-		err := json.Unmarshal(req.Params(), &params)
+		rawJson := req.Params()
+		err := json.Unmarshal(rawJson, &params)
 		if err != nil {
 			klog.Errorf("Failed to parse LogMessageParams: %v", err)
 			return err
@@ -407,7 +417,7 @@ func (c *Client) Handler(ctx context.Context, reply jsonrpc2.Replier, req jsonrp
 				trimString(fmt.Sprintf("%+v", params), 100))
 		}
 	default:
-		klog.Errorf("gopls jsonrpc2 message delivered to GoNB but not handled: %q", req.Method())
+		klog.Errorf("gopls jsonrpc2 message delivered to GoNB but not handled: %q", method)
 	}
 	return nil
 }

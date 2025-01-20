@@ -28,10 +28,10 @@ import (
 	"sync"
 	"time"
 
-	lsp "github.com/go-language-server/protocol"
-	"github.com/go-language-server/uri"
 	"github.com/pkg/errors"
 	"go.lsp.dev/jsonrpc2"
+	lsp "go.lsp.dev/protocol"
+	"go.lsp.dev/uri"
 )
 
 type Client struct {

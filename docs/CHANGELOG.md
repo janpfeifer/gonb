@@ -6,6 +6,7 @@
 * Added `%version`, and environment variables `GONB_VERSION`, `GONB_GIT_COMMIT`.
 * Added `%help` info on missing environment variables.
 * Added stack traces to protocol parsing errors.
+* Include function comments in the generated code. This makes tags like `//go:noinline` work. See #150
 
 ## v0.10.6, 2024/10/16, Improved Docker, added `%capture`
 

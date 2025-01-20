@@ -63,8 +63,10 @@ func (w *WriterWithCursor) CursorPlusDelta(delta Cursor) (fileCursor Cursor) {
 	return fileCursor
 }
 
-// FillLinesGap append NoCursorLine (-1) line indices to fileToCellIdAndLine slice, up to
-// the current line.
+// FillLinesGap appends NoCursorLine (-1) line indices to fileToCellIdAndLine slice, up to
+// the current line in w.
+//
+// Used to account for newlines printed out.
 func (w *WriterWithCursor) FillLinesGap(fileToCellIdAndLine []CellIdAndLine) []CellIdAndLine {
 	for len(fileToCellIdAndLine) < w.Line {
 		fileToCellIdAndLine = append(fileToCellIdAndLine, CellIdAndLine{NoCursorLine, NoCursorLine})
@@ -189,7 +191,7 @@ func (d *Declarations) RenderVariables(w *WriterWithCursor, fileToCellIdAndLine 
 	return cursor, fileToCellIdAndLine
 }
 
-// RenderFunctions without comments, for all functions in Declarations.
+// RenderFunctions for all functions in Declarations.
 func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
 	cursor := NoCursor
 	if len(d.Functions) == 0 {
@@ -198,6 +200,14 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine 
 
 	for _, key := range SortedKeys(d.Functions) {
 		funcDecl := d.Functions[key]
+
+		// First render the corresponding comments.
+		tmpCursor, fileToCellIdAndLine := funcDecl.Comments.Render(w, fileToCellIdAndLine)
+		if tmpCursor != NoCursor {
+			// Cursor in comment, register it.
+			cursor = tmpCursor
+		}
+
 		fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
 		fileToCellIdAndLine = funcDecl.CellLines.Append(fileToCellIdAndLine)
 		def := funcDecl.Definition
@@ -208,6 +218,24 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine 
 			def = strings.Replace(def, key, "init", 1)
 		}
 		w.Writef("%s\n\n", def)
+	}
+	return cursor, fileToCellIdAndLine
+}
+
+// Render comments with the corresponding record of CellIdAndLine.
+// Returns cursor != NoCursor is the cursor is in the comment.
+func (c *Comments) Render(w *WriterWithCursor, fileToCellIdAndLine []CellIdAndLine) (Cursor, []CellIdAndLine) {
+	cursor := NoCursor
+	if c == nil {
+		return cursor, fileToCellIdAndLine
+	}
+	fileToCellIdAndLine = w.FillLinesGap(fileToCellIdAndLine)
+	fileToCellIdAndLine = c.CellLines.Append(fileToCellIdAndLine)
+	if c.HasCursor() {
+		cursor = w.CursorPlusDelta(c.Cursor)
+	}
+	for _, line := range c.Lines {
+		w.Writef("%s\n", line)
 	}
 	return cursor, fileToCellIdAndLine
 }
@@ -416,7 +444,7 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 // It returns the cursor position in the file as well as a mapping from the file Lines to the original cell ids and Lines.
 func (s *State) createCodeFileFromDecls(decls *Declarations, mainDecl *Function) (
 	cursor Cursor, fileToCellIdAndLine []CellIdAndLine, err error) {
-	if err = s.RemoveCode(); err != nil {
+	if err = s.RemoveGeneratedCode(); err != nil {
 		return
 	}
 	var f *os.File

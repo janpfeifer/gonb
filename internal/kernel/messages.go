@@ -52,6 +52,7 @@ type KernelInfo struct {
 	LanguageInfo          KernelLanguageInfo `json:"language_info"`
 	Banner                string             `json:"banner"`
 	HelpLinks             []HelpLink         `json:"help_links"`
+	Status                string             `json:"status"`
 }
 
 // KernelLanguageInfo holds information about the language that this kernel executes code in.
@@ -567,11 +568,13 @@ func SendKernelInfo(msg Message, version string) error {
 				Name:          "go",
 				Version:       runtime.Version(),
 				FileExtension: ".go",
+				MIMEType:      "text/x-go",
 			},
 			HelpLinks: []HelpLink{
 				{Text: "Go", URL: "https://golang.org/"},
 				{Text: "gonb", URL: "https://github.com/janpfeifer/gonb"},
 			},
+			Status: "ok",
 		},
 	)
 }

@@ -1,10 +1,12 @@
 # GoNB Changelog
 
-## v0.10.9, 2025/01/28
+## v0.10.10, 2025/01/28
 
 * Reverted `replace` directive: contrary to what the AI suggested, it doesn't work when running from outside a cloned repository.
   * Temporary solution, as this leaves gonb "at the mercy" of the default GOPROXY proxy.golang.org continuously proxying 
     the now extinct packages under `go.lsp.dev`. See https://github.com/janpfeifer/gonb/issues/157
+  * See more in: https://github.com/go-language-server/jsonrpc2/issues/28
+  * v0.10.9 skipped: issues with the release and GOPROXY. Instead I skipped the version.
 
 ## v0.10.8, 2025/01/28
 

@@ -21,12 +21,6 @@ require (
 	k8s.io/klog/v2 v2.130.1
 )
 
-replace go.lsp.dev/jsonrpc2 => github.com/go-language-server/jsonrpc2 v0.10.0
-
-replace go.lsp.dev/protocol => github.com/go-language-server/protocol v0.12.0
-
-replace go.lsp.dev/uri => github.com/go-language-server/uri v0.3.0
-
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

@@ -1,5 +1,14 @@
 # GoNB Changelog
 
+
+## Next
+
+* Added a `replace` directive from `go.lsp.dev/{jsonrpc2,uri,protocol}` to `github.com/go-language-server/{jsonrpc2,uri,protocol}`
+  in `go.mod`, since `go.lsp.dev` seems to be down.
+* Updated dependencies to `go.lsp.dev/uri` and `go.lsp.dev/protocol`.
+* Set MIMEType KernelLanguageInfo.MIMEType, which enabled auto-complete with VSCode+Polyglot to work with GoNB+Auto-complete. 
+  Thanks @tonidy for the find and fix. More in https://github.com/dotnet/interactive/issues/3511
+
 ## v0.10.7, 2025/01/20
 
 * Improved `autostart` logic: it now requires being mounted as "readonly" under `/root/autostart`.

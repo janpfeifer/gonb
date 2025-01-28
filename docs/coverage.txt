@@ -11,7 +11,7 @@ github.com/janpfeifer/gonb/version.go					init						100.0%
 github.com/janpfeifer/gonb/cache/cache.go					New						75.0%
 github.com/janpfeifer/gonb/cache/cache.go					AssertNoError					50.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNew						100.0%
-github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					72.7%
+github.com/janpfeifer/gonb/cache/cache.go					NewInTmp					68.2%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewInTmp					100.0%
 github.com/janpfeifer/gonb/cache/cache.go					NewHidden					80.0%
 github.com/janpfeifer/gonb/cache/cache.go					MustNewHidden					100.0%
@@ -301,7 +301,7 @@ github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		*Client.CallComp
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		*Client.callCompleteLocked			0.0%
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		*Client.ConsumeMessages				0.0%
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		trimString					66.7%
-github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		*Client.Handler					44.4%
+github.com/janpfeifer/gonb/internal/goexec/goplsclient/conn.go		*Client.Handler					48.4%
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/exec.go		*Client.Start					79.6%
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/exec.go		*Client.Stop					0.0%
 github.com/janpfeifer/gonb/internal/goexec/goplsclient/exec.go		*Client.WaitConnection				0.0%

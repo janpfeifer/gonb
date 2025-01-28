@@ -74,10 +74,14 @@ RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-am
 ARG GONB_VERSION="v0.10.7"
 USER $NB_USER
 WORKDIR ${HOME}
-RUN export GOPROXY=direct && \
-    go install "github.com/janpfeifer/gonb@${GONB_VERSION}" && \
-    go install golang.org/x/tools/cmd/goimports@latest && \
-    go install golang.org/x/tools/gopls@latest && \
+RUN go install golang.org/x/tools/cmd/goimports@latest && \
+    go install golang.org/x/tools/gopls@latest
+
+# Clone from main, build&install gonb binary, and then install it as a kernel in Jupyter.
+WORKDIR ${HOME}
+RUN git clone 'https://github.com/janpfeifer/gonb.git'
+WORKDIR ${HOME}/gonb
+RUN go install . && \
     gonb --install
 
 #######################################################################################################
@@ -87,14 +91,13 @@ USER root
 ENV NOTEBOOKS=/notebooks
 
 # Create directory where notebooks will be stored, where Jupyter Lab will run by default.
-RUN mkdir ${NOTEBOOKS} && chown ${NB_USER}:users ${NOTEBOOKS}
+RUN mkdir ${NOTEBOOKS} ${NOTEBOOKS}/host && chown ${NB_USER}:users ${NOTEBOOKS} ${NOTEBOOKS}/host
 
 # Make tutorial available by default, so it can be used, and include the latest
 # GoNB version locally.
 USER $NB_USER
 WORKDIR ${NOTEBOOKS}
-COPY --link examples/tutorial.ipynb ${NOTEBOOKS}
-RUN git clone 'https://github.com/janpfeifer/gonb.git'
+COPY --link ./examples/tutorial.ipynb ${NOTEBOOKS}
 
 #######################################################################################################
 # Finishing touches

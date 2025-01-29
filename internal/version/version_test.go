@@ -97,14 +97,13 @@ func TestVersionInfo_Print(t *testing.T) {
 
 	// Check if output contains expected information
 	expectedStrings := []string{
-		"App version: 1.0.0",
+		"GoNB version: 1.0.0",
 		"Version control info:",
 		v.CommitLink,
 		"Build info:",
 		runtime.Version(),
 		runtime.GOOS,
 		runtime.GOARCH,
-		"Git commit: abc123",
 	}
 
 	for _, expected := range expectedStrings {

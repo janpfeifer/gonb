@@ -119,7 +119,7 @@ func (v *VersionInfo) Print() {
 	fmt.Printf("  Go version: %s (OS: %s, arch: %s)\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 
-func (v *VersionInfo) PrintMarkdown() string {
+func (v *VersionInfo) Markdown() string {
 	var markdown string
 	markdown += fmt.Sprintf("## GoNB version: `%s`\n\n", v.Version)
 

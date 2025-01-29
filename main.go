@@ -55,7 +55,9 @@ func main() {
 
 	flag.Parse()
 
-	printVersion()
+	if printVersion() {
+		return
+	}
 
 	// Setup logging.
 	if *flagExtraLog != "" {
@@ -156,14 +158,15 @@ func main() {
 	klog.Infof("Exiting...")
 }
 
-func printVersion() {
+func printVersion() bool {
 	if *flagShortVersion {
 		fmt.Println(version.AppVersion.String())
-		os.Exit(0)
+		return true
 	} else if *flagLongVersion {
 		version.AppVersion.Print()
-		os.Exit(0)
+		return true
 	}
+	return false
 }
 
 var (

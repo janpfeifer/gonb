@@ -241,7 +241,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 			klog.Errorf("Failed publishing help contents: %+v", err)
 		}
 	case "version":
-		err := kernel.PublishMarkdown(msg, version.AppVersion.PrintMarkdown())
+		err := kernel.PublishMarkdown(msg, version.AppVersion.Markdown())
 		if err != nil {
 			klog.Errorf("Failed publishing version contents: %+v", err)
 		}

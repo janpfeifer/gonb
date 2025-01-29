@@ -3,27 +3,31 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gofrs/uuid"
-	"github.com/janpfeifer/gonb/internal/dispatcher"
-	"github.com/janpfeifer/gonb/internal/goexec"
-	"github.com/janpfeifer/gonb/internal/kernel"
 	"io"
-	klog "k8s.io/klog/v2"
 	"log"
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/gofrs/uuid"
+	"github.com/janpfeifer/gonb/internal/dispatcher"
+	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/kernel"
+	"github.com/janpfeifer/gonb/version"
+	klog "k8s.io/klog/v2"
 )
 
 var (
-	flagInstall   = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
-	flagKernel    = flag.String("kernel", "", "ProgramExecutor kernel using given path for the `connection_file` provided by Jupyter client")
-	flagExtraLog  = flag.String("extra_log", "", "Extra file to include in the log.")
-	flagForceDeps = flag.Bool("force_deps", false, "Force install even if goimports and/or gopls are missing.")
-	flagForceCopy = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")
-	flagRawError  = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
-	flagWork      = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
-	flagCommsLog  = flag.Bool("comms_log", false, "Enable verbose logging from communication library in Javascript console.")
+	flagInstall      = flag.Bool("install", false, "Install kernel in local config, and make it available in Jupyter")
+	flagKernel       = flag.String("kernel", "", "ProgramExecutor kernel using given path for the `connection_file` provided by Jupyter client")
+	flagExtraLog     = flag.String("extra_log", "", "Extra file to include in the log.")
+	flagForceDeps    = flag.Bool("force_deps", false, "Force install even if goimports and/or gopls are missing.")
+	flagForceCopy    = flag.Bool("force_copy", false, "Copy binary to the Jupyter kernel configuration location. This already happens by default is the binary is under `/tmp`.")
+	flagRawError     = flag.Bool("raw_error", false, "When GoNB executes cells, force raw text errors instead of HTML errors, which facilitates command line testing of notebooks.")
+	flagWork         = flag.Bool("work", false, "Print name of temporary work directory and preserve it at exit. ")
+	flagCommsLog     = flag.Bool("comms_log", false, "Enable verbose logging from communication library in Javascript console.")
+	flagShortVersion = flag.Bool("V", false, "Print version information")
+	flagLongVersion  = flag.Bool("version", false, "Print detailed version information")
 )
 
 var (
@@ -50,6 +54,10 @@ func main() {
 	defer klog.Flush()
 
 	flag.Parse()
+
+	if printVersion() {
+		return
+	}
 
 	// Setup logging.
 	if *flagExtraLog != "" {
@@ -150,6 +158,17 @@ func main() {
 	klog.Infof("Exiting...")
 }
 
+func printVersion() bool {
+	if *flagShortVersion {
+		fmt.Println(version.AppVersion.String())
+		return true
+	} else if *flagLongVersion {
+		version.AppVersion.Print()
+		return true
+	}
+	return false
+}
+
 var (
 	ColorReset    = "\033[0m"
 	ColorYellow   = "\033[33m"
@@ -179,17 +198,17 @@ func prepend[T any](slice []T, value T) []T {
 }
 
 // Filter implements klog.LogFilter interface.
-func (_ UniqueIDFilter) Filter(args []interface{}) []interface{} {
+func (UniqueIDFilter) Filter(args []interface{}) []interface{} {
 	return prepend(args, any(coloredUniqueID))
 }
 
 // FilterF implements klog.LogFilter interface.
-func (_ UniqueIDFilter) FilterF(format string, args []interface{}) (string, []interface{}) {
+func (UniqueIDFilter) FilterF(format string, args []interface{}) (string, []interface{}) {
 	return "%s" + format, prepend(args, any(coloredUniqueID))
 }
 
 // FilterS implements klog.LogFilter interface.
-func (_ UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, []interface{}) {
+func (UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, []interface{}) {
 	return coloredUniqueID + msg, keysAndValues
 }
 

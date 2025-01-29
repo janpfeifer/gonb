@@ -10,11 +10,13 @@ package specialcmd
 import (
 	_ "embed"
 	"fmt"
-	"github.com/janpfeifer/gonb/internal/jpyexec"
-	"golang.org/x/exp/slices"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/janpfeifer/gonb/internal/jpyexec"
+	"github.com/janpfeifer/gonb/version"
+	"golang.org/x/exp/slices"
 
 	. "github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
@@ -239,13 +241,7 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 			klog.Errorf("Failed publishing help contents: %+v", err)
 		}
 	case "version":
-		gitHash := os.Getenv(protocol.GONB_GIT_COMMIT)
-		gitVersion := os.Getenv(protocol.GONB_VERSION)
-		gitCommitURL := fmt.Sprintf("https://github.com/janpfeifer/gonb/tree/%s", gitHash)
-		gitTagURL := fmt.Sprintf("https://github.com/janpfeifer/gonb/releases/tag/%s", gitVersion)
-
-		err := kernel.PublishMarkdown(msg, fmt.Sprintf(
-			"**GoNB** version [%s](%s) / Commit: [%s](%s)\n", gitVersion, gitTagURL, gitHash, gitCommitURL))
+		err := kernel.PublishMarkdown(msg, version.AppVersion.Markdown())
 		if err != nil {
 			klog.Errorf("Failed publishing version contents: %+v", err)
 		}

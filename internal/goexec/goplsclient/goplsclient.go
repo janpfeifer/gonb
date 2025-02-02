@@ -235,29 +235,32 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 		err = nil
 	}
 
+	// Trivial case: file doesn't exist (in filesystem and cache), or it exists in both
+	// and it is up-to-date.
 	if !foundInCache && !foundInFile {
 		// No file in cache or file system.
 		return
 	}
-
-	// Deal with missing and deleted file.
 	if foundInCache && foundInFile && fileInfo.ModTime() == content.ContentTime {
 		// Fine not changed.
 		return
 	}
 
+	// Something needs updating.
 	updated = true
-	if !foundInFile && foundInCache {
-		// Remove notify removal.
+
+	// File no longer exists in filesystem.
+	if !foundInFile {
+		// Remove from cache.
 		delete(c.fileCache, filePath)
 		return
 	}
 
-	if foundInFile && foundInCache {
-		klog.V(2).Infof("File %q: stored date is %s, fileInfo mod time is %s",
+	// Create or update cache for file.
+	if foundInCache && klog.V(2).Enabled() {
+		klog.Infof("File %q: stored date is %s, fileInfo mod time is %s. Cache will be udpated.",
 			filePath, content.ContentTime, fileInfo.ModTime())
 	}
-
 	content = &FileData{
 		URI:         uri.File(filePath),
 		Path:        filePath,

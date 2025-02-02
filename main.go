@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/janpfeifer/gonb/internal/dispatcher"
+	"github.com/janpfeifer/gonb/internal/goexec"
 	"io"
 	"log"
 	"os"
@@ -10,8 +12,6 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
-	"github.com/janpfeifer/gonb/internal/dispatcher"
-	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/janpfeifer/gonb/version"
 	klog "k8s.io/klog/v2"
@@ -33,7 +33,7 @@ var (
 var (
 	// UniqueID uniquely identifies a kernel execution. Used to create the temporary
 	// directory holding the kernel code, and for logging.
-	// Set by SetUpLogging.
+	// Set by setUpLogging.
 	UniqueID string
 
 	coloredUniqueID string
@@ -52,112 +52,74 @@ func init() {
 func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
-
 	flag.Parse()
 
+	// --version or -V
 	if printVersion() {
 		return
 	}
 
-	// Setup logging.
-	if *flagExtraLog != "" {
-		logFile, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-		if err != nil {
-			klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
-		}
-		_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
-		logWriter = logFile
-		flag.VisitAll(func(f *flag.Flag) {
-			if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
-				if f.Value.String() == "true" {
-					logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
-					_ = f.Value.Set("false")
-				}
-			}
-		})
-		defer func() { _ = logFile.Close() }()
+	// Logging.
+	extraLogFile := setUpExtraLog() // --extra_log.
+	if extraLogFile != nil {
+		defer func() { _ = extraLogFile.Close() }()
 	}
-	SetUpLogging() // "log" package.
-	SetUpKlog()    // "github.com/golang/klog" package
+	setUpLogging() // "log" package.
+	setUpKlog()    // "k8s.io/klog/v2" package
 
-	if *flagInstall {
-		// Install kernel in Jupyter configuration.
-		var extraArgs []string
-		if *flagExtraLog != "" {
-			extraArgs = []string{"--extra_log", *flagExtraLog}
-		}
-		if glogFlag := flag.Lookup("vmodule"); glogFlag != nil && glogFlag.Value.String() != "" {
-			extraArgs = append(extraArgs, fmt.Sprintf("--vmodule=%s", glogFlag.Value.String()))
-		}
-		if glogFlag := flag.Lookup("logtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--logtostderr")
-		}
-		if glogFlag := flag.Lookup("alsologtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--alsologtostderr")
-		}
-		if glogFlag := flag.Lookup("raw_error"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--raw_error")
-		}
-		if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--work")
-		}
-		if glogFlag := flag.Lookup("comms_log"); glogFlag != nil && glogFlag.Value.String() != "false" {
-			extraArgs = append(extraArgs, "--comms_log")
-		}
-		err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
-		if err != nil {
-			log.Fatalf("Installation failed: %+v\n", err)
-		}
+	// One of two tasks: (1) install gonb; (2) run kernel, started by JupyterServer.
+	if install() {
+		return
+	}
+	if runKernel() {
 		return
 	}
 
-	if *flagKernel == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Use either --install to install the kernel, or if started by Jupyter the flag --kernel must be provided.\n")
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
-
-	gocoverdir := os.Getenv("GOCOVERDIR")
-	if gocoverdir != "" {
-		klog.Infof("GOCOVERDIR=%s", gocoverdir)
-	}
-
-	_, err := exec.LookPath("go")
-	if err != nil {
-		klog.Exitf("Failed to find path for the `go` program: %+v\n\nCurrent PATH=%q", err, os.Getenv("PATH"))
-	}
-
-	// Create a kernel.
-	k, err := kernel.New(*flagKernel)
-	klog.Infof("kernel created\n")
-	if err != nil {
-		log.Fatalf("Failed to start kernel: %+v", err)
-	}
-	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
-
-	// Create a Go executor.
-	goExec, err := goexec.New(k, UniqueID, *flagWork, *flagRawError)
-	if err != nil {
-		log.Fatalf("Failed to create go executor: %+v", err)
-	}
-	goExec.Comms.LogWebSocket = *flagCommsLog
-
-	// Orchestrate dispatching of messages.
-	dispatcher.RunKernel(k, goExec)
-	klog.V(1).Infof("Dispatcher exited.")
-
-	// Stop gopls.
-	err = goExec.Stop()
-	if err != nil {
-		klog.Warningf("Error during shutdown: %+v", err)
-	}
-	klog.V(1).Infof("goExec stopped.")
-
-	// Wait for all polling goroutines.
-	k.ExitWait()
-	klog.Infof("Exiting...")
+	_, _ = fmt.Fprintf(os.Stderr, "Use either --install to install the kernel, or if started by Jupyter the flag --kernel must be provided.\n")
+	flag.PrintDefaults()
+	os.Exit(1)
+	return
 }
 
+// install GoNB kernel as a JupyterServer configuration.
+// Returns true if installed.
+// Errors are fatal.
+func install() bool {
+	if !*flagInstall {
+		return false
+	}
+
+	// Install kernel in Jupyter configuration.
+	var extraArgs []string
+	if *flagExtraLog != "" {
+		extraArgs = []string{"--extra_log", *flagExtraLog}
+	}
+	if glogFlag := flag.Lookup("vmodule"); glogFlag != nil && glogFlag.Value.String() != "" {
+		extraArgs = append(extraArgs, fmt.Sprintf("--vmodule=%s", glogFlag.Value.String()))
+	}
+	if glogFlag := flag.Lookup("logtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
+		extraArgs = append(extraArgs, "--logtostderr")
+	}
+	if glogFlag := flag.Lookup("alsologtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
+		extraArgs = append(extraArgs, "--alsologtostderr")
+	}
+	if glogFlag := flag.Lookup("raw_error"); glogFlag != nil && glogFlag.Value.String() != "false" {
+		extraArgs = append(extraArgs, "--raw_error")
+	}
+	if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
+		extraArgs = append(extraArgs, "--work")
+	}
+	if glogFlag := flag.Lookup("comms_log"); glogFlag != nil && glogFlag.Value.String() != "false" {
+		extraArgs = append(extraArgs, "--comms_log")
+	}
+	err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
+	if err != nil {
+		log.Fatalf("Installation failed: %+v\n", err)
+	}
+	return true
+}
+
+// printVersion returns whether version printing was requested.
 func printVersion() bool {
 	if *flagShortVersion {
 		fmt.Println(version.AppVersion.String())
@@ -175,9 +137,32 @@ var (
 	ColorBgYellow = "\033[7;39;32m"
 )
 
-// SetUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
+// setUpExtraLog
+func setUpExtraLog() *os.File {
+	if *flagExtraLog == "" {
+		return nil
+	}
+
+	logFile, err := os.OpenFile(*flagExtraLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
+	}
+	_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
+	logWriter = logFile
+	flag.VisitAll(func(f *flag.Flag) {
+		if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
+			if f.Value.String() == "true" {
+				logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
+				_ = f.Value.Set("false")
+			}
+		}
+	})
+	return logFile
+}
+
+// setUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
 // requested.
-func SetUpLogging() {
+func setUpLogging() {
 	log.SetPrefix(coloredUniqueID)
 	if logWriter != nil {
 		log.SetOutput(logWriter)
@@ -187,14 +172,12 @@ func SetUpLogging() {
 // UniqueIDFilter prepends the UniqueID for every log line.
 type UniqueIDFilter struct{}
 
-// prepend value to slice: it makes a copy of the slice.
-func prepend[T any](slice []T, value T) []T {
-	newSlice := make([]T, len(slice)+1)
-	if len(slice) > 0 {
-		copy(newSlice[1:], slice)
-	}
-	newSlice[0] = value
-	return newSlice
+// prepend value to slice.
+func prepend[T any](slice []T, element T) []T {
+	slice = append(slice, element) // It will be overwritten.
+	copy(slice[1:], slice)         // Shift to the "right"
+	slice[0] = element
+	return slice
 }
 
 // Filter implements klog.LogFilter interface.
@@ -212,10 +195,60 @@ func (UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, 
 	return coloredUniqueID + msg, keysAndValues
 }
 
-// SetUpKlog to include prefix with kernel's UniqueID.
-func SetUpKlog() {
+// setUpKlog to include prefix with kernel's UniqueID.
+func setUpKlog() {
 	if logWriter != nil {
 		klog.SetOutput(logWriter)
 	}
 	klog.SetLogFilter(UniqueIDFilter{})
+
+	// Report about profiling test coverage.
+	gocoverdir := os.Getenv("GOCOVERDIR")
+	if gocoverdir != "" {
+		klog.Infof("GOCOVERDIR=%s", gocoverdir)
+	}
+}
+
+// runKernel if --kernel is set. Returns whether the kernel was run.
+// Errors are fatal.
+func runKernel() bool {
+	if *flagKernel == "" {
+		return false
+	}
+
+	_, err := exec.LookPath("go")
+	if err != nil {
+		klog.Exitf("Failed to find path for the `go` program: %+v\n\nCurrent PATH=%q", err, os.Getenv("PATH"))
+	}
+
+	// Create a kernel.
+	k, err := kernel.New(*flagKernel)
+	klog.Infof("kernel created\n")
+	if err != nil {
+		klog.Fatalf("Failed to start kernel: %+v", err)
+	}
+	k.HandleInterrupt() // Handle Jupyter interruptions and Control+C.
+
+	// Create a Go executor.
+	goExec, err := goexec.New(k, UniqueID, *flagWork, *flagRawError)
+	if err != nil {
+		klog.Fatalf("Failed to create go executor: %+v", err)
+	}
+	goExec.Comms.LogWebSocket = *flagCommsLog
+
+	// Orchestrate dispatching of messages.
+	dispatcher.RunKernel(k, goExec)
+	klog.V(1).Infof("Dispatcher exited.")
+
+	// Stop gopls.
+	err = goExec.Stop()
+	if err != nil {
+		klog.Warningf("Error during shutdown: %+v", err)
+	}
+	klog.V(1).Infof("goExec stopped.")
+
+	// Wait for all polling goroutines.
+	k.ExitWait()
+	klog.Infof("Exiting...")
+	return true
 }

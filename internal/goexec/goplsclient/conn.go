@@ -40,18 +40,22 @@ func (c *Client) connCloseLocked() {
 
 // minTimeout extends (or returns a new context with extended Deadline), discarding the
 // previous one -- not the correct use of context, but will do for now.
-func minTimeout(ctx context.Context, timeout time.Duration) context.Context {
+func minTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	var cancel context.CancelFunc
 	minDeadline := time.Now().Add(timeout)
 	if deadline, ok := ctx.Deadline(); !ok || deadline.After(minDeadline) {
-		ctx, _ = context.WithDeadline(ctx, minDeadline)
+		ctx, cancel = context.WithDeadline(ctx, minDeadline)
+	} else {
+		cancel = func() {} // No-op.
 	}
-	return ctx
+	return ctx, cancel
 }
 
 // Connect to the `gopls` in address given by `c.Address()`. It also starts
 // a goroutine to monitor receiving requests.
 func (c *Client) Connect(ctx context.Context) error {
-	ctx = minTimeout(ctx, ConnectTimeout)
+	ctx, cancel := minTimeout(ctx, ConnectTimeout)
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -129,7 +133,8 @@ func (c *Client) NotifyDidOpenOrChange(ctx context.Context, filePath string) (er
 		// Silently do nothing, if no connection available.
 		return
 	}
-	ctx = minTimeout(ctx, CommunicationTimeout)
+	ctx, cancel := minTimeout(ctx, CommunicationTimeout)
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn == nil {
@@ -227,7 +232,8 @@ func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col 
 		// Silently do nothing, if no connection available.
 		return
 	}
-	ctx = minTimeout(ctx, CommunicationTimeout)
+	ctx, cancel := minTimeout(ctx, CommunicationTimeout)
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn == nil {
@@ -277,7 +283,8 @@ func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) 
 		// Silently do nothing, if no connection available.
 		return
 	}
-	ctx = minTimeout(ctx, CommunicationTimeout)
+	ctx, cancel := minTimeout(ctx, CommunicationTimeout)
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn == nil {
@@ -319,7 +326,8 @@ func (c *Client) CallComplete(ctx context.Context, filePath string, line, col in
 		// Silently do nothing, if no connection available.
 		return
 	}
-	ctx = minTimeout(ctx, CommunicationTimeout)
+	ctx, cancel := minTimeout(ctx, CommunicationTimeout)
+	defer cancel()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.conn == nil {

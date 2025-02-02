@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## v0.10.11, 2025/02/01
+
+* New --version and -V flags to print version; Improved `%version` output. (#158)
+* Clean up, refactorings and fixed context leakage.
+
 ## v0.10.10, 2025/01/28
 
 * Reverted `replace` directive: contrary to what the AI suggested, it doesn't work when running from outside a cloned repository.

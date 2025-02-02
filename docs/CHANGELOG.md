@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-## v0.10.11, 2025/02/01
+## v0.10.11, 2025/02/02
 
 * New --version and -V flags to print version; Improved `%version` output. (#158)
 * Clean up, refactorings and fixed context leakage.

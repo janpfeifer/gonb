@@ -77,6 +77,9 @@ RUN go install golang.org/x/tools/cmd/goimports@latest && \
     go install golang.org/x/tools/gopls@latest
 
 # Clone from main, build&install gonb binary, and then install it as a kernel in Jupyter.
+# - First introduce the cache-busting argument. This number can be bumped whenever we only want
+#   to rebuild the gonb part.
+ARG CACHEBUST=2
 WORKDIR ${HOME}
 RUN git clone 'https://github.com/janpfeifer/gonb.git'
 WORKDIR ${HOME}/gonb

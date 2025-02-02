@@ -1,2 +1,2 @@
 package version
-var GitTag = "v0.10.10"
+var GitTag = "v0.10.11"

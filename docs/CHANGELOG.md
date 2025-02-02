@@ -4,6 +4,7 @@
 
 * New --version and -V flags to print version; Improved `%version` output. (#158)
 * Clean up, refactorings and fixed context leakage.
+* Added `version.txt` with target version for build.
 
 ## v0.10.10, 2025/01/28
 

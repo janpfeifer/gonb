@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## v0.10.12, 2025/05/19
+
+* Updated dependencies:
+  * Bumped `go-plotly` dependency to v0.7.0. 
+
 ## v0.10.11, 2025/02/02
 
 * New --version and -V flags to print version; Improved `%version` output. (#158)

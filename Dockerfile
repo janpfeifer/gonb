@@ -47,7 +47,7 @@ RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt insta
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ARG GO_VERSION=1.23.5
+ARG GO_VERSION=1.24.3
 ENV GOROOT=/usr/local/go
 ENV GOPATH=$HOME/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin

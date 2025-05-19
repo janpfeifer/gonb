@@ -25,7 +25,7 @@ import (
 
 // PlotlySrc is the source from where to download Plotly.
 // If you have a local copy or an updated version of the library, change the value here.
-var PlotlySrc = "https://cdn.plot.ly/plotly-2.29.1.min.js"
+var PlotlySrc = "https://cdn.plot.ly/plotly-2.34.0.min.js"
 
 // DisplayFig as HTML output.
 func DisplayFig(fig *grob.Fig) error {

@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next
+
+* Fixed dependency to corresponding Plotly JS library: plotly-2.34.0.min.js
+
 ## v0.10.12, 2025/05/19
 
 * Updated dependencies:

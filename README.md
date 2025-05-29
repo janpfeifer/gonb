@@ -151,6 +151,10 @@ Install there as if it were in a linux machine.
 
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
+## 👥 Support
+
+* [![Join the Gophers Slack Community](https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white)](https://invite.slack.golangbridge.org/): connect with us there. Once you've joined the Gophers slack, find the [`#gomlx` channel](https://app.slack.com/client/T029RQSE6/C08TX33BX6U). [GoMLX](http://github.com/gomlx/gomlx) is a full-featured machine learning framework for Go developed in tandem with **GoNB**.
+ 
 ## 🤔 FAQ
 
 * Is there are reference documentation ?

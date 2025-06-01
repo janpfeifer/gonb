@@ -13,6 +13,7 @@ package plotly
 import (
 	"encoding/json"
 	"fmt"
+
 	grob "github.com/MetalBlueberry/go-plotly/generated/v2.34.0/graph_objects"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/dom"

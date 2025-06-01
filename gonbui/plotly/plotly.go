@@ -6,9 +6,6 @@
 // It also offers a library around github.com/MetalBlueberry/go-plotly (itself a wrapper around
 // Plotly) to integrate it in GoNB, see `DisplayFig` method.
 //
-// It uses go-plotly v0.7.0, which uses github.com/MetalBlueberry/go-plotly/generated/v2.34.0/graph_objects
-// for the graph objects (usually aliased as "grob" package).
-//
 // API is a first stab at it (experimental), and `UpdateHtml` for dynamic plots is not yet supported.
 // Ideas are welcome here.
 package plotly
@@ -16,7 +13,6 @@ package plotly
 import (
 	"encoding/json"
 	"fmt"
-
 	grob "github.com/MetalBlueberry/go-plotly/generated/v2.34.0/graph_objects"
 	"github.com/janpfeifer/gonb/gonbui"
 	"github.com/janpfeifer/gonb/gonbui/dom"

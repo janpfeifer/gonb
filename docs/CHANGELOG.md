@@ -1,13 +1,12 @@
 # GoNB Changelog
 
-## Next
+## v0.11.0, 2025/06/01 
 
-* Fixed dependency to corresponding Plotly JS library: plotly-2.34.0.min.js
-
-## v0.10.12, 2025/05/19
-
-* Updated dependencies:
-  * Bumped `go-plotly` dependency to v0.7.0. 
+* Package `plotly`:
+  * Updated `go-plotly` dependency to v0.7.0. It breaks compatibility, with a new version of the `grob` package,
+    now imported as `grob "github.com/MetalBlueberry/go-plotly/generated/v2.34.0/graph_objects"`.
+  * `PlotlySrc` updated to "https://cdn.plot.ly/plotly-2.34.0.min.js".
+  * Added themes (extracted from the Python library) that can be used as parameters to `Layout.Template`.
 
 ## v0.10.11, 2025/02/02
 

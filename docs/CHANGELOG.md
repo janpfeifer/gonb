@@ -1,5 +1,10 @@
 # GoNB Changelog
 
+## v0.11.1, 2025/06/01
+
+* Properly bumped the version number in `version.txt`.
+* Fixed tutorial.ipynb.
+
 ## v0.11.0, 2025/06/01 
 
 * Package `plotly`:

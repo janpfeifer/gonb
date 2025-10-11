@@ -135,6 +135,9 @@ And if `GOBIN` is in your `PATH`, run the following to install **GoNB** as a ker
 gonb --install
 ```
 
+Otherwise, find the binary in your filesystem (that is $HOME/go on MacOS and Linux by default, and %USERPROFILE%\go on Windows), then
+run `./gonb --install` in that very directory. 
+
 And then (re-)start Jupyter (if it is already running).
 
 In GitHub's Codespace, if Jupyter is already started, restart the docker — it will also restart Jupyter.

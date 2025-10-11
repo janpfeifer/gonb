@@ -26,34 +26,61 @@ var PlotlySrc = "https://cdn.plot.ly/plotly-2.34.0.min.js"
 
 // DisplayFig as HTML output.
 func DisplayFig(fig *grob.Fig) error {
-	return displayFigToId("", fig)
+	return displayFigToID(fig, "")
+}
+
+// DisplayFigAsJSON as HTML output.
+// It provides a mechanism to do arbitrary edits to whatever go-plotly generates.
+//
+// figAsJSON is a grob.Fig object marshalled as JSON.
+// E.g.:
+//
+//	figBytes, err := json.Marshal(fig)
+//	// ... edit figBytes ...
+//	plotly.DisplayFigAsJSON(figBytes)
+func DisplayFigAsJSON(figAsJSON []byte) error {
+	return displayJSONToID(figAsJSON, "")
 }
 
 // AppendFig appends the figure to the HTML element with the given id. It uses [dom.TransientJavascript] so it won't be
 // saved, exported to HTML, or even persistable with [dom.Persist].
 // See [dom.CreateTransientDiv] to create transient div and get its `htmlId`.
-func AppendFig(htmlId string, fig *grob.Fig) error {
-	if htmlId == "" {
+func AppendFig(htmlID string, fig *grob.Fig) error {
+	if htmlID == "" {
 		return errors.Errorf("empty htmlId passed to plots.AppendFig(\"\", fig)")
 	}
-	return displayFigToId(htmlId, fig)
+	return displayFigToID(fig, htmlID)
 }
 
-// displayFigToId implements DisplayFig and AppendFig.
-func displayFigToId(elementId string, fig *grob.Fig) error {
-	// Create a unique div.
-	divId := gonbui.UniqueId()
-	divContent := fmt.Sprintf(`<div id="%s"></div>`, divId)
-	if elementId == "" {
-		gonbui.DisplayHTML(divContent)
-	} else {
-		dom.Append(elementId, divContent)
+// AppendFigAsJSON appends the figure (given as serialized JSON bytes) to the HTML element with the given id. It uses [dom.TransientJavascript] so it won't be
+// saved, exported to HTML, or even persistable with [dom.Persist].
+// See [dom.CreateTransientDiv] to create transient div and get its `htmlId`.
+func AppendFigAsJSON(htmlID string, figAsJSON []byte) error {
+	if htmlID == "" {
+		return errors.Errorf("empty htmlId passed to plots.AppendFigAsJSON(\"\", figAsJSON)")
 	}
+	return displayJSONToID(figAsJSON, htmlID)
+}
 
+// displayFigToID implements DisplayFig and AppendFig.
+func displayFigToID(fig *grob.Fig, elementID string) error {
 	// Encode figure.
 	figBytes, err := json.Marshal(fig)
 	if err != nil {
 		return errors.Wrapf(err, "failed to marshal Json to use with plotly")
+	}
+	return displayJSONToID(figBytes, elementID)
+}
+
+// displayFigToId implements DisplayFig and AppendFig.
+func displayJSONToID(serializedJSON []byte, elementID string) error {
+	// Create a unique div.
+	divId := gonbui.UniqueId()
+	divContent := fmt.Sprintf(`<div id="%s"></div>`, divId)
+	if elementID == "" {
+		gonbui.DisplayHTML(divContent)
+	} else {
+		dom.Append(elementID, divContent)
 	}
 
 	// Run in plotly.
@@ -63,9 +90,10 @@ func displayFigToId(elementId string, fig *grob.Fig) error {
 	}
 	let data = JSON.parse('%s');
 	module.newPlot('%s', data);
-`, figBytes, divId)
+`, serializedJSON, divId)
 
-	if elementId == "" {
+	var err error
+	if elementID == "" {
 		err = dom.LoadScriptOrRequireJSModuleAndRun("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)
 	} else {
 		err = dom.LoadScriptOrRequireJSModuleAndRunTransient("plotly", PlotlySrc, map[string]string{"charset": "utf-8"}, runJS)

@@ -1,5 +1,11 @@
 # GoNB Changelog
 
+## Next
+
+* Package `plotly`:
+  * Added `DisplayFigAsJSON` and `AppendFigAsJSON` to display Plotly figures directly from their
+    JSON rendering. This allows one to do arbitrary editions.
+
 ## v0.11.1, 2025/06/01
 
 * Properly bumped the version number in `version.txt`.

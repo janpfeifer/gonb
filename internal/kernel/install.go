@@ -65,7 +65,7 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	jupyterDataDir := os.Getenv(JupyterDataDirEnv)
 	if jupyterDataDir == "" {
 		switch runtime.GOOS {
-		case "linux":
+		case "linux", "openbsd", "freebsd", "netbsd", "illumos", "solaris":
 			jupyterDataDir = path.Join(home, ".local/share/jupyter")
 		case "darwin":
 			jupyterDataDir = path.Join(home, "Library/Jupyter")

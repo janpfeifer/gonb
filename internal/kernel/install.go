@@ -109,14 +109,10 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	encoder := json.NewEncoder(f)
 	//encoder.SetIndent("", "  ")
 	if err := encoder.Encode(&config); err != nil {
-		if err != nil {
-			return errors.WithMessagef(err, "failed to write configuration file %q", configPath)
-		}
+		return errors.WithMessagef(err, "failed to write configuration file %q", configPath)
 	}
 	if err := f.Close(); err != nil {
-		if err != nil {
-			return errors.WithMessagef(err, "failed to write configuration file %q", configPath)
-		}
+		return errors.WithMessagef(err, "failed to write configuration file %q", configPath)
 	}
 	klog.Infof("Go (gonb) kernel configuration installed in %q.\n", configPath)
 

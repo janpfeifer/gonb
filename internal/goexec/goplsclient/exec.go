@@ -17,7 +17,7 @@ import (
 // This file implements the management of (re-)starting `gopls`
 // as a server for the duration of the kernel.
 
-var StartTimeout = 5 * time.Second
+var StartTimeout = 30 * time.Second
 
 // Start `gopls` as a server, on `Client.Address()` port. It is started
 // asynchronously (so `Start()` returns immediately) and is followed up

@@ -73,7 +73,7 @@ func (c *Client) Start() error {
 			select {
 			case <-onDeadline:
 				// Still failing to connect, kill job.
-				klog.V(2).Infof("started `gopls`, but after %s it failed to connect, stopping it.", StartTimeout)
+				klog.Errorf("started `gopls`, but after %s it failed to connect, stopping it.", StartTimeout)
 				c.Stop()
 				return
 			case <-time.After(ConnectTimeout):

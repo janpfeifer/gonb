@@ -9,10 +9,9 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/janpfeifer/gonb/internal/dispatcher"
 	"github.com/janpfeifer/gonb/internal/goexec"
-
-	"github.com/gofrs/uuid"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/janpfeifer/gonb/version"
 	klog "k8s.io/klog/v2"
@@ -35,11 +34,8 @@ var (
 	// UniqueID uniquely identifies a kernel execution. Used to create the temporary
 	// directory holding the kernel code, and for logging.
 	// Set by setUpLogging.
-	UniqueID string
-
+	UniqueID        string
 	coloredUniqueID string
-
-	logWriter io.Writer
 )
 
 func init() {
@@ -51,7 +47,6 @@ func init() {
 }
 
 func main() {
-	fmt.Printf("Args: %q\n", os.Args)
 	klog.InitFlags(nil)
 	flag.Parse()
 	defer klog.Flush()
@@ -103,7 +98,8 @@ func install() bool {
 
 	// Pass over flags to kernel execution.
 	for _, flagName := range []string{
-		"vmodule", "logtostderr", "alsologtostderr", "log_file", "log_dir", "raw_error", "work", "comms_log"} {
+		"vmodule", "logtostderr", "alsologtostderr", "log_file", "log_dir", "raw_error", "work", "comms_log",
+		"stderrthreshold", "v"} {
 		flagDef := flag.Lookup(flagName)
 		if flagDef == nil {
 			continue
@@ -146,17 +142,8 @@ func setUpExtraLog() *os.File {
 	if err != nil {
 		klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
 	}
-	_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
+	_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n", os.Args[0], os.Getpid(), time.Now())
 	return logFile
-}
-
-// setUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
-// requested.
-func setUpLogging(logWriter io.Writer) {
-	log.SetPrefix(coloredUniqueID)
-	if logWriter != nil {
-		log.SetOutput(logWriter)
-	}
 }
 
 // UniqueIDFilter prepends the UniqueID for every log line.
@@ -187,11 +174,14 @@ func (UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, 
 
 // setUpKlog to include prefix with kernel's UniqueID.
 func setUpKlog(logWriter io.Writer) {
+	log.SetPrefix(coloredUniqueID)
 	klog.SetLogFilter(UniqueIDFilter{})
 	if logWriter != nil {
 		klog.Info("Logging to extra logger configured")
-		klog.SetOutput(logWriter)
-		klog.Info("Logging to extra logger configured")
+		klog.SetOutputBySeverity("INFO", logWriter)
+		klog.Info("Info message")       // 1x in /tmp/gonb.out
+		klog.Warning("Warning message") // 1x in /tmp/gonb.out
+		klog.Error("Error message")     // 1x in /tmp/gonb.out
 	}
 }
 
@@ -207,8 +197,7 @@ func runKernel() bool {
 	if extraLogFile != nil {
 		defer func() { _ = extraLogFile.Close() }()
 	}
-	setUpLogging(extraLogFile) // "log" package.
-	setUpKlog(extraLogFile)    // "k8s.io/klog/v2" package
+	setUpKlog(extraLogFile)
 
 	// Report about profiling test coverage.
 	if gocoverdir, found := os.LookupEnv("GOCOVERDIR"); found {

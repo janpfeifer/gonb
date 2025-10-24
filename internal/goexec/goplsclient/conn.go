@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/klog/v2"
 	"net"
 	"path"
 	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
 	"go.lsp.dev/jsonrpc2"
@@ -16,11 +17,15 @@ import (
 	"go.lsp.dev/uri"
 )
 
-var _ = lsp.MethodInitialize
+var (
+	_ = lsp.MethodInitialize
+
+	notConnected = fmt.Errorf("gopls client not connected")
+)
 
 var (
-	ConnectTimeout       = 2000 * time.Millisecond
-	CommunicationTimeout = 2000 * time.Millisecond
+	ConnectTimeout       = 12000 * time.Millisecond
+	CommunicationTimeout = 8000 * time.Millisecond
 )
 
 func (c *Client) ConnClose() {
@@ -59,7 +64,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Already connected ?
+	// Already connected?
 	if c.conn != nil {
 		return nil
 	}
@@ -226,10 +231,13 @@ func (c *Client) notifyDidOpenOrChangeLocked(ctx context.Context, filePath strin
 // CallDefinition service in `gopls`. This returns just the range of where a symbol, under
 // the cursor, is defined. See `Definition()` for the full definition service.
 //
-// This will automatically call NotifyDidOpenOrChange, if file hasn't been sent yet.
+// This will automatically call NotifyDidOpenOrChange if the file hasn't been sent yet.
 func (c *Client) CallDefinition(ctx context.Context, filePath string, line, col int) (results []lsp.Location, err error) {
 	if !c.WaitConnection(ctx) {
-		// Silently do nothing, if no connection available.
+		if klog.V(1).Enabled() {
+			klog.Infof("goplsclient.CallDefinition(ctx, %s, %d, %d): no connection", uri.File(filePath), line, col)
+		}
+		err = errors.Wrap(notConnected, "CallDefinition()")
 		return
 	}
 	ctx, cancel := minTimeout(ctx, CommunicationTimeout)
@@ -277,10 +285,13 @@ func (c *Client) callDefinitionLocked(ctx context.Context, filePath string, line
 //
 // Documentation was not very clear to me, but it's what gopls uses for Definition.
 //
-// This will automatically call NotifyDidOpenOrChange, if file hasn't been sent yet.
+// This will automatically call NotifyDidOpenOrChange if the file hasn't been sent yet.
 func (c *Client) CallHover(ctx context.Context, filePath string, line, col int) (hover lsp.Hover, err error) {
 	if !c.WaitConnection(ctx) {
-		// Silently do nothing, if no connection available.
+		if klog.V(1).Enabled() {
+			klog.Errorf("goplsclient.CallHover(ctx, %s, %d, %d): no connection", uri.File(filePath), line, col)
+		}
+		err = errors.Wrap(err, "CallHover()")
 		return
 	}
 	ctx, cancel := minTimeout(ctx, CommunicationTimeout)

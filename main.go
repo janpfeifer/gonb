@@ -3,8 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/janpfeifer/gonb/internal/dispatcher"
-	"github.com/janpfeifer/gonb/internal/goexec"
 	"io"
 	"log"
 	"os"
@@ -12,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/janpfeifer/gonb/internal/dispatcher"
+	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/janpfeifer/gonb/version"
 	klog "k8s.io/klog/v2"
@@ -34,11 +34,8 @@ var (
 	// UniqueID uniquely identifies a kernel execution. Used to create the temporary
 	// directory holding the kernel code, and for logging.
 	// Set by setUpLogging.
-	UniqueID string
-
+	UniqueID        string
 	coloredUniqueID string
-
-	logWriter io.Writer
 )
 
 func init() {
@@ -51,21 +48,25 @@ func init() {
 
 func main() {
 	klog.InitFlags(nil)
-	defer klog.Flush()
 	flag.Parse()
+	defer klog.Flush()
+
+	if len(flag.Args()) > 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "No extra arguments are allowed (passed %q). Use --help for more information.\n", flag.Args())
+		os.Exit(1)
+	}
+
+	// Disable -logstderr if -extra_log is set.
+	logtostderrFlag := flag.Lookup("logtostderr")
+	if logtostderrFlag != nil && logtostderrFlag.Value.String() == "true" && *flagExtraLog != "" {
+		logtostderrFlag.Value.Set("false")
+		_, _ = fmt.Fprintf(os.Stderr, "Setting value of -logtostderr to false (default is true) because -extra_log is set. Did you meant to use -alsologtostderr instead ?\n")
+	}
 
 	// --version or -V
 	if printVersion() {
 		return
 	}
-
-	// Logging.
-	extraLogFile := setUpExtraLog() // --extra_log.
-	if extraLogFile != nil {
-		defer func() { _ = extraLogFile.Close() }()
-	}
-	setUpLogging() // "log" package.
-	setUpKlog()    // "k8s.io/klog/v2" package
 
 	// One of two tasks: (1) install gonb; (2) run kernel, started by JupyterServer.
 	if install() {
@@ -92,25 +93,19 @@ func install() bool {
 	// Install kernel in Jupyter configuration.
 	var extraArgs []string
 	if *flagExtraLog != "" {
-		extraArgs = []string{"--extra_log", *flagExtraLog}
+		extraArgs = append(extraArgs, fmt.Sprintf("-extra_log=%s", *flagExtraLog))
 	}
-	if glogFlag := flag.Lookup("vmodule"); glogFlag != nil && glogFlag.Value.String() != "" {
-		extraArgs = append(extraArgs, fmt.Sprintf("--vmodule=%s", glogFlag.Value.String()))
-	}
-	if glogFlag := flag.Lookup("logtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-		extraArgs = append(extraArgs, "--logtostderr")
-	}
-	if glogFlag := flag.Lookup("alsologtostderr"); glogFlag != nil && glogFlag.Value.String() != "false" {
-		extraArgs = append(extraArgs, "--alsologtostderr")
-	}
-	if glogFlag := flag.Lookup("raw_error"); glogFlag != nil && glogFlag.Value.String() != "false" {
-		extraArgs = append(extraArgs, "--raw_error")
-	}
-	if glogFlag := flag.Lookup("work"); glogFlag != nil && glogFlag.Value.String() != "false" {
-		extraArgs = append(extraArgs, "--work")
-	}
-	if glogFlag := flag.Lookup("comms_log"); glogFlag != nil && glogFlag.Value.String() != "false" {
-		extraArgs = append(extraArgs, "--comms_log")
+
+	// Pass over flags to kernel execution.
+	for _, flagName := range []string{
+		"vmodule", "logtostderr", "alsologtostderr", "log_file", "log_dir", "raw_error", "work", "comms_log",
+		"stderrthreshold", "v"} {
+		flagDef := flag.Lookup(flagName)
+		if flagDef == nil {
+			continue
+		}
+		extraArg := fmt.Sprintf("-%s=%s", flagDef.Name, flagDef.Value.String())
+		extraArgs = append(extraArgs, extraArg)
 	}
 	err := kernel.Install(extraArgs, *flagForceDeps, *flagForceCopy)
 	if err != nil {
@@ -147,26 +142,8 @@ func setUpExtraLog() *os.File {
 	if err != nil {
 		klog.Fatalf("Failed to open log file %q for writing: %+v", *flagExtraLog, err)
 	}
-	_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n\n", os.Args[0], os.Getpid(), time.Now())
-	logWriter = logFile
-	flag.VisitAll(func(f *flag.Flag) {
-		if f.Name == "logtostderr" || f.Name == "alsologtostderr" {
-			if f.Value.String() == "true" {
-				logWriter = io.MultiWriter(logFile, os.Stderr) // Write to STDERR and the newly open logFile.
-				_ = f.Value.Set("false")
-			}
-		}
-	})
+	_, _ = fmt.Fprintf(logFile, "\n\nLogging for %q (pid=%d) starting at %s\n", os.Args[0], os.Getpid(), time.Now())
 	return logFile
-}
-
-// setUpLogging creates a UniqueID, uses it as a prefix for logging, and sets up --extra_log if
-// requested.
-func setUpLogging() {
-	log.SetPrefix(coloredUniqueID)
-	if logWriter != nil {
-		log.SetOutput(logWriter)
-	}
 }
 
 // UniqueIDFilter prepends the UniqueID for every log line.
@@ -196,16 +173,15 @@ func (UniqueIDFilter) FilterS(msg string, keysAndValues []interface{}) (string, 
 }
 
 // setUpKlog to include prefix with kernel's UniqueID.
-func setUpKlog() {
-	if logWriter != nil {
-		klog.SetOutput(logWriter)
-	}
+func setUpKlog(logWriter io.Writer) {
+	log.SetPrefix(coloredUniqueID)
 	klog.SetLogFilter(UniqueIDFilter{})
-
-	// Report about profiling test coverage.
-	gocoverdir := os.Getenv("GOCOVERDIR")
-	if gocoverdir != "" {
-		klog.Infof("GOCOVERDIR=%s", gocoverdir)
+	if logWriter != nil {
+		klog.Info("Logging to extra logger configured")
+		klog.SetOutputBySeverity("INFO", logWriter)
+		klog.Info("Info message")       // 1x in /tmp/gonb.out
+		klog.Warning("Warning message") // 1x in /tmp/gonb.out
+		klog.Error("Error message")     // 1x in /tmp/gonb.out
 	}
 }
 
@@ -216,6 +192,19 @@ func runKernel() bool {
 		return false
 	}
 
+	// Logging.
+	extraLogFile := setUpExtraLog() // --extra_log.
+	if extraLogFile != nil {
+		defer func() { _ = extraLogFile.Close() }()
+	}
+	setUpKlog(extraLogFile)
+
+	// Report about profiling test coverage.
+	if gocoverdir, found := os.LookupEnv("GOCOVERDIR"); found {
+		klog.Infof("GOCOVERDIR=%q", gocoverdir)
+	}
+
+	// Find Go path.
 	_, err := exec.LookPath("go")
 	if err != nil {
 		klog.Exitf("Failed to find path for the `go` program: %+v\n\nCurrent PATH=%q", err, os.Getenv("PATH"))

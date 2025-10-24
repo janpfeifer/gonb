@@ -3,13 +3,14 @@ package kernel
 import (
 	_ "embed"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
 	"strings"
+
+	"github.com/pkg/errors"
+	"k8s.io/klog/v2"
 )
 
 // JupyterDataDirEnv is the name of the environment variable pointing to
@@ -78,12 +79,14 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 		return errors.WithMessagef(err, "failed to create configuration directory %q", kernelDir)
 	}
 
-	// If binary is in `/tmp` or `/var/folders`, then presumably it is a temporary compilation of Go binary,
-	// and we make a copy of the binary (since it will be deleted) to the configuration
+	// If the binary is in `/tmp` or `/var/folders` or a cache directory, then presumably it is a temporary compilation
+	// of Go binary. We then make a copy of the binary (since it will be deleted) to the configuration
 	// directory -- otherwise we just point to the current binary.
+	cacheDir, cacheErr := os.UserCacheDir()
 	if forceCopy ||
 		strings.HasPrefix(os.Args[0], "/tmp/") ||
-		strings.HasPrefix(os.Args[0], "/var/folders") {
+		strings.HasPrefix(os.Args[0], "/var/folders") ||
+		(cacheErr == nil && strings.HasPrefix(os.Args[0], cacheDir)) {
 		newBinary := path.Join(kernelDir, "gonb")
 		// Move the previous version out of the way.
 		if _, err := os.Stat(newBinary); err == nil {

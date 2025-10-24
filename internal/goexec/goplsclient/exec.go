@@ -2,12 +2,14 @@ package goplsclient
 
 import (
 	"context"
-	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/janpfeifer/gonb/internal/util"
+	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
 )
@@ -87,7 +89,7 @@ func (c *Client) Start() error {
 		}
 	}()
 
-	// In parallel wait for command to finish.
+	// In parallel wait for the command to finish.
 	go func() {
 		err := c.goplsExec.Wait()
 		if err != nil {
@@ -112,7 +114,7 @@ func (c *Client) Stop() {
 	c.stopLocked()
 }
 
-// WaitConnection checks whether connection is up, and if not tries connecting.
+// WaitConnection checks whether a connection is up, and if it is not, tries connecting.
 // Returns true if good to proceed.
 func (c *Client) WaitConnection(ctx context.Context) bool {
 	c.mu.Lock()
@@ -146,8 +148,8 @@ func (c *Client) IsStopped() bool {
 
 func (c *Client) stopLocked() {
 	if !c.IsStopped() {
-		klog.Infof("killing gopls")
-		c.goplsExec.Process.Kill()
+		klog.Infof("killing gopls: \n%s", util.GetStackTrace())
+		util.ReportError(c.goplsExec.Process.Kill())
 		c.removeUnixSocketFile()
 		// Client will be marked as stopped once the gopls process exits.
 	}

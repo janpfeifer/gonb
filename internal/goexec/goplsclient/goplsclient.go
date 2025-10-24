@@ -20,13 +20,14 @@ package goplsclient
 import (
 	"context"
 	"io"
-	"k8s.io/klog/v2"
 	"net"
 	"os"
 	"os/exec"
 	"path"
 	"sync"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/pkg/errors"
 	"go.lsp.dev/jsonrpc2"
@@ -90,7 +91,7 @@ func (c *Client) SetAddress(address string) {
 	c.address = address
 }
 
-// Shutdown closes connection and stops `gopls` (if connectingLatch/started).
+// Shutdown closes the connection and stops `gopls` (if connectingLatch/started).
 func (c *Client) Shutdown() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -107,10 +108,10 @@ func isGoInternalOrCache(filePath string) bool {
 	return false
 }
 
-// Definition return the definition for the identifier at the given position, rendered
-// in Markdown. It returns empty if position has no identifier.
+// Definition returns the definition for the identifier at the given position, rendered
+// in Markdown. It returns empty if the position has no identifier.
 func (c *Client) Definition(ctx context.Context, filePath string, line, col int) (markdown string, err error) {
-	klog.V(2).Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
+	klog.Infof("goplsclient.Definition(ctx, %s, %d, %d)", filePath, line, col)
 
 	// Send filePath.
 	err = c.NotifyDidOpenOrChange(ctx, filePath)
@@ -121,10 +122,11 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 	var results []lsp.Location
 	results, err = c.CallDefinition(ctx, filePath, line, col)
 	if err != nil {
-		klog.V(1).Infof("c.CallDefinition failed: %+v", err)
+		if klog.V(1).Enabled() {
+			klog.Warningf("c.CallDefinition failed: %+v", err)
+		}
 		return "", err
 	}
-	_ = results
 	for _, result := range results {
 		if result.URI.Filename() != filePath && !isGoInternalOrCache(result.URI.Filename()) {
 			err = c.NotifyDidOpenOrChange(ctx, result.URI.Filename())
@@ -139,7 +141,9 @@ func (c *Client) Definition(ctx context.Context, filePath string, line, col int)
 		return "", err
 	}
 	if hover.Contents.Kind != lsp.Markdown {
-		klog.Warningf("gopls returned 'hover' with unexpected kind %q", hover.Contents.Kind)
+		err = errors.Errorf("gopls request returned 'hover' with unexpected kind %q", hover.Contents.Kind)
+		klog.Errorf("c.CallHover empty: %+v", err)
+		return "", err
 	}
 	return hover.Contents.Value, nil
 }
@@ -235,8 +239,8 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 		err = nil
 	}
 
-	// Trivial case: file doesn't exist (in filesystem and cache), or it exists in both
-	// and it is up-to-date.
+	// Trivial case: the file doesn't exist (in filesystem and cache),
+	// or it exists in both locations, and it is up to date.
 	if !foundInCache && !foundInFile {
 		// No file in cache or file system.
 		return
@@ -256,7 +260,7 @@ func (c *Client) FileData(filePath string) (content *FileData, updated bool, err
 		return
 	}
 
-	// Create or update cache for file.
+	// Create or update the cache for the file.
 	if foundInCache && klog.V(2).Enabled() {
 		klog.Infof("File %q: stored date is %s, fileInfo mod time is %s. Cache will be udpated.",
 			filePath, content.ContentTime, fileInfo.ModTime())

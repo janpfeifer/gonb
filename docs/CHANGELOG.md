@@ -2,9 +2,18 @@
 
 ## Next
 
+* Support Jupyter for more OSSes (thanks @yuce!)
+* Updated dependencies
+* Increased `gopls` timeout.
 * Package `plotly`:
   * Added `DisplayFigAsJSON` and `AppendFigAsJSON` to display Plotly figures directly from their
     JSON rendering. This allows one to do arbitrary editions.
+* Installation:
+  * Fixed the handling of the installation flags forwarded to the kernel execution.
+  * Make a copy of the binary if the gonb binary is under a .cache directory. Same as is already done if
+    the binary is in a temporary directory.
+  * Fixed duplicate error logging issues.
+* Added internal `util` package. Improved error logging.
 
 ## v0.11.1, 2025/06/01
 

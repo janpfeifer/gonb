@@ -11,6 +11,10 @@
 
 ## For a quick start, see the [**tutorial** 🧭](examples/tutorial.ipynb)
 
+
+> **🚀 NEW 🚀**: [Positron Go (github.com/dfalbel/positron-go)](https://github.com/dfalbel/positron-go):
+> A [Positron](https://positron.posit.co/) extension that adds support for GoNB notebooks.
+
 ## ✨ Highlights:
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
@@ -112,10 +116,10 @@ Then copy&paste the URL that it outputs in your browser.
 **Note**: The docker allows for customization by running an arbitrary script at start up as `root`, which allows
 one to install any planned dependencies. See [docker.md](docs/docker.md) for details.
 
-### Linux and macOS Installation Using Standard Go Tools
+### 🐧 Linux and macOS Installation Using Standard Go Tools
 
-The [official tutorial on how to install go programs here](https://go.dev/doc/tutorial/compile-install) --
-it is pretty simple, go maintains a `GOBIN` directory (that you can set) and `go install` will compile
+The [official tutorial on how to install go programs here](https://go.dev/doc/tutorial/compile-install).
+It is pretty straightforward: Go maintains a `GOBIN` directory (that you can set) and `go install` will compile
 programs and put it there. You should add the `GOBIN` directory to your `PATH` (the default list of directories
 to search for executables).
 
@@ -135,10 +139,10 @@ And if `GOBIN` is in your `PATH`, run the following to install **GoNB** as a ker
 gonb --install
 ```
 
-Otherwise, find the binary in your filesystem (that is $HOME/go on MacOS and Linux by default, and %USERPROFILE%\go on Windows), then
-run `./gonb --install` in that very directory. 
+Otherwise, find the binary in your filesystem (that is $HOME/go on macOS and Linux by default, and 
+%USERPROFILE%\go on Windows), then run `./gonb --install` in that very directory. 
 
-And then (re-)start Jupyter (if it is already running).
+And then (re-)start Jupyter.
 
 In GitHub's Codespace, if Jupyter is already started, restart the docker — it will also restart Jupyter.
 
@@ -146,7 +150,7 @@ In GitHub's Codespace, if Jupyter is already started, restart the docker — it 
 to v0.12.4 (or at least `v0.12.0`?).
 You can check it with `gopls version`.
 
-### Windows
+### 🪟 Windows
 
 The recommendation is to use [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install)
 or WSL2, and run Jupyter and the GoNB kernel in the Linux/WSL environment. 
@@ -154,22 +158,30 @@ Install there as if it were in a linux machine.
 
 A pure Windows installation is not supported at this time — but contributions to add support for it would be welcome :)
 
+## 🧩 Extensions
+
+* [Positron Go (github.com/dfalbel/positron-go)](https://github.com/dfalbel/positron-go): 
+  A [Positron](https://positron.posit.co/) extension that adds support for GoNB notebooks.
+  See [demo video](https://github.com/user-attachments/assets/85b539ca-4778-41c9-b5b9-b4d05a806c0f).
+  Positron is a new Data Science IDE, built by the same company that created RStudio.
+
 ## 👥 Support
 
 * [![Join the Gophers Slack Community](https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=slack&logoColor=white)](https://invite.slack.golangbridge.org/): connect with us there. Once you've joined the Gophers slack, find the [`#gomlx` channel](https://app.slack.com/client/T029RQSE6/C08TX33BX6U). [GoMLX](http://github.com/gomlx/gomlx) is a full-featured machine learning framework for Go developed in tandem with **GoNB**.
  
 ## 🤔 FAQ
 
-* Is there are reference documentation ?
-  * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up-to-date and
-    is comprehensive -- it includes every GoNB feature.
-  * The libraries that are used or UI, Widgets and manipulating the DOM in the notebook's browser, are all under the package `gonbui`.
+* Is there more documentation?
+  * There is a help (run `%help` in a cell) and a [**tutorial**](examples/tutorial.ipynb), which is kept up to date and
+    is comprehensive – it includes every GoNB feature.
+  * The libraries that are used or UI, Widgets and manipulating the DOM in the notebook's browser, 
+    are all under the package `gonbui`.
     They are described in the [**tutorial**](examples/tutorial.ipynb), but also documented in [pkg.go.dev](https://pkg.go.dev/github.com/janpfeifer/gonb/gonbui?tab=doc).
 * What is the `%%` symbol seen everywhere?
   * It is a special commands for *GoNB* that means "insert a `func main {...}` here".
-* Go error handling is verbose and annoying for things interactive as a notebook. Can we do something ?
-  * Yes! Error handling for small scripts in a notebook can get in the way at times. There are various
-    solutions to this. Often folks create a series of `Must()` functions, or simply use
+* Go error handling is verbose and annoying for things interactive as a notebook. Can we do something?
+  * Yes! Error handling for small scripts in a notebook can get in the way at times.  
+    There are various solutions to this. Often folks create a series of `Must()` functions, or simply use
     [this trivial `must` package](https://github.com/janpfeifer/must).
 
 ## 📝 TODOs
@@ -180,15 +192,6 @@ Contributions are welcome!
   * Installation.
   * Named-pipe implementation in `kernel/pipeexec.go`.
 
-##  💖 Thanks
-
-* [Go](golang.org)
-* [Jupyter](https://jupyter.org/), what an awesome project.
-* [gophernotes](https://github.com/gopherdata/gophernotes), from which this is a highly modified fork, little from the original code exists.
-* The Go gopher logo (`internal/kernel`) used in the installation of the Jupyter kernel was designed by Renee French
-  (http://reneefrench.blogspot.com/), see Creative Commons 3.0 Attributions license in
-  [Wikimedia](https://commons.wikimedia.org/wiki/File:Go_gopher_favicon.svg).
-
 ## 🤝 Contributing
 
 Contributions are very welcome. The code is generally well documented -- not always, but mostly. There are a also a couple of guides worth reading if contributing in the [`docs/`](https://github.com/janpfeifer/gonb/tree/main/docs) subdirectory.
@@ -198,6 +201,22 @@ There are two parts of the project:
 1. The kernel itself: that builds the binary package. Most subpackages are under `internal/`.
 2. The UI library in the packages under `github.com/janpfeifer/gonb/gonbui`.
 
-##  🌟 Star History
+## 💖 Support the Project
 
-[![Star History Chart](https://api.star-history.com/svg?repos=janpfeifer/gonb&type=Date)](https://star-history.com/#janpfeifer/gonb&Date)
+**GoNB** is part of the larger family of data science and machine learning tools under the GoMLX umbrella.
+If you find this project helpful, please consider
+[supporting our work through GitHub Sponsors](https://github.com/sponsors/gomlx).
+
+Your contribution helps us (currently mostly [me](https://github.com/janpfeifer)) dedicate more time to maintenance 
+and add new features for the entire GoMLX ecosystem.
+
+It also helps us acquire access (buying or cloud) to hardware for more portability.
+
+##  💖 Thanks
+
+* [Go](golang.org)
+* [Jupyter](https://jupyter.org/), what an awesome project.
+* [gophernotes](https://github.com/gopherdata/gophernotes), from which this is a highly modified fork, little from the original code exists.
+* The Go gopher logo (`internal/kernel`) used in the installation of the Jupyter kernel was designed by Renee French
+  (http://reneefrench.blogspot.com/), see Creative Commons 3.0 Attributions license in
+  [Wikimedia](https://commons.wikimedia.org/wiki/File:Go_gopher_favicon.svg).

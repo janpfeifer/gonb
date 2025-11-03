@@ -14,17 +14,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/signal"
+	"regexp"
+	"sync"
+	"sync/atomic"
+
 	"github.com/go-zeromq/zmq4"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/must"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
-	"os"
-	"os/signal"
-	"regexp"
-	"sync"
-	"sync/atomic"
 )
 
 var (

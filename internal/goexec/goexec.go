@@ -6,19 +6,20 @@ package goexec
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path"
+	"regexp"
+	"slices"
+
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/gonbui/protocol"
 	"github.com/janpfeifer/gonb/internal/comms"
 	"github.com/janpfeifer/gonb/internal/goexec/goplsclient"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
-	"io"
 	"k8s.io/klog/v2"
-	"os"
-	"os/exec"
-	"path"
-	"regexp"
-	"slices"
 )
 
 const (
@@ -209,7 +210,39 @@ with:
 	return s, nil
 }
 
-// GoModInit removes current `go.mod` if it already exists, and recreate it with `go mod init`.
+// InitializeGoWork creates a `go.work` file in the temporary directory, with the given paths, plus the current path.
+//
+// It also calls the equivalent of `%goworkfix`
+func (s *State) InitializeGoWork(paths []string) error {
+	// Initialize go.work
+	cmd := exec.Command("go", "work", "init")
+	cmd.Dir = s.TempDir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Failed to run `go work init`:\n%s", output)
+		return errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+
+	// Add paths to go.work
+	args := append([]string{"work", "use"}, paths...)
+	cmd = exec.Command("go", args...)
+	cmd.Dir = s.TempDir
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Failed to run `go work use`:\n%s", output)
+		return errors.Wrapf(err, "failed to run %q", cmd.String())
+	}
+
+	// Track paths used in go.work
+	s.hasGoWork = true
+	s.goWorkUsePaths = make(common.Set[string])
+	for _, p := range paths {
+		s.goWorkUsePaths.Insert(p)
+	}
+	return s.GoWorkFix(nil)
+}
+
+// GoModInit removes the current `go.mod` if it already exists, and recreate it with `go mod init`.
 func (s *State) GoModInit() error {
 	err := os.Remove(path.Join(s.TempDir, "go.mod"))
 	if err != nil && !os.IsNotExist(err) {

@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+# Next
+
+* Added `-go_work` flag that also works with the installer `gonb -install`. 
+
 ## v0.11.2, 2025/10.24 Support for various OSes; Fixed logging; Increased gopls timeout and improved error handling.
 
 * Support Jupyter for more OSSes (thanks @yuce!)

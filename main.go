@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -28,6 +30,11 @@ var (
 	flagCommsLog     = flag.Bool("comms_log", false, "Enable verbose logging from communication library in Javascript console.")
 	flagShortVersion = flag.Bool("V", false, "Print version information")
 	flagLongVersion  = flag.Bool("version", false, "Print detailed version information")
+	flagGoWork       = flag.String("go_work", "",
+		"Comma-separated paths used to start a go.work file for any new notebook. "+
+			"It can be used with -install and the flag will be configured in the kernel configuration so all new "+
+			"notebooks will use this initial go.work file. It's not necessary to include \".\" in this path,"+
+			"it will be added automatically.")
 )
 
 var (
@@ -99,7 +106,7 @@ func install() bool {
 	// Pass over flags to kernel execution.
 	for _, flagName := range []string{
 		"vmodule", "logtostderr", "alsologtostderr", "log_file", "log_dir", "raw_error", "work", "comms_log",
-		"stderrthreshold", "v"} {
+		"stderrthreshold", "v", "go_work"} {
 		flagDef := flag.Lookup(flagName)
 		if flagDef == nil {
 			continue
@@ -224,6 +231,19 @@ func runKernel() bool {
 		klog.Fatalf("Failed to create go executor: %+v", err)
 	}
 	goExec.Comms.LogWebSocket = *flagCommsLog
+
+	// Initialize go.work if -go_work flag was given.
+	if *flagGoWork != "" {
+		paths := strings.Split(*flagGoWork, ",")
+		paths = slices.DeleteFunc(paths, func(path string) bool { return path == "" })
+		if !slices.Contains(paths, ".") {
+			paths = append(paths, ".")
+		}
+		err = goExec.InitializeGoWork(paths)
+		if err != nil {
+			klog.Fatalf("Failed to initialize go.work: %+v", err)
+		}
+	}
 
 	// Orchestrate dispatching of messages.
 	dispatcher.RunKernel(k, goExec)

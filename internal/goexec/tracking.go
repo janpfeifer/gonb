@@ -2,19 +2,20 @@ package goexec
 
 import (
 	"fmt"
-	"github.com/fsnotify/fsnotify"
-	"github.com/janpfeifer/gonb/common"
-	"github.com/janpfeifer/gonb/internal/kernel"
-	"github.com/pkg/errors"
-	"golang.org/x/mod/modfile"
 	"io/fs"
-	"k8s.io/klog/v2"
 	"os"
 	"path"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/janpfeifer/gonb/common"
+	"github.com/janpfeifer/gonb/internal/kernel"
+	"github.com/pkg/errors"
+	"golang.org/x/mod/modfile"
+	"k8s.io/klog/v2"
 )
 
 // This file implements the tracking of files and directories. When updated, these files
@@ -519,29 +520,33 @@ func (s *State) GoWorkFix(msg kernel.Message) (err error) {
 		if replace, found := replaceRules[mod]; found {
 			if replace.New.Path == p {
 				// The correct "replace" rule already exists.
-				err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
-					fmt.Sprintf("\t- Replace rule for module %q to local directory %q already exists.\n",
-						mod, p))
-				if err != nil {
-					return
+				if msg != nil {
+					err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
+						fmt.Sprintf("\t- Replace rule for module %q to local directory %q already exists.\n",
+							mod, p))
+					if err != nil {
+						return
+					}
 				}
 				continue
 			}
 
 			// Update previous "replace" rule.
-			err = kernel.PublishWriteStream(msg, kernel.StreamStderr,
-				fmt.Sprintf(
-					"\t- WARNING: replace rule for module %q mapping to %q, updated to `go.work` location %q\n",
-					mod, replace.New.Path, p))
-			if err != nil {
-				return
+			if msg != nil {
+				err = kernel.PublishWriteStream(msg, kernel.StreamStderr,
+					fmt.Sprintf(
+						"\t- WARNING: replace rule for module %q mapping to %q, updated to `go.work` location %q\n",
+						mod, replace.New.Path, p))
+				if err != nil {
+					return
+				}
 			}
 			err = modFile.DropReplace(replace.Old.Path, replace.Old.Version)
 			if err != nil {
 				err = errors.Wrapf(err, "failed to remove previous replace rule for %q", mod)
 				return
 			}
-		} else {
+		} else if msg != nil {
 			err = kernel.PublishWriteStream(msg, kernel.StreamStdout,
 				fmt.Sprintf("\t- Added replace rule for module %q to local directory %q.\n",
 					mod, p))
@@ -551,13 +556,10 @@ func (s *State) GoWorkFix(msg kernel.Message) (err error) {
 			err = errors.Wrapf(err, "failed to add replace rule from %q to %q", mod, p)
 			return
 		}
-		if err != nil {
-			return
-		}
 		goModModified = true
 	}
 	if goModModified {
-		// Update go.mod file.
+		// Update the go.mod file.
 		goModContents, err = modFile.Format()
 		if err != nil {
 			err = errors.Wrapf(err, "failed to format the updated `go.mod` file %q", goModPath)

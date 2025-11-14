@@ -5,12 +5,14 @@ import (
 	"github.com/janpfeifer/gonb/internal/jpyexec"
 
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/janpfeifer/gonb/internal/goexec"
+	"github.com/janpfeifer/gonb/internal/gxexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
-	"os"
-	"strings"
 )
 
 var (
@@ -18,7 +20,9 @@ var (
 		"%%writefile",
 		"%%script",
 		"%%bash",
-		"%%sh")
+		"%%sh",
+		"%%gx",
+	)
 )
 
 // IsGoCell returns whether the cell is expected to be a Go cell, based on the first line.
@@ -62,6 +66,9 @@ func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string
 			args = []string{parts[0][2:]} // Trim the prefix "%%".
 		}
 		err = cellCmdScript(msg, goExec, args, lines[1:])
+
+	case "%%gx":
+		err = gxexec.ExecuteCell(msg, goExec, lines)
 
 	default:
 		err = errors.Errorf("special cell command %q not implemented", parts[0])

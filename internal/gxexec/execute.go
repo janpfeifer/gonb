@@ -3,13 +3,13 @@
 package gxexec
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 
-	"github.com/janpfeifer/gonb/internal/jpyexec"
 	"k8s.io/klog/v2"
 )
 
@@ -22,12 +22,10 @@ func ExecuteCell(msg kernel.Message, goExec *goexec.State, lines []string) error
 		klog.Infof("GX cell: %q", strings.Join(lines, "\n"))
 	}
 
-	stdout := kernel.NewJupyterStreamWriter(msg, kernel.StreamStdout)
-
 	// Find the last line that is gx code, ie before we see %go or %%
 	last_gx_line := -1
 	for i, line := range lines {
-		if line == "%go" || line == "%%" {
+		if line == "%%go" || line == "%%" {
 			break
 		}
 		last_gx_line = i
@@ -37,10 +35,8 @@ func ExecuteCell(msg kernel.Message, goExec *goexec.State, lines []string) error
 	// We'll actually want to compile Gx code here, and create some kind of
 	// declaration 'memory' that will be used to merge multiple GX cells together.
 	// For now we just print it.
-	err := jpyexec.New(msg, "printf", append([]string{"%s\n"}, lines[1:last_gx_line]...)...).
-		ExecutionCount(msg.Kernel().ExecCounter).
-		WithStdout(stdout).
-		Exec()
+	gx_code := strings.Join(lines[1:last_gx_line], "\n")
+	err := kernel.PublishWriteStream(msg, kernel.StreamStdout, fmt.Sprintf("%s\n", gx_code))
 
 	if err != nil {
 		return err
@@ -59,9 +55,11 @@ func ExecuteCell(msg kernel.Message, goExec *goexec.State, lines []string) error
 		skipLines.Insert(i)
 	}
 
+	skipLines.Insert(last_gx_line + 1) // also skip the %% or %go line
+
 	// We pass all lines so that we get correct line numbers in errors,
 	// but we skip the gx lines.
 	// Eventually, we'll want to merge any generated bindings into the go code here.
 	// which will be tricky.
-	return goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines[1:], skipLines)
+	return goExec.ExecuteCell(msg, msg.Kernel().ExecCounter, lines, skipLines)
 }

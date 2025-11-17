@@ -380,7 +380,7 @@ func (s *State) createGoFileFromLines(filePath string, cellId int, lines []strin
 	var needsClosingMain bool
 	for ii, line := range lines {
 		trimmedLine := TrimGonbCommentPrefix(line)
-		if strings.HasPrefix(trimmedLine, "%main") || strings.HasPrefix(trimmedLine, "%%") {
+		if strings.HasPrefix(trimmedLine, "%main") || trimmedLine == "%%" {
 			// Write preamble of func main() and associate to the "%%" line:
 			fileToCellLines[w.Line] = ii
 			fileToCellLines[w.Line+1] = ii

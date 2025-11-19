@@ -4,6 +4,7 @@
 
 * Added `-go_work` flag that also works with the installer `gonb -install`. 
 * Added a `%%gx` cell magic that will eventually support `gx` cells. Currently just echoes the cell code and allows executing go code below. Requires `--tags=gx`.
+* Bumped Go to version 1.24.4 in preparation for using GX.
 
 ## v0.11.2, 2025/10.24 Support for various OSes; Fixed logging; Increased gopls timeout and improved error handling.
 

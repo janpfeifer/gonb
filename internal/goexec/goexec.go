@@ -191,7 +191,7 @@ with:
 ` + "```" + `
 !go install golang.org/x/tools/gopls@latest
 ` + "```\n"
-		klog.Errorf(msg)
+		klog.Error(msg)
 	}
 
 	// Try to find out Jupyter root's directory.

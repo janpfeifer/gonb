@@ -36,9 +36,12 @@ func ExecuteCell(msg kernel.Message, goExec *goexec.State, lines []string) error
 	// declaration 'memory' that will be used to merge multiple GX cells together.
 	// For now we just print it.
 	gx_code := strings.Join(lines[1:last_gx_line], "\n")
-	err := kernel.PublishWriteStream(msg, kernel.StreamStdout, fmt.Sprintf("%s\n", gx_code))
 
-	if err != nil {
+	if err := compile(gx_code); err != nil {
+		kernel.PublishWriteStream(msg, kernel.StreamStderr, fmt.Sprintf("GX compile error: %v\n", err))
+	}
+
+	if err := kernel.PublishWriteStream(msg, kernel.StreamStdout, fmt.Sprintf("%s\n", gx_code)); err != nil {
 		return err
 	}
 

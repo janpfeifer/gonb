@@ -10,6 +10,7 @@ require (
 	github.com/go-zeromq/zmq4 v0.17.0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/gowebapi/webapi v0.0.0-20221221115732-41cedfc27a0b
+	github.com/gx-org/gx v0.6.1
 	github.com/janpfeifer/must v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.8.1
@@ -17,7 +18,7 @@ require (
 	go.lsp.dev/protocol v0.12.0
 	go.lsp.dev/uri v0.3.0
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
-	golang.org/x/mod v0.22.0
+	golang.org/x/mod v0.26.0
 	k8s.io/klog/v2 v2.130.1
 )
 
@@ -25,6 +26,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
+	github.com/gx-org/backend v0.3.0 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

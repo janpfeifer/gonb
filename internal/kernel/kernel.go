@@ -489,7 +489,7 @@ func bindSockets(connInfo connectionInfo) (sg *SocketGroup, err error) {
 		address := addrFn(portNum)
 		err = sockets[ii].Socket.Listen(address)
 		if err != nil {
-			return sg, errors.WithMessagef(err, fmt.Sprintf("failed to listen on %s", socketName[ii]))
+			return sg, errors.WithMessagef(err, "failed to listen on %s", socketName[ii])
 		}
 	}
 	return

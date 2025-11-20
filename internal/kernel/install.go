@@ -141,9 +141,9 @@ go install golang.org/x/tools/gopls@latest
 
 `
 		if !forceDeps {
-			klog.Fatalf(msg)
+			klog.Fatal(msg)
 		}
-		klog.Infof(msg)
+		klog.Info(msg)
 		err = nil
 	}
 	return nil

@@ -34,7 +34,8 @@ func IsGoCell(firstLine string) bool {
 	return !CellSpecialCommands.Has(parts[0])
 }
 
-// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]), and if so it executes the special cell command.
+// ExecuteSpecialCell checks whether it is a special cell (see [CellSpecialCommands]), and if so it executes the
+// special cell command.
 //
 // It returns if this was a special cell (if true it executes it), and potentially an execution error, if one happened.
 func ExecuteSpecialCell(msg kernel.Message, goExec *goexec.State, lines []string) (isSpecialCell bool, err error) {

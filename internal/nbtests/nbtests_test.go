@@ -12,17 +12,18 @@ package nbtests
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/exec"
+	"path"
+	"strings"
+	"testing"
+
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/gonb/internal/goexec"
 	"github.com/janpfeifer/gonb/internal/kernel"
 	"github.com/janpfeifer/must"
 	"github.com/stretchr/testify/require"
 	"k8s.io/klog/v2"
-	"os"
-	"os/exec"
-	"path"
-	"strings"
-	"testing"
 )
 
 var panicf = common.Panicf
@@ -227,7 +228,11 @@ func TestHello(t *testing.T) {
 				Separator),
 			Match(OutputLine(4),
 				Separator,
-				"%exec worked for x=17",
+				"Got x=17",
+				Separator),
+			Match(OutputLine(5),
+				Separator,
+				"Got x=13",
 				Separator),
 		),
 		*flagPrintNotebook)

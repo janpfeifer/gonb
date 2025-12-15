@@ -1,6 +1,6 @@
 # GoNB Changelog
 
-# Next
+## v0.11.3, 2025/12/15 Added -go_work flag
 
 * Added `-go_work` flag that also works with the installer `gonb -install`. 
 * Added a `%%gx` cell magic that will eventually support `gx` cells. Currently just echoes the cell code and allows executing go code below. Requires `--tags=gx`.

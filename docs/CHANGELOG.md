@@ -6,6 +6,8 @@
 * Fixed an issue where the Cell/Line or errors were not being displayed correctly.
 * Extended cell compilation error hover popups to also trigger when hovering over the cell/line area, in addition to the file/line area.
 * Added support for rich HTML execution/runtime error reporting, enabling hoverable popups that show code context directly over Go stack traces printed to stderr (e.g. panics and fatal logs).
+* Refactored execution error handling: stderr streams in real-time to Jupyter (not buffered), and the rich hover-popup HTML boxes for cell-related error lines are printed after the execution exits.
+* Improved error CSS layout to wrap long code lines without displaying horizontal scrollbars.
 
 ## v0.11.3, 2025/12/15 Added -go_work flag
 

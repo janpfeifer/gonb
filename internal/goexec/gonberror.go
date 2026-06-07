@@ -195,7 +195,7 @@ func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdA
 	l.RawContext = strings.Join(partsRaw, "")
 
 	// Gather CellInfo
-	if lineNum > 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {
+	if lineNum >= 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {
 		cell := fileToCellIdAndLine[lineNum]
 		l.HasCellInfo = true
 		// Notice GoNB store Lines starting at 0, but Jupyter display Lines starting at 1, so we add 1 here.

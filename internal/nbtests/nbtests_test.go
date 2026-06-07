@@ -794,9 +794,9 @@ func TestErrors(t *testing.T) {
 			Match(
 				OutputLine(3),
 				Separator,
-				"Stuck in Switzerland",
 			),
-			Match("Cell [3] Line 8"),
+			Match("Stuck in Switzerland"),
+			Match("Cell++[++3++]++: Line 8"),
 			Match("exit status 1"),
 		), *flagPrintNotebook)
 

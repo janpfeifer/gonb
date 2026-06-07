@@ -41,7 +41,8 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	border-width: 1px;
 	border-color: var(--jp-border-color2);
 	display: block;
-	white-space: pre;
+	white-space: pre-wrap;
+	word-break: break-word;
 	font-family: monospace;
 }
 .gonb-err-line {
@@ -61,17 +62,9 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	padding-right: 0.2em;
 }
 </style>
-<div class="lm-Widget p-Widget lm-Panel p-Panel jp-OutputArea-child">
-<div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
+<div class="jp-RenderedText" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
-{{if .HasContext}}{{.LeadingSpace}}<span class="gonb-err-hover-area">{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span> {{end}}<span class="gonb-err-location">{{.Location}}</span></span>{{.Message}}
-<div class="gonb-err-context">
-{{.HtmlContext}}
-</div>
-{{else}}
-<span style="white-space: pre;">{{.Location}} {{.Message}}</span>
-{{end}}
-<br/>
+<div style="white-space: pre-wrap;">{{if .HasContext}}{{.LeadingSpace}}<span class="gonb-err-hover-area">{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span> {{end}}<span class="gonb-err-location">{{.Location}}</span></span>{{.Message}}<div class="gonb-err-context">{{.HtmlContext}}</div>{{else}}{{.Location}} {{.Message}}{{end}}</div>
 {{end}}
 </div>
 `))
@@ -97,6 +90,16 @@ func (s *State) DisplayErrorWithContext(msg kernel.Message, fileToCellIdAndLine 
 	}
 }
 
+// DisplayErrorLines displays the gathered errorLines that have hover context as HTML.
+func (s *State) DisplayErrorLines(msg kernel.Message, errorLines []errorLine, baseErr error) {
+	nbErr := &GonbError{
+		Lines:  errorLines,
+		errMsg: baseErr.Error(),
+		err:    baseErr,
+	}
+	nbErr.PublishWithHTML(msg)
+}
+
 // LinesForErrorContext indicates how many lines to display in the error context, before and after the offending line.
 // Hard-coded for now, but it could be made configurable.
 const LinesForErrorContext = 3
@@ -108,7 +111,7 @@ func (nbErr *GonbError) PublishWithHTML(msg kernel.Message) {
 		return
 	}
 	// Default report, and makes sure display is called at the end.
-	htmlReport := "<pre>" + nbErr.errMsg + "</pre>" // If anything goes wrong, simply display the err message.
+	htmlReport := "<pre style=\"white-space: pre-wrap;\">" + nbErr.errMsg + "</pre>" // If anything goes wrong, simply display the err message.
 	defer func() {
 		// Display HTML report on exit.
 		err := kernel.PublishHtml(msg, htmlReport)

@@ -67,17 +67,38 @@ func checkCells(notebookPath string) {
 		var errType, errMsg string
 		var traceback []string
 
-		// First pass: look for explicit error or rich HTML error reports
-		hasRichError := false
+		// Prioritize failure check:
+		// 1. Check stderr stream for failure indicators (like exit status or panic).
+		// 2. Check for rich HTML error reports (for compiler errors).
+		// 3. Check for explicit error outputs (for Python or other standard errors).
+		var stderrText []string
+		var hasStderr bool
+		var hasExplicitError bool
+		var explicitErrType, explicitErrMsg string
+		var explicitTraceback []string
+		var hasRichError bool
 		var richErrType, richErrMsg string
 		var richTraceback []string
 
 		for _, output := range cell.Outputs {
+			if output.OutputType == "stream" && output.Name == "stderr" {
+				hasFailure := false
+				for _, line := range output.Text {
+					if strings.Contains(line, "exit status ") || strings.Contains(line, "panic:") {
+						hasFailure = true
+						break
+					}
+				}
+				if hasFailure {
+					hasStderr = true
+					stderrText = output.Text
+				}
+			}
 			if output.OutputType == "error" {
-				cellFailed = true
-				errType = output.Ename
-				errMsg = output.Evalue
-				traceback = output.Traceback
+				hasExplicitError = true
+				explicitErrType = output.Ename
+				explicitErrMsg = output.Evalue
+				explicitTraceback = output.Traceback
 			}
 			if output.OutputType == "display_data" && output.Data != nil {
 				if htmlVal, ok := output.Data["text/html"]; ok {
@@ -101,7 +122,6 @@ func checkCells(notebookPath string) {
 						} else {
 							richErrType = "Compilation Error"
 						}
-						// Convert HTML to clean plain text lines
 						htmlStr = stripHTML(htmlStr)
 						lines := strings.Split(htmlStr, "\n")
 						var tb []string
@@ -118,39 +138,33 @@ func checkCells(notebookPath string) {
 			}
 		}
 
-		if hasRichError {
+		if hasStderr {
 			cellFailed = true
-			if errType == "" || errType == "ERROR" {
-				if errMsg == "exit status 1" {
-					errType = "Runtime Error"
-				} else {
-					errType = richErrType
-				}
-			}
+			errType = "Runtime Error"
+			errMsg = strings.Join(stderrText, "")
+			traceback = stderrText
+		} else if hasRichError {
+			cellFailed = true
+			errType = richErrType
 			errMsg = richErrMsg
 			traceback = richTraceback
-		}
-
-		// Second pass: if no explicit error was found, check stderr stream for exit status
-		if !cellFailed {
+		} else if hasExplicitError {
+			cellFailed = true
+			var cellStderr []string
 			for _, output := range cell.Outputs {
 				if output.OutputType == "stream" && output.Name == "stderr" {
-					// Check if any of the lines indicate a failure (exit status or panic)
-					hasExitStatus := false
-					for _, line := range output.Text {
-						if strings.Contains(line, "exit status ") || strings.Contains(line, "panic:") {
-							hasExitStatus = true
-							break
-						}
-					}
-					if hasExitStatus {
-						cellFailed = true
-						errType = "Runtime Error"
-						errMsg = strings.Join(output.Text, "")
-						traceback = output.Text
-						break
-					}
+					cellStderr = output.Text
+					break
 				}
+			}
+			if len(cellStderr) > 0 && (explicitErrMsg == "exit status 1" || strings.HasPrefix(explicitErrMsg, "exit status ")) {
+				errType = "Runtime Error"
+				errMsg = strings.Join(cellStderr, "")
+				traceback = cellStderr
+			} else {
+				errType = explicitErrType
+				errMsg = explicitErrMsg
+				traceback = explicitTraceback
 			}
 		}
 

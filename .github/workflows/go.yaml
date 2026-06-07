@@ -49,16 +49,9 @@ jobs:
         filename: docs/coverage.txt  # Manually generated.
 
     - uses: stefanzweifel/git-auto-commit-action@v5
-      id: auto-commit-action
+      if: github.ref == 'refs/heads/main'
       with:
         commit_message: Apply Code Coverage Badge
         skip_fetch: true
         skip_checkout: true
         file_pattern: ./README.md
-
-    - name: Push Changes
-      if: steps.auto-commit-action.outputs.changes_detected == 'true'
-      uses: ad-m/github-push-action@v1.2.0
-      with:
-        github_token: ${{ github.token }}
-        branch: ${{ github.ref }}

@@ -4,6 +4,8 @@
 * `nbexec`: Added `-export_html` flag to export the executed notebook to HTML at a specified target path.
 * `nbexec`: Added `-check_cells` flag to check and report cells that failed execution, exiting with code 1 if any failure occurs.
 * Fixed an issue where the Cell/Line or errors were not being displayed correctly.
+* Extended cell compilation error hover popups to also trigger when hovering over the cell/line area, in addition to the file/line area.
+* Added support for rich HTML execution/runtime error reporting, enabling hoverable popups that show code context directly over Go stack traces printed to stderr (e.g. panics and fatal logs).
 
 ## v0.11.3, 2025/12/15 Added -go_work flag
 

@@ -62,9 +62,10 @@ type Executor struct {
 	// Notice the contents are written raw, without the mime-type.
 	captureDisplayDataOutput io.Writer
 
-	isDone   bool
-	doneChan chan struct{}
-	muDone   sync.Mutex
+	isDone    bool
+	doneChan  chan struct{}
+	muDone    sync.Mutex
+	exitError error
 }
 
 // New creates an executor for the given command plus arguments,
@@ -277,8 +278,9 @@ func (exec *Executor) Exec() error {
 
 	// Wait for output pipes to finish.
 	streamersWG.Wait()
-	if err := cmd.Wait(); err != nil {
-		errMsg := err.Error() + "\n"
+	exec.exitError = cmd.Wait()
+	if exec.exitError != nil {
+		errMsg := exec.exitError.Error() + "\n"
 		if exec.Msg.Kernel().Interrupted.Load() {
 			errMsg = "^C\n" + errMsg
 		}
@@ -373,4 +375,9 @@ func (exec *Executor) handleStaticInput() {
 		}
 
 	}()
+}
+
+// ExitError returns the error returned by cmd.Wait() when execution finishes.
+func (exec *Executor) ExitError() error {
+	return exec.exitError
 }

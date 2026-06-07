@@ -205,22 +205,35 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 	// Create stdout and stderr pipes that write to Jupyter stdout/stderr streams.
 	stdout := kernel.NewJupyterStreamWriter(msg, kernel.StreamStdout)
 	stderrWithAnnotator := newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)
+	var stderrBuffer bytes.Buffer
+	stderr := io.MultiWriter(stderrWithAnnotator, &stderrBuffer)
 	if s.CaptureFile != nil {
 		stdout = io.MultiWriter(stdout, s.CaptureFile)
-		stderrWithAnnotator = io.MultiWriter(stderrWithAnnotator, s.CaptureFile)
+		stderr = io.MultiWriter(stderr, s.CaptureFile)
 	}
 
-	err := jpyexec.New(msg, s.BinaryPath(), args...).
+	jpyExec := jpyexec.New(msg, s.BinaryPath(), args...).
 		UseNamedPipes(s.Comms).
 		ExecutionCount(msg.Kernel().ExecCounter).
 		WithStdout(stdout).
-		WithStderr(stderrWithAnnotator).
-		CaptureDisplayDataOutput(s.CaptureFile).
-		Exec()
+		WithStderr(stderr).
+		CaptureDisplayDataOutput(s.CaptureFile)
+
+	err := jpyExec.Exec()
 	if err != nil {
 		klog.Infof("goexec.Execute(): failed to run the compiled cell: %+v", msg)
+		return err
 	}
-	return err
+
+	if exitErr := jpyExec.ExitError(); exitErr != nil {
+		stderrStr := stderrBuffer.String()
+		if len(stderrStr) > 0 {
+			return s.DisplayErrorWithContext(msg, fileToCellIdAndLine, stderrStr, exitErr)
+		}
+		return exitErr
+	}
+
+	return nil
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.

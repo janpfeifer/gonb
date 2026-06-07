@@ -20,15 +20,21 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	border-width: 1px;
 	border-color: var(--jp-border-color2);
 }
-.gonb-err-location:hover {
+.gonb-err-hover-area {
+	cursor: pointer;
+}
+.gonb-err-hover-area:hover .gonb-err-location {
 	border-width: 2px;
 	border-style: solid;
+	border-color: var(--jp-border-color2);
+}
+.gonb-err-hover-area:hover .gonb-cell-line-info {
 	border-color: var(--jp-border-color2);
 }
 .gonb-err-context {
 	display: none;
 }
-.gonb-err-location:hover + .gonb-err-context {
+.gonb-err-hover-area:hover + .gonb-err-context {
 	background: var(--jp-dialog-background);  
 	border-radius: 3px;
 	border-style: solid;
@@ -58,8 +64,7 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 <div class="lm-Widget p-Widget lm-Panel p-Panel jp-OutputArea-child">
 <div class="lm-Widget p-Widget jp-RenderedText jp-mod-trusted jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}
-{{if .HasContext}}{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span>
-{{end}}<span class="gonb-err-location">{{.Location}}</span> {{.Message}}
+{{if .HasContext}}{{.LeadingSpace}}<span class="gonb-err-hover-area">{{if .HasCellInfo}}<span class="gonb-cell-line-info">{{.CellInfo}}</span> {{end}}<span class="gonb-err-location">{{.Location}}</span></span>{{.Message}}
 <div class="gonb-err-context">
 {{.HtmlContext}}
 </div>

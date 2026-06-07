@@ -54,8 +54,8 @@ var (
 			"are created by `%with_input` special command and with `gonbui.RequestInput()`. The "+
 			"comma-separated list of values will be fed everytime such an input box is created. ")
 
-	flagExportHTML = flag.Bool("export_html", false,
-		"If set to true, it will export the notebook as HTML after execution.")
+	flagExportHTML = flag.String("export_html", "",
+		"If set to a file path, it will export the notebook as HTML after execution to the specified path.")
 )
 
 func main() {
@@ -116,7 +116,7 @@ func main() {
 				panic(e)
 			}
 		}()
-		executeNotebook(url, notebookPath, inputBoxes)
+		executeNotebook(url, inputBoxes)
 	}()
 
 	// Wait for `jupyter notebook` to finish.
@@ -272,7 +272,7 @@ func startJupyterNotebook() {
 }
 
 // Notebook instrumenting using go-rod.
-func executeNotebook(url string, notebookPath string, inputBoxes []string) {
+func executeNotebook(url string, inputBoxes []string) {
 	// Use system's Google Chrome is available, for sandboxing:
 	var controlURL string
 	chromePath, err := exec.LookPath("google-chrome")
@@ -335,8 +335,8 @@ func executeNotebook(url string, notebookPath string, inputBoxes []string) {
 	page.MustWaitStable()
 	klog.V(1).Infof("page.MustWaitStable() finished.")
 
-	if *flagExportHTML {
-		exportHTML(page, notebookPath)
+	if *flagExportHTML != "" {
+		exportHTML(page, *flagExportHTML)
 	}
 
 	if *flagScreenshot != "" {
@@ -348,8 +348,8 @@ func executeNotebook(url string, notebookPath string, inputBoxes []string) {
 }
 
 // exportHTML triggers the HTML export command on the page, waits for the download to complete,
-// and saves the file in the same directory as the notebook but with the extension changed to ".html".
-func exportHTML(page *rod.Page, notebookPath string) {
+// and saves the file to the specified targetHTMLPath.
+func exportHTML(page *rod.Page, targetHTMLPath string) {
 	// Set download behavior first.
 	tempDownloadDir, err := os.MkdirTemp("", "nbexec-html-*")
 	if err != nil {
@@ -407,12 +407,16 @@ func exportHTML(page *rod.Page, notebookPath string) {
 		panicf("Timed out waiting for HTML export download")
 	}
 
-	targetHTMLPath := strings.TrimSuffix(notebookPath, filepath.Ext(notebookPath)) + ".html"
-	klog.Infof("Moving exported HTML from %q to %q", downloadedFile, targetHTMLPath)
-
-	err = moveFile(downloadedFile, targetHTMLPath)
+	targetAbsPath, err := filepath.Abs(targetHTMLPath)
 	if err != nil {
-		panicf("Failed to move exported HTML file to %q: %v", targetHTMLPath, err)
+		panicf("Failed to resolve absolute path for %q: %v", targetHTMLPath, err)
+	}
+
+	klog.Infof("Moving exported HTML from %q to %q", downloadedFile, targetAbsPath)
+
+	err = moveFile(downloadedFile, targetAbsPath)
+	if err != nil {
+		panicf("Failed to move exported HTML file to %q: %v", targetAbsPath, err)
 	}
 }
 

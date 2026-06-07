@@ -98,11 +98,12 @@ func inBetween[T constraints.Ordered](x, from, to T) T {
 // optionally with context about the error.
 // It is created by `State.parseErrorLine()`.
 type errorLine struct {
-	HasContext  bool   // Whether this line has a context, usually displayed as a mouse-over content.
-	Message     string // Error message, what comes after the `file:line_number:col_number`
-	Location    string // `file:line_number:col_number` prefix, only if HasContext == true.
-	HtmlContext string // HtmlContext to display on a mouse-over window, only if HasContext == true.
-	RawContext  string // RawContext to display on a traceback, only if HasContext == true: this is text only, sent back to Jupyter
+	HasContext   bool   // Whether this line has a context, usually displayed as a mouse-over content.
+	Message      string // Error message, what comes after the `file:line_number:col_number`
+	Location     string // `file:line_number:col_number` prefix, only if HasContext == true.
+	HtmlContext  string // HtmlContext to display on a mouse-over window, only if HasContext == true.
+	RawContext   string // RawContext to display on a traceback, only if HasContext == true: this is text only, sent back to Jupyter
+	LeadingSpace string // Any leading space for alignment (e.g. in stack traces)
 
 	HasCellInfo bool
 	CellInfo    string
@@ -122,7 +123,7 @@ func (e *errorLine) getTraceback() (message string) {
 
 func (e *errorLine) getCol() int {
 	split := strings.Split(e.Location, ":")
-	if split[0] != "" {
+	if len(split) >= 3 && split[0] != "" {
 		col, _ := strconv.Atoi(split[2])
 		return col
 	}
@@ -140,23 +141,36 @@ func (e *errorLine) getColLine() string {
 }
 
 var reFileLinePrefix = regexp.MustCompile(`(^.*main(_test)?\.go:(\d+):(\d+): )(.+)$`)
+var reStackTraceLine = regexp.MustCompile(`(^\s*)(.*main(?:_test)?\.go):(\d+)(.*)$`)
 
 // parseErrorLine parses an err line, and given current line to cell mapping, creates context for the err
 // if available.
 func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdAndLine []CellIdAndLine) (l errorLine) {
 	l.HasContext = false
-	matches := reFileLinePrefix.FindStringSubmatch(lineStr)
-	if len(codeLines) == 0 || len(matches) != 6 {
-		l.HasContext = false
+	if len(codeLines) == 0 {
 		l.Message = lineStr
 		return
 	}
 
-	l.HasContext = true
-	l.Message = matches[5]
-	l.Location = matches[1]
+	var lineNum int
+	var matches []string
 
-	lineNum, _ := strconv.Atoi(matches[3])
+	if matches = reFileLinePrefix.FindStringSubmatch(lineStr); len(matches) == 6 {
+		l.HasContext = true
+		l.Message = matches[5]
+		l.Location = matches[1]
+		lineNum, _ = strconv.Atoi(matches[3])
+	} else if matches = reStackTraceLine.FindStringSubmatch(lineStr); len(matches) == 5 {
+		l.HasContext = true
+		l.Message = matches[4]
+		l.Location = fmt.Sprintf("%s:%s", matches[2], matches[3])
+		l.LeadingSpace = matches[1]
+		lineNum, _ = strconv.Atoi(matches[3])
+	} else {
+		l.Message = lineStr
+		return
+	}
+
 	lineNum -= 1 // Error messages start at line 1 (as opposed to 0)
 	//colNum, _ := strconv.Atoi(matches[4])
 	fromLines := lineNum - LinesForErrorContext
@@ -181,7 +195,7 @@ func (s *State) parseErrorLine(lineStr string, codeLines []string, fileToCellIdA
 	l.RawContext = strings.Join(partsRaw, "")
 
 	// Gather CellInfo
-	if lineNum > 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {
+	if lineNum >= 0 && lineNum < len(fileToCellIdAndLine) && fileToCellIdAndLine[lineNum].Line != NoCursorLine {
 		cell := fileToCellIdAndLine[lineNum]
 		l.HasCellInfo = true
 		// Notice GoNB store Lines starting at 0, but Jupyter display Lines starting at 1, so we add 1 here.

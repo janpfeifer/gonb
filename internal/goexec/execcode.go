@@ -204,23 +204,43 @@ func (s *State) Execute(msg kernel.Message, fileToCellIdAndLine []CellIdAndLine)
 
 	// Create stdout and stderr pipes that write to Jupyter stdout/stderr streams.
 	stdout := kernel.NewJupyterStreamWriter(msg, kernel.StreamStdout)
-	stderrWithAnnotator := newJupyterStackTraceMapperWriter(msg, "stderr", s.CodePath(), fileToCellIdAndLine)
+	stderrWithAnnotator := newJupyterStackTraceMapperWriter(msg, "stderr", s, fileToCellIdAndLine)
+	var stderr io.Writer = stderrWithAnnotator
 	if s.CaptureFile != nil {
 		stdout = io.MultiWriter(stdout, s.CaptureFile)
-		stderrWithAnnotator = io.MultiWriter(stderrWithAnnotator, s.CaptureFile)
+		stderr = io.MultiWriter(stderr, s.CaptureFile)
 	}
 
-	err := jpyexec.New(msg, s.BinaryPath(), args...).
+	jpyExec := jpyexec.New(msg, s.BinaryPath(), args...).
 		UseNamedPipes(s.Comms).
 		ExecutionCount(msg.Kernel().ExecCounter).
 		WithStdout(stdout).
-		WithStderr(stderrWithAnnotator).
-		CaptureDisplayDataOutput(s.CaptureFile).
-		Exec()
+		WithStderr(stderr).
+		CaptureDisplayDataOutput(s.CaptureFile)
+
+	err := jpyExec.Exec()
 	if err != nil {
 		klog.Infof("goexec.Execute(): failed to run the compiled cell: %+v", msg)
+		return err
 	}
-	return err
+
+	if exitErr := jpyExec.ExitError(); exitErr != nil {
+		if !s.rawError {
+			if annotator, ok := stderrWithAnnotator.(*jupyterStackTraceMapperWriter); ok {
+				if annotator.lineBuffer.Len() > 0 {
+					lineStr := strings.TrimRight(annotator.lineBuffer.String(), "\n\r")
+					annotator.processLine(lineStr)
+					annotator.lineBuffer.Reset()
+				}
+				if len(annotator.errorLines) > 0 {
+					annotator.state.DisplayErrorLines(msg, annotator.errorLines, exitErr)
+				}
+			}
+		}
+		return exitErr
+	}
+
+	return nil
 }
 
 // Compile compiles the currently generate go files in State.TempDir to a binary named State.Package.
@@ -352,25 +372,32 @@ can install it from the notebook with:
 // jupyterStackTraceMapperWriter implements an io.Writer that maps stack traces to their corresponding
 // cell Lines, to facilitate debugging.
 type jupyterStackTraceMapperWriter struct {
+	msg                 kernel.Message
 	jupyterWriter       io.Writer
 	mainPath            string
 	fileToCellIdAndLine []CellIdAndLine
 	regexpMainPath      *regexp.Regexp
+	state               *State
+	codeLines           []string
+	errorLines          []errorLine
+	lineBuffer          bytes.Buffer
 }
 
 // newJupyterStackTraceMapperWriter creates an io.Writer that allows for mapping of references to the `main.go`
 // to its corresponding position in a cell.
-func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, mainPath string, fileToCellIdAndLine []CellIdAndLine) io.Writer {
-	r, err := regexp.Compile(fmt.Sprintf("%s:(\\d+)", regexp.QuoteMeta(mainPath)))
+func newJupyterStackTraceMapperWriter(msg kernel.Message, stream string, s *State, fileToCellIdAndLine []CellIdAndLine) io.Writer {
+	r, err := regexp.Compile(fmt.Sprintf("%s:(\\d+)", regexp.QuoteMeta(s.CodePath())))
 	if err != nil {
-		klog.Errorf("Failed to compile expression to match %q: won't be able to map stack traces with cell Lines", mainPath)
+		klog.Errorf("Failed to compile expression to match %q: won't be able to map stack traces with cell Lines", s.CodePath())
 	}
 
 	return &jupyterStackTraceMapperWriter{
+		msg:                 msg,
 		jupyterWriter:       kernel.NewJupyterStreamWriter(msg, stream),
-		mainPath:            mainPath,
+		mainPath:            s.CodePath(),
 		regexpMainPath:      r,
 		fileToCellIdAndLine: fileToCellIdAndLine,
+		state:               s,
 	}
 }
 
@@ -380,7 +407,7 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 	if w.regexpMainPath == nil {
 		return w.jupyterWriter.Write(p)
 	}
-	p = w.regexpMainPath.ReplaceAllFunc(p, func(match []byte) []byte {
+	pAnnotated := w.regexpMainPath.ReplaceAllFunc(p, func(match []byte) []byte {
 		klog.V(2).Infof("\tFiltering stderr: %s", match)
 		lineNumStr := strings.Split(string(match), ":")[1]
 		lineNum, err := strconv.Atoi(lineNumStr)
@@ -394,6 +421,7 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 			return match
 		}
 		cellId, cellLineNum := w.fileToCellIdAndLine[lineNum].Id, w.fileToCellIdAndLine[lineNum].Line
+
 		var cellText []byte
 		const invertColor = "\033[7m"
 		const resetColor = "\033[0m"
@@ -406,12 +434,50 @@ func (w *jupyterStackTraceMapperWriter) Write(p []byte) (int, error) {
 		res := bytes.Join([][]byte{cellText, match}, nil)
 		return res
 	})
-	_, err := w.jupyterWriter.Write(p)
+	_, err := w.jupyterWriter.Write(pAnnotated)
 	if err != nil {
 		return 0, err
 	}
-	// Return the original number of bytes: since we change what is written, we actually write more bytes.
+
+	w.lineBuffer.Write(p)
+	for {
+		lineBytes, err := w.lineBuffer.ReadBytes('\n')
+		if err != nil {
+			if len(lineBytes) > 0 {
+				w.lineBuffer.Write(lineBytes)
+			}
+			break
+		}
+		lineStr := strings.TrimRight(string(lineBytes), "\n\r")
+		w.processLine(lineStr)
+	}
+
 	return n, nil
+}
+
+func (w *jupyterStackTraceMapperWriter) processLine(lineStr string) {
+	if len(w.codeLines) == 0 {
+		mainGo, err := w.state.readMainGo()
+		if err == nil {
+			w.codeLines = strings.Split(mainGo, "\n")
+		} else {
+			klog.Errorf("Failed to read main.go: %v", err)
+			return
+		}
+	}
+	parsed := w.state.parseErrorLine(lineStr, w.codeLines, w.fileToCellIdAndLine)
+	if parsed.HasContext && parsed.HasCellInfo {
+		alreadyCollected := false
+		for _, l := range w.errorLines {
+			if l.Location == parsed.Location {
+				alreadyCollected = true
+				break
+			}
+		}
+		if !alreadyCollected {
+			w.errorLines = append(w.errorLines, parsed)
+		}
+	}
 }
 
 const (

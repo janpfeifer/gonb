@@ -356,7 +356,7 @@ func TestGoWork(t *testing.T) {
 				Separator,
 				"List of files/directories being tracked",
 				"",
-				"/tmp/gonb_tests_gowork_",
+				"/tmp/gonb",
 				Separator,
 			),
 			Match(
@@ -765,3 +765,44 @@ func TestCapture(t *testing.T) {
 	require.NoError(t, os.Remove(f.Name()))
 	clearNotebook(t, notebook)
 }
+
+func TestErrors(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration (nbconvert) test for short tests.")
+		return
+	}
+	notebook := "errors"
+	f := executeNotebook(t, notebook)
+	err := Check(f,
+		Sequence(
+			// Working cell (Cell 1)
+			Match(
+				OutputLine(1),
+				Separator,
+				"Hello World",
+				Separator,
+			),
+
+			// Cell 2 should report compilation error with correct cell/line number.
+			Match(
+				OutputLine(2),
+				Separator,
+				"Cell++[++2++]++: Line 2",
+			),
+
+			// Cell 3 should report runtime crash with stack trace matching Cell [3] Line 8.
+			Match(
+				OutputLine(3),
+				Separator,
+			),
+			Match("Stuck in Switzerland"),
+			Match("Cell++[++3++]++: Line 8"),
+			Match("exit status 1"),
+		), *flagPrintNotebook)
+
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	require.NoError(t, os.Remove(f.Name()))
+	clearNotebook(t, notebook)
+}
+

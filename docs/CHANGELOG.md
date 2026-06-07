@@ -3,6 +3,7 @@
 ## Next: v0.11.4
 * `nbexec`: Added `-export_html` flag to export the executed notebook to HTML at a specified target path.
 * `nbexec`: Added `-check_cells` flag to check and report cells that failed execution, exiting with code 1 if any failure occurs.
+* Fixed an issue where the Cell/Line or errors were not being displayed correctly.
 
 ## v0.11.3, 2025/12/15 Added -go_work flag
 

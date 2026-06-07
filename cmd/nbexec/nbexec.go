@@ -4,20 +4,22 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/janpfeifer/gonb/common"
 	"github.com/janpfeifer/must"
-	"io"
 	"k8s.io/klog/v2"
-	"net"
-	"os"
-	"os/exec"
-	"path"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var (
@@ -51,6 +53,9 @@ var (
 		"List of inputs to feed input boxes created for Stdin in Jupyter. In GoNB these "+
 			"are created by `%with_input` special command and with `gonbui.RequestInput()`. The "+
 			"comma-separated list of values will be fed everytime such an input box is created. ")
+
+	flagExportHTML = flag.Bool("export_html", false,
+		"If set to true, it will export the notebook as HTML after execution.")
 )
 
 func main() {
@@ -111,7 +116,7 @@ func main() {
 				panic(e)
 			}
 		}()
-		executeNotebook(url, inputBoxes)
+		executeNotebook(url, notebookPath, inputBoxes)
 	}()
 
 	// Wait for `jupyter notebook` to finish.
@@ -267,7 +272,7 @@ func startJupyterNotebook() {
 }
 
 // Notebook instrumenting using go-rod.
-func executeNotebook(url string, inputBoxes []string) {
+func executeNotebook(url string, notebookPath string, inputBoxes []string) {
 	// Use system's Google Chrome is available, for sandboxing:
 	var controlURL string
 	chromePath, err := exec.LookPath("google-chrome")
@@ -316,7 +321,9 @@ func executeNotebook(url string, inputBoxes []string) {
 }`)
 		klog.V(1).Infof("Started Javascript to execute cells.")
 		checkForInputBoxes(page, inputBoxes)
-		klog.V(1).Infof("Notebook execution finished.")
+		page.MustWaitStable()
+		page.MustWaitDOMStable()
+		klog.V(1).Infof("DOM stabilized after execution start.")
 	}
 
 	page.MustEval(`() => {
@@ -328,12 +335,85 @@ func executeNotebook(url string, inputBoxes []string) {
 	page.MustWaitStable()
 	klog.V(1).Infof("page.MustWaitStable() finished.")
 
+	if *flagExportHTML {
+		exportHTML(page, notebookPath)
+	}
+
 	if *flagScreenshot != "" {
 		klog.Infof("Screenshot to %q", *flagScreenshot)
 		page.MustScreenshot(*flagScreenshot)
 	}
 
 	//common.Pause()
+}
+
+// exportHTML triggers the HTML export command on the page, waits for the download to complete,
+// and saves the file in the same directory as the notebook but with the extension changed to ".html".
+func exportHTML(page *rod.Page, notebookPath string) {
+	// Set download behavior first.
+	tempDownloadDir, err := os.MkdirTemp("", "nbexec-html-*")
+	if err != nil {
+		panicf("Failed to create temporary directory for HTML export: %v", err)
+	}
+	defer os.RemoveAll(tempDownloadDir)
+
+	klog.V(1).Infof("Setting download path to %q", tempDownloadDir)
+	err = proto.PageSetDownloadBehavior{
+		Behavior:     proto.PageSetDownloadBehaviorBehaviorAllow,
+		DownloadPath: tempDownloadDir,
+	}.Call(page)
+	if err != nil {
+		panicf("Failed to set download behavior: %v", err)
+	}
+
+	// Trigger export command.
+	klog.V(1).Info("Exporting notebook to HTML")
+	page.MustEval(`() => {
+		let jupyterapp = globalThis.jupyterapp;
+		jupyterapp.commands.execute("notebook:export-to-format", { format: "html" }).
+			then(() => { console.log("Finished exporting HTML!"); });
+	}`)
+
+	// Wait for the HTML file to be fully downloaded.
+	var downloadedFile string
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		entries, err := os.ReadDir(tempDownloadDir)
+		if err != nil {
+			panicf("Failed to read temporary download directory: %v", err)
+		}
+
+		hasCrdownload := false
+		var htmlFiles []string
+		for _, entry := range entries {
+			name := entry.Name()
+			if strings.HasSuffix(name, ".crdownload") {
+				hasCrdownload = true
+				break
+			}
+			if strings.HasSuffix(name, ".html") {
+				htmlFiles = append(htmlFiles, name)
+			}
+		}
+
+		if !hasCrdownload && len(htmlFiles) > 0 {
+			downloadedFile = filepath.Join(tempDownloadDir, htmlFiles[0])
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if downloadedFile == "" {
+		panicf("Timed out waiting for HTML export download")
+	}
+
+	targetHTMLPath := strings.TrimSuffix(notebookPath, filepath.Ext(notebookPath)) + ".html"
+	klog.Infof("Moving exported HTML from %q to %q", downloadedFile, targetHTMLPath)
+
+	err = moveFile(downloadedFile, targetHTMLPath)
+	if err != nil {
+		panicf("Failed to move exported HTML file to %q: %v", targetHTMLPath, err)
+	}
 }
 
 const maxInputBoxes = 20 // After those many repeats, give up.
@@ -367,7 +447,7 @@ func checkForInputBoxes(page *rod.Page, valuesToFeed []string) {
 					return
 				}
 				time.Sleep(time.Second) // Poll every second.
-				klog.V(1).Infof("Checking for input boxes")
+				klog.V(2).Infof("Checking for input boxes")
 				if page.MustEval(fmt.Sprintf(`() => {
 	let inputBox = globalThis.document.querySelector('input.jp-Stdin-input');
 	if (inputBox === null) {
@@ -399,4 +479,33 @@ func checkForInputBoxes(page *rod.Page, valuesToFeed []string) {
 		}
 	}
 	panicf("Max number of input box values %d fed, assuming an infinite loop, and stopping!", maxInputBoxes)
+}
+
+// moveFile moves a file from src to dst. It handles cross-filesystem moves.
+func moveFile(src, dst string) error {
+	err := os.Rename(src, dst)
+	if err == nil {
+		return nil
+	}
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return err
+	}
+
+	srcFile.Close()
+	dstFile.Close()
+
+	return os.Remove(src)
 }

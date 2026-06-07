@@ -47,7 +47,7 @@ RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt insta
 #######################################################################################################
 # Go and GoNB Libraries
 #######################################################################################################
-ARG GO_VERSION=1.24.3
+ARG GO_VERSION=1.26.4
 ENV GOROOT=/usr/local/go
 ENV GOPATH=$HOME/go
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
@@ -84,7 +84,7 @@ WORKDIR ${HOME}
 RUN git clone 'https://github.com/janpfeifer/gonb.git'
 WORKDIR ${HOME}/gonb
 RUN go install . && \
-    gonb --install
+    gonb -install -go_work=$(pwd)
 
 #######################################################################################################
 # Prepare directory where Jupyter Lab will run, with the notebooks we want to demo

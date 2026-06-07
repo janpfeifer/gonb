@@ -56,6 +56,9 @@ var (
 
 	flagExportHTML = flag.String("export_html", "",
 		"If set to a file path, it will export the notebook as HTML after execution to the specified path.")
+
+	flagCheckCells = flag.Bool("check_cells", false,
+		"If set to true, it will check and report cells that failed execution, exiting with code 1 if any failed.")
 )
 
 func main() {
@@ -70,7 +73,7 @@ func main() {
 	klog.V(1).Info("Starting")
 
 	// Sanity checking.
-	if strings.Index(*flagNotebook, "/../") >= 0 ||
+	if strings.Contains(*flagNotebook, "/../") ||
 		strings.Index(*flagNotebook, "../") == 0 ||
 		strings.Index(*flagNotebook, "/..") == len(*flagNotebook)-3 {
 		klog.Fatalf("Invalid value for notebook -n=%q: cannot use \"..\" in path", *flagNotebook)
@@ -121,6 +124,10 @@ func main() {
 
 	// Wait for `jupyter notebook` to finish.
 	jupyterDone.Wait()
+
+	if *flagCheckCells {
+		checkCells(notebookPath)
+	}
 }
 
 // Jupyter Notebook execution related variables.
@@ -315,10 +322,10 @@ func executeNotebook(url string, inputBoxes []string) {
 		// Execute all cells (if --clear is not set)
 		klog.V(1).Info("Executing run-all")
 		page.MustEval(`() => {
-	let jupyterapp = globalThis.jupyterapp;
-	jupyterapp.commands.execute("runmenu:run-all", null).
-		then(() => { console.log("Finished executing!"); });
-}`)
+		let jupyterapp = globalThis.jupyterapp;
+		jupyterapp.commands.execute("runmenu:run-all", null).
+			then(() => { console.log("Finished executing!"); });
+	}`)
 		klog.V(1).Infof("Started Javascript to execute cells.")
 		checkForInputBoxes(page, inputBoxes)
 		page.MustWaitStable()

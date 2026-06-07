@@ -61,6 +61,10 @@ var templateErrorReport = template.Must(template.New("error_report").Parse(`
 	padding-left: 0.2em;
 	padding-right: 0.2em;
 }
+.jp-RenderedHTML:has(.jp-RenderedText[data-mime-type="application/vnd.jupyter.stderr"]) {
+	padding: 0 !important;
+	margin: 0 !important;
+}
 </style>
 <div class="jp-RenderedText" data-mime-type="application/vnd.jupyter.stderr" style="font-family: monospace;">
 {{range .Lines}}

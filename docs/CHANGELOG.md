@@ -1,5 +1,9 @@
 # GoNB Changelog
 
+## Next: v0.11.4
+* `nbexec`: Added `-export_html` flag to export the executed notebook to HTML at a specified target path.
+* `nbexec`: Added `-check_cells` flag to check and report cells that failed execution, exiting with code 1 if any failure occurs.
+
 ## v0.11.3, 2025/12/15 Added -go_work flag
 
 * Added `-go_work` flag that also works with the installer `gonb -install`. 

@@ -202,7 +202,8 @@ func (d *Declarations) RenderFunctions(w *WriterWithCursor, fileToCellIdAndLine 
 		funcDecl := d.Functions[key]
 
 		// First render the corresponding comments.
-		tmpCursor, fileToCellIdAndLine := funcDecl.Comments.Render(w, fileToCellIdAndLine)
+		var tmpCursor Cursor
+		tmpCursor, fileToCellIdAndLine = funcDecl.Comments.Render(w, fileToCellIdAndLine)
 		if tmpCursor != NoCursor {
 			// Cursor in comment, register it.
 			cursor = tmpCursor

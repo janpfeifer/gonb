@@ -2,10 +2,12 @@ package goplsclient
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/janpfeifer/gonb/internal/util"
@@ -18,6 +20,29 @@ import (
 // as a server for the duration of the kernel.
 
 var StartTimeout = 30 * time.Second
+
+// resolveWindowsGoplsAddr resolves the gopls address for Windows.
+// If addr is "127.0.0.1:0", it finds a free port and updates c.address
+// so the client knows which port to connect to.
+func resolveWindowsGoplsAddr(c *Client, addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil || port != "0" {
+		// Not a :0 address, use as-is with tcp; prefix.
+		return "tcp;" + addr
+	}
+	// Find a free port by listening on :0 and closing.
+	listener, err := net.Listen("tcp", host+":0")
+	if err != nil {
+		klog.Warningf("gopls: failed to find free port, using :0: %v", err)
+		return "tcp;" + addr
+	}
+	freePort := listener.Addr().(*net.TCPAddr).Port
+	_ = listener.Close()
+
+	// Update client address to the actual port so Connect() can find gopls.
+	c.address = fmt.Sprintf("%s:%d", host, freePort)
+	return fmt.Sprintf("tcp;%s:%d", host, freePort)
+}
 
 // Start `gopls` as a server, on `Client.Address()` port. It is started
 // asynchronously (so `Start()` returns immediately) and is followed up
@@ -44,14 +69,12 @@ func (c *Client) Start() error {
 	addr := c.Address()
 	if strings.HasPrefix(addr, "/") {
 		addr = "unix;" + addr
+	} else if runtime.GOOS == "windows" {
+		addr = resolveWindowsGoplsAddr(c, addr)
 	}
 	c.goplsExec = exec.Command(goplsPath, "-listen", addr)
 
-	// Start on its own process group, to avoid receiving the `sigint` that
-	// the kernel receives from Jupyter and dying.
-	// Not sure on the status of MacOS:
-	// https://stackoverflow.com/questions/43364958/start-command-with-new-process-group-id-golang
-	c.goplsExec.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pgid: 0}
+	setNewProcessGroup(c.goplsExec)
 	c.goplsExec.Dir = c.dir
 	klog.Infof("Executing %q", c.goplsExec)
 	err = c.goplsExec.Start()

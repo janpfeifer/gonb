@@ -63,6 +63,9 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 
 	// Jupyter configuration directory for gonb.
 	home := os.Getenv("HOME")
+	if home == "" {
+		home = os.Getenv("USERPROFILE")
+	}
 	jupyterDataDir := os.Getenv(JupyterDataDirEnv)
 	if jupyterDataDir == "" {
 		switch runtime.GOOS {
@@ -70,6 +73,12 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 			jupyterDataDir = path.Join(home, ".local/share/jupyter")
 		case "darwin":
 			jupyterDataDir = path.Join(home, "Library/Jupyter")
+		case "windows":
+			appData := os.Getenv("APPDATA")
+			if appData == "" {
+				appData = path.Join(home, "AppData", "Roaming")
+			}
+			jupyterDataDir = path.Join(appData, "jupyter")
 		default:
 			return errors.Errorf("Unknown OS %q: not sure where to install GoNB kernel -- set the environment %q to force a location.", runtime.GOOS, JupyterDataDirEnv)
 		}
@@ -83,11 +92,16 @@ func Install(extraArgs []string, forceDeps, forceCopy bool) error {
 	// of Go binary. We then make a copy of the binary (since it will be deleted) to the configuration
 	// directory -- otherwise we just point to the current binary.
 	cacheDir, cacheErr := os.UserCacheDir()
+	tmpDir := os.TempDir()
 	if forceCopy ||
 		strings.HasPrefix(os.Args[0], "/tmp/") ||
 		strings.HasPrefix(os.Args[0], "/var/folders") ||
+		(tmpDir != "" && strings.HasPrefix(os.Args[0], tmpDir)) ||
 		(cacheErr == nil && strings.HasPrefix(os.Args[0], cacheDir)) {
 		newBinary := path.Join(kernelDir, "gonb")
+		if runtime.GOOS == "windows" {
+			newBinary = path.Join(kernelDir, "gonb.exe")
+		}
 		// Move the previous version out of the way.
 		if _, err := os.Stat(newBinary); err == nil {
 			err = os.Rename(newBinary, newBinary+"~")

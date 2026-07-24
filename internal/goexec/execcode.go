@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -151,7 +152,11 @@ func (s *State) PostExecuteCell() {
 
 // BinaryPath is the path to the generated binary file.
 func (s *State) BinaryPath() string {
-	return path.Join(s.TempDir, s.Package)
+	binaryPath := path.Join(s.TempDir, s.Package)
+	if runtime.GOOS == "windows" {
+		binaryPath += ".exe"
+	}
+	return binaryPath
 }
 
 const (

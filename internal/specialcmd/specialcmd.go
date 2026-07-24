@@ -11,6 +11,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -338,32 +339,38 @@ func execSpecialConfig(msg kernel.Message, goExec *goexec.State, cmdStr string, 
 	return nil
 }
 
+// shellCommand returns the OS shell and its command flag for executing a command string.
+func shellCommand() (shell string, argFlag string) {
+	if runtime.GOOS == "windows" {
+		return "cmd.exe", "/c"
+	}
+	return "/bin/bash", "-c"
+}
+
 // execShell executes `cmdStr` properly redirecting outputs to display in the notebook.
 //
 // It only returns errors for system errors that will lead to the kernel restart. Syntax errors
 // on the command themselves are simply reported back to jupyter and are not returned here.
 func execShell(msg kernel.Message, goExec *goexec.State, cmdStr string, status *cellStatus) error {
-	var execDir string // Default "", means current directory.
+	var execDir string
 	if cmdStr[0] == '*' {
 		cmdStr = cmdStr[1:]
 		execDir = goExec.TempDir
 	}
+	shell, argFlag := shellCommand()
+	execBase := jpyexec.New(msg, shell, argFlag, cmdStr).
+			ExecutionCount(msg.Kernel().ExecCounter).
+			InDir(execDir)
 	if status.withInputs {
 		status.withInputs = false
 		status.withPassword = false
-		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
-			ExecutionCount(msg.Kernel().ExecCounter).
-			InDir(execDir).WithInputs(MillisecondsWaitForInput).Exec()
+		return execBase.WithInputs(MillisecondsWaitForInput).Exec()
 	} else if status.withPassword {
 		status.withInputs = false
 		status.withPassword = false
-		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
-			ExecutionCount(msg.Kernel().ExecCounter).
-			InDir(execDir).WithPassword(MillisecondsWaitForInput).Exec()
+		return execBase.WithPassword(MillisecondsWaitForInput).Exec()
 	} else {
-		return jpyexec.New(msg, "/bin/bash", "-c", cmdStr).
-			ExecutionCount(msg.Kernel().ExecCounter).
-			InDir(execDir).Exec()
+		return execBase.Exec()
 	}
 }
 

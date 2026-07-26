@@ -4,8 +4,11 @@ package goplsclient
 
 import (
 	"os/exec"
+	"syscall"
 )
 
-// setNewProcessGroup is a no-op for Windows, it doesn't support process groups.
 func setNewProcessGroup(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
+	}
 }

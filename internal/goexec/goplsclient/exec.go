@@ -21,25 +21,30 @@ import (
 
 var StartTimeout = 30 * time.Second
 
+// GetFreePort asks the OS for an available port on localhost.
+// It works on dual-stack IPv4/IPv6 on the loopback interface.
+func GetFreePort() (int, error) {
+	l, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
 // resolveWindowsGoplsAddr resolves the gopls address for Windows.
 // If addr is "127.0.0.1:0", it finds a free port and updates c.address
 // so the client knows which port to connect to.
 func resolveWindowsGoplsAddr(c *Client, addr string) string {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil || port != "0" {
-		// Not a :0 address, use as-is with tcp; prefix.
 		return "tcp;" + addr
 	}
-	// Find a free port by listening on :0 and closing.
-	listener, err := net.Listen("tcp", host+":0")
+	freePort, err := GetFreePort()
 	if err != nil {
 		klog.Warningf("gopls: failed to find free port, using :0: %v", err)
 		return "tcp;" + addr
 	}
-	freePort := listener.Addr().(*net.TCPAddr).Port
-	_ = listener.Close()
-
-	// Update client address to the actual port so Connect() can find gopls.
 	c.address = fmt.Sprintf("%s:%d", host, freePort)
 	return fmt.Sprintf("tcp;%s:%d", host, freePort)
 }

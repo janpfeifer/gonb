@@ -12,12 +12,13 @@
 ## For a quick start, see the [**tutorial** 🧭](examples/tutorial.ipynb)
 
 
-> **🚀 NEW 🚀**: [Positron Go (github.com/dfalbel/positron-go)](https://github.com/dfalbel/positron-go):
-> A [Positron](https://positron.posit.co/) extension that adds support for GoNB notebooks.
 
 ## ✨ Highlights:
 
 <img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
+
+**🚀 NEW 🚀**: Windows (not WSL) support is working! Thanks to @StarWindv. (It's fresh from the oven, so there may be
+some kinks -- please report any issues!).
 
 * Auto-complete and contextual help while coding.
 * Rich content display: HTML, markdown (with latex), images, javascript, svg, videos, etc.
@@ -41,6 +42,8 @@
 * Includes a [pre-built docker](https://hub.docker.com/r/janpfeifer/gonb_jupyterlab), that includes JupyterLab and GoNB, that can be used to easily try it out. Alternatively, there is a [Google's Colab](https://colab.research.google.com/drive/1vUd3SSoOm2K6UQLnkJQursZZx4CaIT_1?usp=sharing), that bootstraps **GoNB** and can be used online.
 * Online help and much more, see `%help`.
 * Compile and execute the Go code as WASM: allows one to do interactive widgets in notebooks. See `%wasm` (EXPERIMENTAL).
+* [Positron Go (github.com/dfalbel/positron-go)](https://github.com/dfalbel/positron-go):
+  A [Positron](https://positron.posit.co/) extension that adds support for GoNB notebooks.
 
 ## 👁️‍🗨️ Examples:
 

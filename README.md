@@ -15,7 +15,7 @@
 
 ## ✨ Highlights:
 
-<img align="right" width="480px" src="https://repository-images.githubusercontent.com/599714179/38d0328a-abdb-4f69-9617-6ef136390708">
+<img align="right" width="480px" src="docs/gopher_notebook_2.jpg"/>
 
 **🚀 NEW 🚀**: Windows (not WSL) support is working! Thanks to @StarWindv. (It's fresh from the oven, so there may be
 some kinks -- please report any issues!).

@@ -28,7 +28,7 @@
 #######################################################################################################
 ARG BASE_IMAGE=quay.io/jupyter/base-notebook
 ARG BASE_TAG=latest
-FROM ${BASE_IMAGE}:${BASE_TAG}
+FROM ${BASE_IMAGE}:${BASE_TAG} AS gonb_base
 
 # Update apt and install basic utils that may be helpful for users to install their own dependencies.
 USER root
@@ -43,6 +43,10 @@ RUN usermod -aG apt-users $NB_USER
 # Allow members of the apt-users group to execute only apt-get commands without a password
 RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt-get update, /usr/bin/apt-get install *" >> /etc/sudoers
 RUN echo "%apt-users ALL=(ALL) NOPASSWD: /usr/bin/apt update, /usr/bin/apt install *" >> /etc/sudoers
+
+# Clean up space used by apt, to minimize the size of the image.
+USER root
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 #######################################################################################################
 # Go and GoNB Libraries
@@ -70,16 +74,25 @@ WORKDIR /usr/local
 RUN wget --quiet --output-document=- "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -xvz \
     && go version
 
-# Install GoNB (https://github.com/janpfeifer/gonb) in the user account
+# Install gopls and goimports used by gonb.
 USER $NB_USER
 WORKDIR ${HOME}
 RUN go install golang.org/x/tools/cmd/goimports@latest && \
     go install golang.org/x/tools/gopls@latest
 
+
+#######################################################################################################
+#
+# Stage "gonb_jupyterlab": this is the gonb specific stage.
+#
+#######################################################################################################
+FROM gonb_base AS gonb_jupyterlab
+
+# Install GoNB (https://github.com/janpfeifer/gonb) in the user account
+#
 # Clone from main, build&install gonb binary, and then install it as a kernel in Jupyter.
 # - First introduce the cache-busting argument. This number can be bumped whenever we only want
 #   to rebuild the gonb part.
-ARG CACHEBUST=2
 WORKDIR ${HOME}
 RUN git clone 'https://github.com/janpfeifer/gonb.git'
 WORKDIR ${HOME}/gonb
@@ -104,10 +117,6 @@ COPY --link ./examples/tutorial.ipynb ${NOTEBOOKS}
 #######################################################################################################
 # Finishing touches
 #######################################################################################################
-
-# Clean up space used by apt.
-USER root
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Start-up.
 USER root

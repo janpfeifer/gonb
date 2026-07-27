@@ -76,6 +76,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	} else if strings.HasPrefix(addr, "unix;") {
 		netMethod = "unix"
 		addr = addr[5:]
+	} else if strings.HasPrefix(addr, "tcp;") {
+		netMethod = "tcp"
+		addr = addr[4:]
 	}
 	var err error
 	c.conn, err = net.DialTimeout(netMethod, addr, ConnectTimeout)

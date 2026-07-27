@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"sync"
 	"time"
 
@@ -70,7 +71,7 @@ type Client struct {
 func New(dir string) *Client {
 	c := &Client{
 		dir:          dir,
-		address:      path.Join(dir, "gopls_socket"),
+		address:      defaultAddress(dir),
 		fileVersions: make(map[string]int),
 		fileCache:    make(map[string]*FileData),
 
@@ -78,6 +79,18 @@ func New(dir string) *Client {
 	}
 	return c
 }
+
+// defaultAddress returns the default gopls listen address for the platform.
+// On Unix: a Unix socket path under dir.
+// On Windows: a TCP address on localhost with a random available port.
+func defaultAddress(dir string) string {
+	if runtime.GOOS == "windows" {
+		return "127.0.0.1:0"
+	}
+	return path.Join(dir, "gopls_socket")
+}
+
+
 
 // Address used either to start `gopls` or to connect to it.
 func (c *Client) Address() string { return c.address }

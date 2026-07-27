@@ -17,7 +17,6 @@ import (
 	"os"
 	osexec "os/exec"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -61,6 +60,11 @@ type Executor struct {
 	//
 	// Notice the contents are written raw, without the mime-type.
 	captureDisplayDataOutput io.Writer
+
+	// namedPipeReaderHandle and namedPipeWriterHandle are used on Windows to store
+	// the named pipe server handles before they are converted to *os.File.
+	namedPipeReaderHandle uintptr
+	namedPipeWriterHandle uintptr
 
 	isDone    bool
 	doneChan  chan struct{}
@@ -264,8 +268,7 @@ func (exec *Executor) Exec() error {
 		case <-exec.doneChan:
 			// Normal stop, nothing to do.
 		case <-time.After(WaitToKill):
-			// If process hasn't yet died, kill it.
-			err = cmd.Process.Signal(syscall.SIGKILL)
+			err = cmd.Process.Kill()
 			if err != nil {
 				klog.Errorf("failed to kill process %s (%v): %+v", cmd, cmd.Process, err)
 			}

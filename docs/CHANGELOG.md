@@ -2,8 +2,11 @@
 
 ## v0.11.5, 2026/07/26
 
+* Windows version working (thanks @StarWindv) - see [#194](https://github.com/janpfeifer/gonb/pull/194)
 * Bumped `versiontag.go` that has gone stale.
-* Removed `golang.org/x/exp/constraints` import in the `tutorial.ipynb`.
+* Fixed tutorial ([#195](https://github.com/janpfeifer/gonb/issues/195)): 
+  - Removed `golang.org/x/exp/constraints` import in the `tutorial.ipynb`.
+  - Fixed `go.work` section.
 * Dockerfile: Updated Go version to 1.26.5
 
 ## v0.11.4, 2026/06/07 Improved error reporting / Added nbexec flags

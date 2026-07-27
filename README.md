@@ -15,7 +15,7 @@
 
 ## ✨ Highlights:
 
-<img align="right" width="480px" src="docs/gopher_notebook_2.jpg"/>
+<img align="right" width="33%" src="docs/gopher_notebook_2.jpg"/>
 
 **🚀 NEW 🚀**: Windows (not WSL) support is working! Thanks to @StarWindv. (It's fresh from the oven, so there may be
 some kinks -- please report any issues!).
